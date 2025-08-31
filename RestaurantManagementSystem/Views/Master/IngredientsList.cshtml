@@ -1,0 +1,33 @@
+@model IEnumerable<RestaurantManagementSystem.Models.Ingredients>
+@{
+    ViewData["Title"] = "Ingredients List";
+}
+
+<h2 class="mb-4">Ingredients List</h2>
+<a class="btn btn-success mb-3" asp-controller="Master" asp-action="IngredientsForm">
+    <i class="bi bi-plus-circle"></i> Add New
+</a>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Ingredients Name</th>
+            <th>Display Name</th>
+            <th>Code</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.IngredientsName</td>
+                <td>@item.DisplayName</td>
+                <td>@item.Code</td>
+                <td>
+                    <a class="btn btn-primary btn-sm" asp-controller="Master" asp-action="IngredientsForm" asp-route-id="@item.Id">Edit</a>
+                    <a class="btn btn-info btn-sm" asp-controller="Master" asp-action="IngredientsForm" asp-route-id="@item.Id" asp-route-isView="true">View</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
