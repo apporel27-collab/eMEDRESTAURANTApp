@@ -622,12 +622,12 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     if (reader.Read())
                     {
-                        stats.NewTicketsCount = (int)reader["NewTicketsCount"];
-                        stats.InProgressTicketsCount = (int)reader["InProgressTicketsCount"];
-                        stats.ReadyTicketsCount = (int)reader["ReadyTicketsCount"];
-                        stats.PendingItemsCount = (int)reader["PendingItemsCount"];
-                        stats.ReadyItemsCount = (int)reader["ReadyItemsCount"];
-                        stats.AvgPrepTimeMinutes = Convert.ToDouble(reader["AvgPrepTimeMinutes"]);
+                        stats.NewTicketsCount = reader["NewTicketsCount"] != DBNull.Value ? Convert.ToInt32(reader["NewTicketsCount"]) : 0;
+                        stats.InProgressTicketsCount = reader["InProgressTicketsCount"] != DBNull.Value ? Convert.ToInt32(reader["InProgressTicketsCount"]) : 0;
+                        stats.ReadyTicketsCount = reader["ReadyTicketsCount"] != DBNull.Value ? Convert.ToInt32(reader["ReadyTicketsCount"]) : 0;
+                        stats.PendingItemsCount = reader["PendingItemsCount"] != DBNull.Value ? Convert.ToInt32(reader["PendingItemsCount"]) : 0;
+                        stats.ReadyItemsCount = reader["ReadyItemsCount"] != DBNull.Value ? Convert.ToInt32(reader["ReadyItemsCount"]) : 0;
+                        stats.AvgPrepTimeMinutes = reader["AvgPrepTimeMinutes"] != DBNull.Value ? Convert.ToDouble(reader["AvgPrepTimeMinutes"]) : 0.0;
                     }
                 }
             }
