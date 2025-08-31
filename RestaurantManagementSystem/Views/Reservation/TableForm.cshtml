@@ -1,0 +1,72 @@
+@model RestaurantManagementSystem.Models.Table
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Create New Table" : "Edit Table";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>@ViewData["Title"]</h2>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form asp-action="SaveTable" method="post">
+                <input type="hidden" asp-for="Id" />
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="TableNumber" class="form-label">Table Number</label>
+                            <input asp-for="TableNumber" class="form-control" required maxlength="20" />
+                            <span asp-validation-for="TableNumber" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Capacity" class="form-label">Seating Capacity</label>
+                            <input asp-for="Capacity" class="form-control" type="number" min="1" max="20" required />
+                            <span asp-validation-for="Capacity" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="MinPartySize" class="form-label">Minimum Party Size</label>
+                            <input asp-for="MinPartySize" class="form-control" type="number" min="1" max="20" />
+                            <span asp-validation-for="MinPartySize" class="text-danger"></span>
+                            <small class="form-text text-muted">Minimum party size this table is suitable for</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="Section" class="form-label">Area/Section</label>
+                            <input asp-for="Section" class="form-control" maxlength="50" />
+                            <span asp-validation-for="Section" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Status" class="form-label">Status</label>
+                            <select asp-for="Status" class="form-select" asp-items="Html.GetEnumSelectList<TableStatus>()"></select>
+                            <span asp-validation-for="Status" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input asp-for="IsActive" class="form-check-input" />
+                            <label asp-for="IsActive" class="form-check-label">Active</label>
+                            <span asp-validation-for="IsActive" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <a asp-action="Tables" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

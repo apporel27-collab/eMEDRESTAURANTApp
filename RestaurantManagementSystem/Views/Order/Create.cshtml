@@ -1,0 +1,106 @@
+@model CreateOrderViewModel
+@{
+    ViewData["Title"] = "Create New Order";
+}
+
+<div class="container-fluid p-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>@ViewData["Title"]</h1>
+        <div>
+            <a asp-action="Dashboard" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <form asp-action="Create" method="post">
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="OrderType" class="form-label"></label>
+                                    <select asp-for="OrderType" class="form-select" id="orderType">
+                                        <option value="0">Dine-In</option>
+                                        <option value="1">Takeout</option>
+                                        <option value="2">Delivery</option>
+                                    </select>
+                                    <span asp-validation-for="OrderType" class="text-danger"></span>
+                                </div>
+                                
+                                <div id="tableSection" class="mb-3">
+                                    <label asp-for="TableTurnoverId" class="form-label"></label>
+                                    <div class="form-text mb-2">Select a table with guests already seated, or create a new order without table assignment.</div>
+                                    <select asp-for="TableTurnoverId" class="form-select">
+                                        <option value="">-- No Table --</option>
+                                        @foreach (var table in Model.OccupiedTables)
+                                        {
+                                            <option value="@table.TurnoverId">@table.TableName - @table.GuestName (@table.PartySize guests)</option>
+                                        }
+                                    </select>
+                                    <span asp-validation-for="TableTurnoverId" class="text-danger"></span>
+                                </div>
+                                
+                                <div id="customerSection" class="mb-3 d-none">
+                                    <label asp-for="CustomerName" class="form-label"></label>
+                                    <input asp-for="CustomerName" class="form-control" />
+                                    <span asp-validation-for="CustomerName" class="text-danger"></span>
+                                </div>
+                                
+                                <div id="phoneSection" class="mb-3 d-none">
+                                    <label asp-for="CustomerPhone" class="form-label"></label>
+                                    <input asp-for="CustomerPhone" class="form-control" />
+                                    <span asp-validation-for="CustomerPhone" class="text-danger"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="SpecialInstructions" class="form-label"></label>
+                                    <textarea asp-for="SpecialInstructions" class="form-control" rows="5"></textarea>
+                                    <span asp-validation-for="SpecialInstructions" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Dashboard" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus-circle"></i> Create Order
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function () {
+            // Handle order type change
+            $('#orderType').change(function () {
+                var orderType = $(this).val();
+                
+                if (orderType === '0') { // Dine-In
+                    $('#tableSection').removeClass('d-none');
+                    $('#customerSection').addClass('d-none');
+                    $('#phoneSection').addClass('d-none');
+                } else { // Takeout, Delivery, or Online
+                    $('#tableSection').addClass('d-none');
+                    $('#customerSection').removeClass('d-none');
+                    $('#phoneSection').removeClass('d-none');
+                }
+            });
+            
+            // Trigger change event on page load to set initial state
+            $('#orderType').trigger('change');
+        });
+    </script>
+}

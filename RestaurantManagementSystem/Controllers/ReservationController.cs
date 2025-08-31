@@ -1,0 +1,878 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using RestaurantManagementSystem.Models;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace RestaurantManagementSystem.Controllers
+{
+    public class ReservationController : Controller
+    {
+        private readonly IConfiguration _config;
+
+        public ReservationController(IConfiguration configuration)
+        {
+            _config = configuration;
+        }
+
+        #region Reservations
+
+        // GET: Reservations Dashboard
+        public IActionResult Dashboard()
+        {
+            // Get today's date
+            DateTime today = DateTime.Today;
+
+            // Get reservations for today
+            var todaysReservations = GetReservationsByDate(today);
+            ViewBag.TodaysReservations = todaysReservations;
+
+            // Get tomorrow's reservations
+            var tomorrowsReservations = GetReservationsByDate(today.AddDays(1));
+            ViewBag.TomorrowsReservations = tomorrowsReservations;
+
+            // Get active waitlist
+            var waitlist = GetActiveWaitlist();
+            ViewBag.Waitlist = waitlist;
+
+            // Get all tables with their status
+            var tables = GetAllTables();
+            ViewBag.Tables = tables;
+
+            // Calculate statistics
+            ViewBag.TotalTables = tables.Count;
+            ViewBag.AvailableTables = tables.Count(t => t.Status == TableStatus.Available);
+            ViewBag.OccupiedTables = tables.Count(t => t.Status == TableStatus.Occupied);
+            ViewBag.ReservedTables = tables.Count(t => t.Status == TableStatus.Reserved);
+            ViewBag.WaitlistCount = waitlist.Count;
+            ViewBag.TodaysReservationCount = todaysReservations.Count;
+            ViewBag.PendingArrivals = todaysReservations.Count(r => r.Status == ReservationStatus.Confirmed);
+            ViewBag.SeatedGuests = todaysReservations.Count(r => r.Status == ReservationStatus.Seated);
+
+            return View();
+        }
+
+        // GET: Reservation List
+        public IActionResult List(DateTime? date = null)
+        {
+            // If no date is provided, use today's date
+            date ??= DateTime.Today;
+
+            // Get reservations for the selected date
+            var reservations = GetReservationsByDate(date.Value);
+            
+            // Store the selected date in ViewBag for the view
+            ViewBag.SelectedDate = date.Value;
+
+            return View(reservations);
+        }
+
+        // GET: Create Reservation Form
+        public IActionResult Create()
+        {
+            Reservation model = new Reservation 
+            { 
+                ReservationDate = DateTime.Today,
+                ReservationTime = DateTime.Now.AddHours(1)
+            };
+            
+            // Get available tables for the dropdown
+            ViewBag.Tables = GetAvailableTables(model.ReservationDateTime, model.PartySize);
+            
+            return View("ReservationForm", model);
+        }
+
+        // GET: Edit Reservation Form
+        public IActionResult Edit(int id)
+        {
+            var model = GetReservationById(id);
+            if (model == null)
+            {
+                TempData["ErrorMessage"] = "Reservation not found.";
+                return RedirectToAction("List");
+            }
+
+            // Get available tables for the dropdown, including the currently assigned table
+            ViewBag.Tables = GetAvailableTables(model.ReservationDateTime, model.PartySize, model.TableId);
+
+            return View("ReservationForm", model);
+        }
+
+        // POST: Save Reservation
+        [HttpPost]
+        public IActionResult SaveReservation(Reservation model)
+        {
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Tables = GetAvailableTables(model.ReservationDateTime, model.PartySize, model.TableId);
+                return View("ReservationForm", model);
+            }
+
+            string resultMessage = "";
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                
+                // Check if updating and Id exists
+                if (model.Id > 0)
+                {
+                    using (var checkCmd = new SqlCommand("SELECT COUNT(*) FROM Reservations WHERE Id = @Id", con))
+                    {
+                        checkCmd.Parameters.AddWithValue("@Id", model.Id);
+                        int count = (int)checkCmd.ExecuteScalar();
+                        if (count == 0)
+                        {
+                            TempData["ErrorMessage"] = "Reservation update failed. Id not found.";
+                            return RedirectToAction("List");
+                        }
+                    }
+                }
+
+                using (var cmd = new SqlCommand("usp_UpsertReservation", con))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Id", model.Id == 0 ? 0 : model.Id);
+                    cmd.Parameters.AddWithValue("@GuestName", model.GuestName);
+                    cmd.Parameters.AddWithValue("@PhoneNumber", model.PhoneNumber);
+                    cmd.Parameters.AddWithValue("@EmailAddress", model.EmailAddress ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@PartySize", model.PartySize);
+                    cmd.Parameters.AddWithValue("@ReservationDate", model.ReservationDate.Date);
+                    cmd.Parameters.AddWithValue("@ReservationTime", model.ReservationTime);
+                    cmd.Parameters.AddWithValue("@SpecialRequests", model.SpecialRequests ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Notes", model.Notes ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@TableId", model.TableId ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Status", (int)model.Status);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            resultMessage = reader["Message"].ToString();
+                        }
+                    }
+                }
+
+                // If a table is assigned, update the table status
+                if (model.TableId.HasValue && model.Status == ReservationStatus.Confirmed)
+                {
+                    using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
+                    {
+                        cmd.Parameters.AddWithValue("@Status", (int)TableStatus.Reserved);
+                        cmd.Parameters.AddWithValue("@Id", model.TableId.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            TempData["ResultMessage"] = resultMessage;
+            return RedirectToAction("List", new { date = model.ReservationDate.ToString("yyyy-MM-dd") });
+        }
+
+        // POST: Change Reservation Status
+        [HttpPost]
+        public IActionResult ChangeStatus(int id, ReservationStatus status)
+        {
+            var reservation = GetReservationById(id);
+            if (reservation == null)
+            {
+                TempData["ErrorMessage"] = "Reservation not found.";
+                return RedirectToAction("List");
+            }
+
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand("UPDATE Reservations SET Status = @Status, UpdatedAt = @UpdatedAt WHERE Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Status", (int)status);
+                    cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now);
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Update the table status based on reservation status
+                if (reservation.TableId.HasValue)
+                {
+                    TableStatus tableStatus = status switch
+                    {
+                        ReservationStatus.Seated => TableStatus.Occupied,
+                        ReservationStatus.Completed => TableStatus.Dirty,
+                        ReservationStatus.Cancelled => TableStatus.Available,
+                        ReservationStatus.NoShow => TableStatus.Available,
+                        _ => TableStatus.Reserved
+                    };
+
+                    using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
+                    {
+                        cmd.Parameters.AddWithValue("@Status", (int)tableStatus);
+                        cmd.Parameters.AddWithValue("@Id", reservation.TableId.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // If the reservation is marked as seated, update the LastOccupiedAt timestamp
+                    if (status == ReservationStatus.Seated)
+                    {
+                        using (var cmd = new SqlCommand("UPDATE Tables SET LastOccupiedAt = @LastOccupiedAt WHERE Id = @Id", con))
+                        {
+                            cmd.Parameters.AddWithValue("@LastOccupiedAt", DateTime.Now);
+                            cmd.Parameters.AddWithValue("@Id", reservation.TableId.Value);
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                }
+
+                // If the reservation is marked as NoShow, update the NoShow flag
+                if (status == ReservationStatus.NoShow)
+                {
+                    using (var cmd = new SqlCommand("UPDATE Reservations SET NoShow = 1 WHERE Id = @Id", con))
+                    {
+                        cmd.Parameters.AddWithValue("@Id", id);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            TempData["ResultMessage"] = $"Reservation status updated to {status}";
+            return RedirectToAction("List", new { date = reservation.ReservationDate.ToString("yyyy-MM-dd") });
+        }
+
+        // GET: Delete Reservation Confirmation
+        public IActionResult DeleteConfirm(int id)
+        {
+            var model = GetReservationById(id);
+            if (model == null)
+            {
+                TempData["ErrorMessage"] = "Reservation not found.";
+                return RedirectToAction("List");
+            }
+
+            return View(model);
+        }
+
+        // POST: Delete Reservation
+        [HttpPost]
+        public IActionResult Delete(int id)
+        {
+            var reservation = GetReservationById(id);
+            if (reservation == null)
+            {
+                TempData["ErrorMessage"] = "Reservation not found.";
+                return RedirectToAction("List");
+            }
+
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                
+                // Free up the table if the reservation had one assigned
+                if (reservation.TableId.HasValue && reservation.Status == ReservationStatus.Confirmed)
+                {
+                    using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
+                    {
+                        cmd.Parameters.AddWithValue("@Status", (int)TableStatus.Available);
+                        cmd.Parameters.AddWithValue("@Id", reservation.TableId.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                
+                // Delete the reservation
+                using (var cmd = new SqlCommand("DELETE FROM Reservations WHERE Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+
+            TempData["ResultMessage"] = "Reservation successfully deleted.";
+            return RedirectToAction("List", new { date = reservation.ReservationDate.ToString("yyyy-MM-dd") });
+        }
+
+        #endregion
+
+        #region Waitlist
+
+        // GET: Waitlist Management
+        public IActionResult Waitlist()
+        {
+            var waitlist = GetActiveWaitlist();
+            
+            // Get available tables for potentially seating waitlisted guests
+            ViewBag.AvailableTables = GetAllTables().Where(t => t.Status == TableStatus.Available).ToList();
+            
+            return View(waitlist);
+        }
+
+        // GET: Add to Waitlist Form
+        public IActionResult AddToWaitlist()
+        {
+            WaitlistEntry model = new WaitlistEntry();
+            return View("WaitlistForm", model);
+        }
+
+        // POST: Save Waitlist Entry
+        [HttpPost]
+        public IActionResult SaveWaitlist(WaitlistEntry model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View("WaitlistForm", model);
+            }
+
+            string resultMessage = "";
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                
+                using (var cmd = new SqlCommand("usp_UpsertWaitlist", con))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Id", model.Id == 0 ? 0 : model.Id);
+                    cmd.Parameters.AddWithValue("@GuestName", model.GuestName);
+                    cmd.Parameters.AddWithValue("@PhoneNumber", model.PhoneNumber);
+                    cmd.Parameters.AddWithValue("@PartySize", model.PartySize);
+                    cmd.Parameters.AddWithValue("@QuotedWaitTime", model.QuotedWaitTime);
+                    cmd.Parameters.AddWithValue("@NotifyWhenReady", model.NotifyWhenReady);
+                    cmd.Parameters.AddWithValue("@Notes", model.Notes ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Status", (int)model.Status);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            resultMessage = reader["Message"].ToString();
+                        }
+                    }
+                }
+            }
+
+            TempData["ResultMessage"] = resultMessage;
+            return RedirectToAction("Waitlist");
+        }
+
+        // POST: Update Waitlist Status
+        [HttpPost]
+        public IActionResult UpdateWaitlistStatus(int id, WaitlistStatus status)
+        {
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand("UPDATE Waitlist SET Status = @Status WHERE Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Status", (int)status);
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // If notifying the guest, update the NotifiedAt timestamp
+                if (status == WaitlistStatus.Notified)
+                {
+                    using (var cmd = new SqlCommand("UPDATE Waitlist SET NotifiedAt = @NotifiedAt WHERE Id = @Id", con))
+                    {
+                        cmd.Parameters.AddWithValue("@NotifiedAt", DateTime.Now);
+                        cmd.Parameters.AddWithValue("@Id", id);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                // If seating the guest, update the SeatedAt timestamp
+                if (status == WaitlistStatus.Seated)
+                {
+                    using (var cmd = new SqlCommand("UPDATE Waitlist SET SeatedAt = @SeatedAt WHERE Id = @Id", con))
+                    {
+                        cmd.Parameters.AddWithValue("@SeatedAt", DateTime.Now);
+                        cmd.Parameters.AddWithValue("@Id", id);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            TempData["ResultMessage"] = $"Waitlist status updated to {status}";
+            return RedirectToAction("Waitlist");
+        }
+
+        // POST: Assign Table to Waitlist Entry
+        [HttpPost]
+        public IActionResult AssignTableToWaitlist(int waitlistId, int tableId)
+        {
+            var waitlistEntry = GetWaitlistEntryById(waitlistId);
+            var table = GetTableById(tableId);
+
+            if (waitlistEntry == null || table == null)
+            {
+                TempData["ErrorMessage"] = "Waitlist entry or table not found.";
+                return RedirectToAction("Waitlist");
+            }
+
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var transaction = con.BeginTransaction())
+                {
+                    try
+                    {
+                        // Update waitlist entry
+                        using (var cmd = new SqlCommand("UPDATE Waitlist SET Status = @Status, TableId = @TableId, SeatedAt = @SeatedAt WHERE Id = @Id", con, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@Status", (int)WaitlistStatus.Seated);
+                            cmd.Parameters.AddWithValue("@TableId", tableId);
+                            cmd.Parameters.AddWithValue("@SeatedAt", DateTime.Now);
+                            cmd.Parameters.AddWithValue("@Id", waitlistId);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        // Update table status
+                        using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status, LastOccupiedAt = @LastOccupiedAt WHERE Id = @Id", con, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@Status", (int)TableStatus.Occupied);
+                            cmd.Parameters.AddWithValue("@LastOccupiedAt", DateTime.Now);
+                            cmd.Parameters.AddWithValue("@Id", tableId);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch (Exception)
+                    {
+                        transaction.Rollback();
+                        TempData["ErrorMessage"] = "Error assigning table. Please try again.";
+                        return RedirectToAction("Waitlist");
+                    }
+                }
+            }
+
+            TempData["ResultMessage"] = $"Table {table.TableNumber} assigned to {waitlistEntry.GuestName}";
+            return RedirectToAction("Waitlist");
+        }
+
+        // POST: Remove from Waitlist
+        [HttpPost]
+        public IActionResult RemoveFromWaitlist(int id)
+        {
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand("DELETE FROM Waitlist WHERE Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+
+            TempData["ResultMessage"] = "Entry removed from waitlist.";
+            return RedirectToAction("Waitlist");
+        }
+
+        #endregion
+
+        #region Tables Management
+
+        // GET: Tables List
+        public IActionResult Tables()
+        {
+            var tables = GetAllTables();
+            return View(tables);
+        }
+
+        // GET: Create/Edit Table Form
+        public IActionResult TableForm(int? id)
+        {
+            Table model = new Table();
+
+            if (id.HasValue)
+            {
+                model = GetTableById(id.Value);
+                if (model == null)
+                {
+                    TempData["ErrorMessage"] = "Table not found.";
+                    return RedirectToAction("Tables");
+                }
+            }
+
+            return View(model);
+        }
+
+        // POST: Save Table
+        [HttpPost]
+        public IActionResult SaveTable(Table model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View("TableForm", model);
+            }
+
+            string resultMessage = "";
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                
+                // Check if updating and Id exists
+                if (model.Id > 0)
+                {
+                    using (var checkCmd = new SqlCommand("SELECT COUNT(*) FROM Tables WHERE Id = @Id", con))
+                    {
+                        checkCmd.Parameters.AddWithValue("@Id", model.Id);
+                        int count = (int)checkCmd.ExecuteScalar();
+                        if (count == 0)
+                        {
+                            TempData["ErrorMessage"] = "Table update failed. Id not found.";
+                            return RedirectToAction("Tables");
+                        }
+                    }
+                }
+
+                using (var cmd = new SqlCommand("usp_UpsertTable", con))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Id", model.Id == 0 ? 0 : model.Id);
+                    cmd.Parameters.AddWithValue("@TableNumber", model.TableNumber);
+                    cmd.Parameters.AddWithValue("@Capacity", model.Capacity);
+                    cmd.Parameters.AddWithValue("@Section", model.Section ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Status", (int)model.Status);
+                    cmd.Parameters.AddWithValue("@MinPartySize", model.MinPartySize);
+                    cmd.Parameters.AddWithValue("@IsActive", model.IsActive);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            resultMessage = reader["Message"].ToString();
+                        }
+                    }
+                }
+            }
+
+            TempData["ResultMessage"] = resultMessage;
+            return RedirectToAction("Tables");
+        }
+
+        // POST: Update Table Status
+        [HttpPost]
+        public IActionResult UpdateTableStatus(int id, TableStatus status)
+        {
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Status", (int)status);
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+
+            TempData["ResultMessage"] = $"Table status updated to {status}";
+            return RedirectToAction("Tables");
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        private List<Reservation> GetReservationsByDate(DateTime date)
+        {
+            var reservations = new List<Reservation>();
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand(
+                    @"SELECT r.Id, r.GuestName, r.PhoneNumber, r.EmailAddress, r.PartySize, 
+                    r.ReservationDate, r.ReservationTime, r.SpecialRequests, r.Notes, 
+                    r.TableId, r.Status, r.CreatedAt, r.UpdatedAt, r.ReminderSent, r.NoShow,
+                    t.TableNumber
+                    FROM Reservations r
+                    LEFT JOIN Tables t ON r.TableId = t.Id
+                    WHERE CONVERT(date, r.ReservationDate) = @Date
+                    ORDER BY r.ReservationTime", con))
+                {
+                    cmd.Parameters.AddWithValue("@Date", date.Date);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            reservations.Add(new Reservation
+                            {
+                                Id = reader.GetInt32(0),
+                                GuestName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                PhoneNumber = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                                EmailAddress = reader.IsDBNull(3) ? null : reader.GetString(3),
+                                PartySize = reader.GetInt32(4),
+                                ReservationDate = reader.GetDateTime(5),
+                                ReservationTime = reader.GetDateTime(6),
+                                SpecialRequests = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                Notes = reader.IsDBNull(8) ? null : reader.GetString(8),
+                                TableId = reader.IsDBNull(9) ? null : (int?)reader.GetInt32(9),
+                                Status = (ReservationStatus)reader.GetInt32(10),
+                                CreatedAt = reader.GetDateTime(11),
+                                UpdatedAt = reader.GetDateTime(12),
+                                ReminderSent = reader.GetBoolean(13),
+                                NoShow = reader.GetBoolean(14)
+                            });
+                        }
+                    }
+                }
+            }
+            return reservations;
+        }
+
+        private Reservation GetReservationById(int id)
+        {
+            Reservation reservation = null;
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand(
+                    @"SELECT r.Id, r.GuestName, r.PhoneNumber, r.EmailAddress, r.PartySize, 
+                    r.ReservationDate, r.ReservationTime, r.SpecialRequests, r.Notes, 
+                    r.TableId, r.Status, r.CreatedAt, r.UpdatedAt, r.ReminderSent, r.NoShow,
+                    t.TableNumber
+                    FROM Reservations r
+                    LEFT JOIN Tables t ON r.TableId = t.Id
+                    WHERE r.Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            reservation = new Reservation
+                            {
+                                Id = reader.GetInt32(0),
+                                GuestName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                PhoneNumber = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                                EmailAddress = reader.IsDBNull(3) ? null : reader.GetString(3),
+                                PartySize = reader.GetInt32(4),
+                                ReservationDate = reader.GetDateTime(5),
+                                ReservationTime = reader.GetDateTime(6),
+                                SpecialRequests = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                Notes = reader.IsDBNull(8) ? null : reader.GetString(8),
+                                TableId = reader.IsDBNull(9) ? null : (int?)reader.GetInt32(9),
+                                Status = (ReservationStatus)reader.GetInt32(10),
+                                CreatedAt = reader.GetDateTime(11),
+                                UpdatedAt = reader.GetDateTime(12),
+                                ReminderSent = reader.GetBoolean(13),
+                                NoShow = reader.GetBoolean(14)
+                            };
+                        }
+                    }
+                }
+            }
+            return reservation;
+        }
+
+        private List<WaitlistEntry> GetActiveWaitlist()
+        {
+            var waitlist = new List<WaitlistEntry>();
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand(
+                    @"SELECT w.Id, w.GuestName, w.PhoneNumber, w.PartySize, w.AddedAt, 
+                    w.QuotedWaitTime, w.NotifyWhenReady, w.Notes, w.Status, w.NotifiedAt, 
+                    w.SeatedAt, w.TableId,
+                    t.TableNumber
+                    FROM Waitlist w
+                    LEFT JOIN Tables t ON w.TableId = t.Id
+                    WHERE w.Status IN (0, 1) -- Only Waiting and Notified statuses
+                    ORDER BY w.AddedAt", con))
+                {
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            waitlist.Add(new WaitlistEntry
+                            {
+                                Id = reader.GetInt32(0),
+                                GuestName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                PhoneNumber = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                                PartySize = reader.GetInt32(3),
+                                AddedAt = reader.GetDateTime(4),
+                                QuotedWaitTime = reader.GetInt32(5),
+                                NotifyWhenReady = reader.GetBoolean(6),
+                                Notes = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                Status = (WaitlistStatus)reader.GetInt32(8),
+                                NotifiedAt = reader.IsDBNull(9) ? null : (DateTime?)reader.GetDateTime(9),
+                                SeatedAt = reader.IsDBNull(10) ? null : (DateTime?)reader.GetDateTime(10),
+                                TableId = reader.IsDBNull(11) ? null : (int?)reader.GetInt32(11)
+                            });
+                        }
+                    }
+                }
+            }
+            return waitlist;
+        }
+
+        private WaitlistEntry GetWaitlistEntryById(int id)
+        {
+            WaitlistEntry entry = null;
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand(
+                    @"SELECT w.Id, w.GuestName, w.PhoneNumber, w.PartySize, w.AddedAt, 
+                    w.QuotedWaitTime, w.NotifyWhenReady, w.Notes, w.Status, w.NotifiedAt, 
+                    w.SeatedAt, w.TableId,
+                    t.TableNumber
+                    FROM Waitlist w
+                    LEFT JOIN Tables t ON w.TableId = t.Id
+                    WHERE w.Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            entry = new WaitlistEntry
+                            {
+                                Id = reader.GetInt32(0),
+                                GuestName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                PhoneNumber = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                                PartySize = reader.GetInt32(3),
+                                AddedAt = reader.GetDateTime(4),
+                                QuotedWaitTime = reader.GetInt32(5),
+                                NotifyWhenReady = reader.GetBoolean(6),
+                                Notes = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                Status = (WaitlistStatus)reader.GetInt32(8),
+                                NotifiedAt = reader.IsDBNull(9) ? null : (DateTime?)reader.GetDateTime(9),
+                                SeatedAt = reader.IsDBNull(10) ? null : (DateTime?)reader.GetDateTime(10),
+                                TableId = reader.IsDBNull(11) ? null : (int?)reader.GetInt32(11)
+                            };
+                        }
+                    }
+                }
+            }
+            return entry;
+        }
+
+        private List<Table> GetAllTables()
+        {
+            var tables = new List<Table>();
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand(
+                    @"SELECT Id, TableNumber, Capacity, Section, IsAvailable, Status, 
+                    MinPartySize, LastOccupiedAt, IsActive 
+                    FROM Tables 
+                    WHERE IsActive = 1
+                    ORDER BY TableNumber", con))
+                {
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            tables.Add(new Table
+                            {
+                                Id = reader.GetInt32(0),
+                                TableNumber = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                Capacity = reader.GetInt32(2),
+                                Section = reader.IsDBNull(3) ? null : reader.GetString(3),
+                                IsAvailable = reader.GetBoolean(4),
+                                Status = (TableStatus)reader.GetInt32(5),
+                                MinPartySize = reader.GetInt32(6),
+                                LastOccupiedAt = reader.IsDBNull(7) ? null : (DateTime?)reader.GetDateTime(7),
+                                IsActive = reader.GetBoolean(8)
+                            });
+                        }
+                    }
+                }
+            }
+            return tables;
+        }
+
+        private Table GetTableById(int id)
+        {
+            Table table = null;
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand(
+                    @"SELECT Id, TableNumber, Capacity, Section, IsAvailable, Status, 
+                    MinPartySize, LastOccupiedAt, IsActive 
+                    FROM Tables 
+                    WHERE Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            table = new Table
+                            {
+                                Id = reader.GetInt32(0),
+                                TableNumber = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                Capacity = reader.GetInt32(2),
+                                Section = reader.IsDBNull(3) ? null : reader.GetString(3),
+                                IsAvailable = reader.GetBoolean(4),
+                                Status = (TableStatus)reader.GetInt32(5),
+                                MinPartySize = reader.GetInt32(6),
+                                LastOccupiedAt = reader.IsDBNull(7) ? null : (DateTime?)reader.GetDateTime(7),
+                                IsActive = reader.GetBoolean(8)
+                            };
+                        }
+                    }
+                }
+            }
+            return table;
+        }
+
+        private List<Table> GetAvailableTables(DateTime reservationDateTime, int partySize, int? currentTableId = null)
+        {
+            var tables = new List<Table>();
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand(
+                    @"SELECT t.Id, t.TableNumber, t.Capacity, t.Section, t.IsAvailable, t.Status, 
+                    t.MinPartySize, t.LastOccupiedAt, t.IsActive 
+                    FROM Tables t
+                    WHERE t.IsActive = 1
+                    AND t.Capacity >= @PartySize
+                    AND (t.Status = 0 -- Available
+                         OR t.Id = @CurrentTableId)
+                    AND NOT EXISTS (
+                        SELECT 1 FROM Reservations r
+                        WHERE r.TableId = t.Id
+                        AND CONVERT(date, r.ReservationDate) = CONVERT(date, @ReservationDate)
+                        AND r.Status IN (1, 2) -- Confirmed or Seated
+                        AND r.Id <> ISNULL(@CurrentReservationId, 0) -- Exclude current reservation
+                        AND DATEADD(HOUR, -1, @ReservationTime) < r.ReservationTime
+                        AND DATEADD(HOUR, 1, @ReservationTime) > r.ReservationTime
+                    )
+                    ORDER BY ABS(t.Capacity - @PartySize), t.TableNumber", con))
+                {
+                    cmd.Parameters.AddWithValue("@PartySize", partySize);
+                    cmd.Parameters.AddWithValue("@ReservationDate", reservationDateTime.Date);
+                    cmd.Parameters.AddWithValue("@ReservationTime", reservationDateTime);
+                    cmd.Parameters.AddWithValue("@CurrentTableId", currentTableId ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@CurrentReservationId", currentTableId != null ? (object)currentTableId : DBNull.Value);
+                    
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            tables.Add(new Table
+                            {
+                                Id = reader.GetInt32(0),
+                                TableNumber = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                Capacity = reader.GetInt32(2),
+                                Section = reader.IsDBNull(3) ? null : reader.GetString(3),
+                                IsAvailable = reader.GetBoolean(4),
+                                Status = (TableStatus)reader.GetInt32(5),
+                                MinPartySize = reader.GetInt32(6),
+                                LastOccupiedAt = reader.IsDBNull(7) ? null : (DateTime?)reader.GetDateTime(7),
+                                IsActive = reader.GetBoolean(8)
+                            });
+                        }
+                    }
+                }
+            }
+            return tables;
+        }
+
+        #endregion
+    }
+}

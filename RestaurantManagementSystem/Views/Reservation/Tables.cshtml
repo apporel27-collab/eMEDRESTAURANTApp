@@ -1,0 +1,146 @@
+@model IEnumerable<RestaurantManagementSystem.Models.Table>
+@{
+    ViewData["Title"] = "Table Management";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <h2>Table Management</h2>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <a asp-action="TableForm" class="btn btn-primary">Add New Table</a>
+        </div>
+    </div>
+
+    @if (TempData["ResultMessage"] != null)
+    {
+        <div class="alert alert-info">@TempData["ResultMessage"]</div>
+    }
+    
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    }
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped" id="tablesTable">
+                    <thead>
+                        <tr>
+                            <th>Table Number</th>
+                            <th>Capacity</th>
+                            <th>Section</th>
+                            <th>Status</th>
+                            <th>Min Party Size</th>
+                            <th>Last Occupied</th>
+                            <th>Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var table in Model)
+                        {
+                            <tr>
+                                <td>@table.TableNumber</td>
+                                <td>@table.Capacity</td>
+                                <td>@(string.IsNullOrEmpty(table.Section) ? "-" : table.Section)</td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(table.Status)">
+                                        @table.StatusDescription
+                                    </span>
+                                </td>
+                                <td>@table.MinPartySize</td>
+                                <td>@(table.LastOccupiedAt.HasValue ? table.LastOccupiedAt.Value.ToString("MMM dd, yyyy h:mm tt") : "-")</td>
+                                <td>
+                                    @if (table.IsActive)
+                                    {
+                                        <span class="badge bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Inactive</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            Actions
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" asp-action="TableForm" asp-route-id="@table.Id">Edit</a></li>
+                                            
+                                            <li><hr class="dropdown-divider"></li>
+                                            
+                                            <li>
+                                                <form asp-action="UpdateTableStatus" method="post">
+                                                    <input type="hidden" name="id" value="@table.Id" />
+                                                    <input type="hidden" name="status" value="@((int)TableStatus.Available)" />
+                                                    <button type="submit" class="dropdown-item">Mark Available</button>
+                                                </form>
+                                            </li>
+                                            
+                                            <li>
+                                                <form asp-action="UpdateTableStatus" method="post">
+                                                    <input type="hidden" name="id" value="@table.Id" />
+                                                    <input type="hidden" name="status" value="@((int)TableStatus.Dirty)" />
+                                                    <button type="submit" class="dropdown-item">Mark Needs Cleaning</button>
+                                                </form>
+                                            </li>
+                                            
+                                            <li>
+                                                <form asp-action="UpdateTableStatus" method="post">
+                                                    <input type="hidden" name="id" value="@table.Id" />
+                                                    <input type="hidden" name="status" value="@((int)TableStatus.Maintenance)" />
+                                                    <button type="submit" class="dropdown-item">Mark Under Maintenance</button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center">No tables found</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-3">
+        <a asp-action="Dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+</div>
+
+@functions {
+    string GetStatusBadgeClass(TableStatus status)
+    {
+        return status switch
+        {
+            TableStatus.Available => "bg-success",
+            TableStatus.Reserved => "bg-info",
+            TableStatus.Occupied => "bg-danger",
+            TableStatus.Dirty => "bg-warning text-dark",
+            TableStatus.Maintenance => "bg-secondary",
+            _ => "bg-light"
+        };
+    }
+}
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#tablesTable').DataTable({
+                "paging": false,
+                "ordering": true,
+                "info": false
+            });
+        });
+    </script>
+}

@@ -1,0 +1,71 @@
+@model RestaurantManagementSystem.Models.WaitlistEntry
+@{
+    ViewData["Title"] = "Add to Waitlist";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Add to Waitlist</h2>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form asp-action="SaveWaitlist" method="post">
+                <input type="hidden" asp-for="Id" />
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="GuestName" class="form-label">Guest Name</label>
+                            <input asp-for="GuestName" class="form-control" required />
+                            <span asp-validation-for="GuestName" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="PhoneNumber" class="form-label">Phone Number</label>
+                            <input asp-for="PhoneNumber" class="form-control" required />
+                            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="PartySize" class="form-label">Party Size</label>
+                            <input asp-for="PartySize" class="form-control" type="number" min="1" max="50" required />
+                            <span asp-validation-for="PartySize" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="QuotedWaitTime" class="form-label">Quoted Wait Time (minutes)</label>
+                            <input asp-for="QuotedWaitTime" class="form-control" type="number" min="5" max="240" required />
+                            <span asp-validation-for="QuotedWaitTime" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input asp-for="NotifyWhenReady" class="form-check-input" />
+                            <label asp-for="NotifyWhenReady" class="form-check-label">Notify When Ready</label>
+                            <span asp-validation-for="NotifyWhenReady" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Notes" class="form-label">Notes</label>
+                            <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="Notes" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <a asp-action="Waitlist" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Add to Waitlist</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

@@ -1,0 +1,167 @@
+@model IEnumerable<RestaurantManagementSystem.Models.Reservation>
+@{
+    ViewData["Title"] = $"Reservations for {ViewBag.SelectedDate:MMM dd, yyyy}";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <h2>@ViewData["Title"]</h2>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <div class="btn-group">
+                <a asp-action="List" asp-route-date="@DateTime.Today.AddDays(-1).ToString("yyyy-MM-dd")" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Previous Day
+                </a>
+                <a asp-action="List" asp-route-date="@DateTime.Today.ToString("yyyy-MM-dd")" class="btn @(ViewBag.SelectedDate.Date == DateTime.Today ? "btn-primary" : "btn-outline-primary")">Today</a>
+                <a asp-action="List" asp-route-date="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")" class="btn btn-outline-secondary">
+                    Next Day <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <a asp-action="Create" class="btn btn-primary ms-2">New Reservation</a>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <form asp-action="List" method="get" class="row g-3">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text">Date</span>
+                        <input type="date" name="date" class="form-control" value="@ViewBag.SelectedDate.ToString("yyyy-MM-dd")" />
+                        <button type="submit" class="btn btn-secondary">Go</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (TempData["ResultMessage"] != null)
+    {
+        <div class="alert alert-info">@TempData["ResultMessage"]</div>
+    }
+    
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    }
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped" id="reservationsTable">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Guest</th>
+                            <th>Phone</th>
+                            <th>Party Size</th>
+                            <th>Table</th>
+                            <th>Status</th>
+                            <th>Special Requests</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var reservation in Model)
+                        {
+                            <tr class="@GetStatusClass(reservation.Status)">
+                                <td>@reservation.ReservationTime.ToString("h:mm tt")</td>
+                                <td>@reservation.GuestName</td>
+                                <td>@reservation.PhoneNumber</td>
+                                <td>@reservation.PartySize</td>
+                                <td>@(reservation.TableId.HasValue ? $"Table {reservation.TableId}" : "-")</td>
+                                <td>@reservation.Status</td>
+                                <td>@(string.IsNullOrEmpty(reservation.SpecialRequests) ? "-" : reservation.SpecialRequests)</td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            Actions
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" asp-action="Edit" asp-route-id="@reservation.Id">Edit</a></li>
+                                            @if (reservation.Status == ReservationStatus.Confirmed)
+                                            {
+                                                <li>
+                                                    <form asp-action="ChangeStatus" method="post">
+                                                        <input type="hidden" name="id" value="@reservation.Id" />
+                                                        <input type="hidden" name="status" value="@((int)ReservationStatus.Seated)" />
+                                                        <button type="submit" class="dropdown-item">Seat Guest</button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form asp-action="ChangeStatus" method="post">
+                                                        <input type="hidden" name="id" value="@reservation.Id" />
+                                                        <input type="hidden" name="status" value="@((int)ReservationStatus.NoShow)" />
+                                                        <button type="submit" class="dropdown-item">Mark No-Show</button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form asp-action="ChangeStatus" method="post">
+                                                        <input type="hidden" name="id" value="@reservation.Id" />
+                                                        <input type="hidden" name="status" value="@((int)ReservationStatus.Cancelled)" />
+                                                        <button type="submit" class="dropdown-item">Cancel</button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            @if (reservation.Status == ReservationStatus.Seated)
+                                            {
+                                                <li>
+                                                    <form asp-action="ChangeStatus" method="post">
+                                                        <input type="hidden" name="id" value="@reservation.Id" />
+                                                        <input type="hidden" name="status" value="@((int)ReservationStatus.Completed)" />
+                                                        <button type="submit" class="dropdown-item">Complete</button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item text-danger" asp-action="DeleteConfirm" asp-route-id="@reservation.Id">Delete</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center">No reservations found for this date</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-3">
+        <a asp-action="Dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+</div>
+
+@functions {
+    string GetStatusClass(ReservationStatus status)
+    {
+        return status switch
+        {
+            ReservationStatus.Seated => "table-success",
+            ReservationStatus.Confirmed => "",
+            ReservationStatus.Completed => "table-info",
+            ReservationStatus.Cancelled => "table-danger",
+            ReservationStatus.NoShow => "table-danger",
+            _ => ""
+        };
+    }
+}
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#reservationsTable').DataTable({
+                "paging": false,
+                "ordering": true,
+                "info": false,
+                "searching": true
+            });
+        });
+    </script>
+}

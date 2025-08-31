@@ -1,0 +1,163 @@
+@model AddOrderItemViewModel
+@{
+    ViewData["Title"] = "Add Item to Order";
+}
+
+<div class="container-fluid p-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>@ViewData["Title"]</h1>
+        <div>
+            <a asp-action="BrowseMenu" asp-route-id="@Model.OrderId" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Menu
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Item Details</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="AddItem" method="post">
+                        <input type="hidden" asp-for="OrderId" />
+                        <input type="hidden" asp-for="MenuItemId" />
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h4>@Model.MenuItemName</h4>
+                                @if (!string.IsNullOrEmpty(Model.MenuItemDescription))
+                                {
+                                    <p class="text-muted">@Model.MenuItemDescription</p>
+                                }
+                                <p><strong>Price:</strong> $@Model.MenuItemPrice.ToString("F2")</p>
+                            </div>
+                            <div class="col-md-6">
+                                @if (!string.IsNullOrEmpty(Model.MenuItemImagePath))
+                                {
+                                    <img src="@Model.MenuItemImagePath" alt="@Model.MenuItemName" class="img-fluid rounded" />
+                                }
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="Quantity" class="form-label">Quantity</label>
+                            <input asp-for="Quantity" class="form-control" min="1" value="1" />
+                            <span asp-validation-for="Quantity" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label asp-for="SpecialInstructions" class="form-label">Special Instructions</label>
+                            <textarea asp-for="SpecialInstructions" class="form-control" rows="3" placeholder="E.g., No onions, extra sauce, etc."></textarea>
+                            <span asp-validation-for="SpecialInstructions" class="text-danger"></span>
+                        </div>
+
+                        @if (Model.AvailableModifiers != null && Model.AvailableModifiers.Any())
+                        {
+                            <div class="card mb-4">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0">Modifiers</h5>
+                                </div>
+                                <div class="card-body">
+                                    @for (int i = 0; i < Model.AvailableModifiers.Count; i++)
+                                    {
+                                        <div class="form-check mb-2">
+                                            <input type="checkbox" class="form-check-input" id="modifier-@i" name="SelectedModifiers" value="@Model.AvailableModifiers[i].ModifierId" />
+                                            <label class="form-check-label d-flex justify-content-between align-items-center" for="modifier-@i">
+                                                <span>@Model.AvailableModifiers[i].Name</span>
+                                                @if (Model.AvailableModifiers[i].Price > 0)
+                                                {
+                                                    <span class="badge bg-light text-dark">+$@Model.AvailableModifiers[i].Price.ToString("F2")</span>
+                                                }
+                                            </label>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @if (Model.CommonAllergens != null && Model.CommonAllergens.Any())
+                        {
+                            <div class="card mb-4">
+                                <div class="card-header bg-warning text-dark">
+                                    <h5 class="mb-0">Allergens</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        @foreach (var allergen in Model.CommonAllergens)
+                                        {
+                                            <div class="col-md-4 mb-2">
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                                    <span>@allergen</span>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-plus-circle"></i> Add to Order
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>Order #@Model.OrderNumber</span>
+                        <span>Table @Model.TableNumber</span>
+                    </div>
+                    
+                    @if (Model.CurrentOrderItems != null && Model.CurrentOrderItems.Any())
+                    {
+                        <ul class="list-group mb-3">
+                            @foreach (var item in Model.CurrentOrderItems)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>@item.Quantity x @item.Name</strong>
+                                        @if (!string.IsNullOrEmpty(item.SpecialInstructions))
+                                        {
+                                            <div class="text-muted small">@item.SpecialInstructions</div>
+                                        }
+                                    </div>
+                                    <span>$@item.TotalPrice.ToString("F2")</span>
+                                </li>
+                            }
+                        </ul>
+                        
+                        <div class="d-flex justify-content-between fw-bold">
+                            <span>Current Total:</span>
+                            <span>$@Model.CurrentOrderTotal.ToString("F2")</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No items in order yet.</p>
+                    }
+                </div>
+                <div class="card-footer">
+                    <a asp-action="Details" asp-route-id="@Model.OrderId" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-check-circle"></i> Complete Order
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

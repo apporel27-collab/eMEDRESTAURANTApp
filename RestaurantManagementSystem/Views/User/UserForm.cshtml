@@ -1,0 +1,89 @@
+@model RestaurantManagementSystem.Models.User
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Create User" : (ViewBag.IsView ? "View User" : "Edit User");
+    bool isView = ViewBag.IsView;
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>@ViewData["Title"]</h2>
+        </div>
+    </div>
+
+    <form asp-action="UserForm" method="post">
+        <input type="hidden" asp-for="Id" />
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Username" class="form-label">Username</label>
+                    <input asp-for="Username" class="form-control" required maxlength="50" disabled="@isView" />
+                    <span asp-validation-for="Username" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">@(Model.Id == 0 ? "Password" : "New Password (leave empty to keep current)")</label>
+                    <input type="password" id="password" name="password" class="form-control" 
+                           @(Model.Id == 0 ? "required" : "") maxlength="100" disabled="@isView" />
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="FirstName" class="form-label">First Name</label>
+                    <input asp-for="FirstName" class="form-control" required maxlength="50" disabled="@isView" />
+                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="LastName" class="form-label">Last Name</label>
+                    <input asp-for="LastName" class="form-control" maxlength="50" disabled="@isView" />
+                    <span asp-validation-for="LastName" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label">Email</label>
+                    <input asp-for="Email" class="form-control" type="email" maxlength="100" disabled="@isView" />
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Phone" class="form-label">Phone</label>
+                    <input asp-for="Phone" class="form-control" maxlength="20" disabled="@isView" />
+                    <span asp-validation-for="Phone" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Role" class="form-label">Role</label>
+                    <select asp-for="Role" class="form-select" disabled="@isView">
+                        @foreach (var role in ViewBag.Roles)
+                        {
+                            <option value="@role.Id">@role.Name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Role" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input asp-for="IsActive" class="form-check-input" disabled="@isView" />
+                        <label asp-for="IsActive" class="form-check-label">Active</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <a asp-action="UserList" class="btn btn-secondary">Back to List</a>
+            @if (!isView)
+            {
+                <button type="submit" class="btn btn-primary">Save</button>
+            }
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

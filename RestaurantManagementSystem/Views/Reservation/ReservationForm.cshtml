@@ -1,0 +1,132 @@
+@model RestaurantManagementSystem.Models.Reservation
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Create Reservation" : "Edit Reservation";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>@ViewData["Title"]</h2>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form asp-action="SaveReservation" method="post">
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="CreatedAt" />
+                <input type="hidden" asp-for="ReminderSent" />
+                <input type="hidden" asp-for="NoShow" />
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="GuestName" class="form-label">Guest Name</label>
+                            <input asp-for="GuestName" class="form-control" required />
+                            <span asp-validation-for="GuestName" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="PhoneNumber" class="form-label">Phone Number</label>
+                            <input asp-for="PhoneNumber" class="form-control" required />
+                            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="EmailAddress" class="form-label">Email Address</label>
+                            <input asp-for="EmailAddress" class="form-control" />
+                            <span asp-validation-for="EmailAddress" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="PartySize" class="form-label">Party Size</label>
+                            <input asp-for="PartySize" class="form-control" type="number" min="1" max="50" required />
+                            <span asp-validation-for="PartySize" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="ReservationDate" class="form-label">Reservation Date</label>
+                            <input asp-for="ReservationDate" class="form-control" type="date" required />
+                            <span asp-validation-for="ReservationDate" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="ReservationTime" class="form-label">Reservation Time</label>
+                            <input asp-for="ReservationTime" class="form-control" type="time" required />
+                            <span asp-validation-for="ReservationTime" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="TableId" class="form-label">Table</label>
+                            <select asp-for="TableId" class="form-select">
+                                <option value="">-- Select a Table --</option>
+                                @foreach (var table in ViewBag.Tables)
+                                {
+                                    <option value="@table.Id">Table @table.TableNumber (Seats @table.Capacity)</option>
+                                }
+                            </select>
+                            <span asp-validation-for="TableId" class="text-danger"></span>
+                            <small class="form-text text-muted">Tables shown are available for the selected date/time and party size.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Status" class="form-label">Status</label>
+                            <select asp-for="Status" class="form-select" asp-items="Html.GetEnumSelectList<ReservationStatus>()"></select>
+                            <span asp-validation-for="Status" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="SpecialRequests" class="form-label">Special Requests</label>
+                            <textarea asp-for="SpecialRequests" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="SpecialRequests" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="Notes" class="form-label">Internal Notes</label>
+                            <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="Notes" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <a asp-action="List" asp-route-date="@Model.ReservationDate.ToString("yyyy-MM-dd")" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function() {
+            // Update available tables when date, time or party size changes
+            $('#ReservationDate, #ReservationTime, #PartySize').change(function() {
+                updateAvailableTables();
+            });
+
+            function updateAvailableTables() {
+                var date = $('#ReservationDate').val();
+                var time = $('#ReservationTime').val();
+                var partySize = $('#PartySize').val();
+                var currentTableId = $('#TableId').val();
+                
+                if (date && time && partySize) {
+                    // Ajax call to get available tables
+                    // This would be implemented server-side
+                    console.log("Would update available tables for:", date, time, partySize);
+                }
+            }
+        });
+    </script>
+}
