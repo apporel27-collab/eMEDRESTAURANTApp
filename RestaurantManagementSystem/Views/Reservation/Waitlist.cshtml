@@ -81,8 +81,7 @@
                                                     }
                                                     
                                                     <li>
-                                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#assignTableModal" 
-                                                                onclick="setWaitlistId(@entry.Id)">
+                                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#assignTableModal" onclick="setWaitlistId(@entry.Id)">
                                                             Assign Table
                                                         </button>
                                                     </li>
@@ -145,7 +144,7 @@
                                     <br>Seats: @table.Capacity
                                     @if (!string.IsNullOrEmpty(table.Section))
                                     {
-                                        <br>Section: @table.Section
+                                        @Html.Raw("<br>")@:Section: @table.Section
                                     }
                                 </li>
                             }

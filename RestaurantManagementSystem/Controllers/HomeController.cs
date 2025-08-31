@@ -2,30 +2,78 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantManagementSystem.Models;
 
-namespace RestaurantManagementSystem.Controllers;
-
-public class HomeController : Controller
+namespace RestaurantManagementSystem.Controllers
 {
-    private readonly ILogger<HomeController> _logger;
-
-    public HomeController(ILogger<HomeController> logger)
+    public class HomeController : Controller
     {
-        _logger = logger;
-    }
+        private readonly ILogger<HomeController> _logger;
 
-    public IActionResult Index()
-    {
-        return View();
-    }
+        public HomeController(ILogger<HomeController> logger)
+        {
+            _logger = logger;
+        }
 
-    public IActionResult Privacy()
-    {
-        return View();
-    }
+        public IActionResult Index()
+        {
+            // Create a simple dashboard view model with sample data
+            var model = new DashboardViewModel
+            {
+                TodaySales = 1250.75m,
+                TodayOrders = 45,
+                ActiveTables = 12,
+                UpcomingReservations = 8,
+                RecentOrders = new List<DashboardOrderViewModel>
+                {
+                    new DashboardOrderViewModel { OrderId = 1001, CustomerName = "John Smith", TableNumber = 5, TotalAmount = 89.95m, Status = "Completed", OrderTime = "10:15 AM" },
+                    new DashboardOrderViewModel { OrderId = 1002, CustomerName = "Emily Davis", TableNumber = 7, TotalAmount = 64.50m, Status = "In Progress", OrderTime = "11:30 AM" },
+                    new DashboardOrderViewModel { OrderId = 1003, CustomerName = "Michael Brown", TableNumber = 3, TotalAmount = 42.75m, Status = "Completed", OrderTime = "12:45 PM" }
+                },
+                LowInventoryItems = new List<InventoryItemViewModel>
+                {
+                    new InventoryItemViewModel { Name = "Fresh Tomatoes", CurrentStock = 2.5m, MinimumStock = 5.0m, Unit = "kg" },
+                    new InventoryItemViewModel { Name = "Olive Oil", CurrentStock = 1.0m, MinimumStock = 2.0m, Unit = "L" }
+                },
+                PopularMenuItems = new List<MenuItemPopularityViewModel>
+                {
+                    new MenuItemPopularityViewModel { Name = "Margherita Pizza", OrderCount = 32 },
+                    new MenuItemPopularityViewModel { Name = "Chicken Parmesan", OrderCount = 28 },
+                    new MenuItemPopularityViewModel { Name = "Caesar Salad", OrderCount = 24 },
+                    new MenuItemPopularityViewModel { Name = "Tiramisu", OrderCount = 18 }
+                },
+                SalesData = new List<SalesDataViewModel>
+                {
+                    new SalesDataViewModel { Day = "Monday", Amount = 850.00m },
+                    new SalesDataViewModel { Day = "Tuesday", Amount = 920.50m },
+                    new SalesDataViewModel { Day = "Wednesday", Amount = 1100.25m },
+                    new SalesDataViewModel { Day = "Thursday", Amount = 980.75m },
+                    new SalesDataViewModel { Day = "Friday", Amount = 1450.00m },
+                    new SalesDataViewModel { Day = "Saturday", Amount = 1750.50m },
+                    new SalesDataViewModel { Day = "Sunday", Amount = 1200.25m }
+                },
+                CustomersByTime = new List<CustomersByTimeViewModel>
+                {
+                    new CustomersByTimeViewModel { Hour = 11, CustomerCount = 15 },
+                    new CustomersByTimeViewModel { Hour = 12, CustomerCount = 25 },
+                    new CustomersByTimeViewModel { Hour = 13, CustomerCount = 30 },
+                    new CustomersByTimeViewModel { Hour = 14, CustomerCount = 20 },
+                    new CustomersByTimeViewModel { Hour = 18, CustomerCount = 35 },
+                    new CustomersByTimeViewModel { Hour = 19, CustomerCount = 40 },
+                    new CustomersByTimeViewModel { Hour = 20, CustomerCount = 30 }
+                }
+            };
+            
+            return View(model);
+        }
 
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    public IActionResult Error()
-    {
-        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        public IActionResult Privacy()
+        {
+            return View();
+        }
+
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
+        {
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
     }
 }

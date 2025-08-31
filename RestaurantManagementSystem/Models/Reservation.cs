@@ -9,8 +9,22 @@ namespace RestaurantManagementSystem.Models
 
         [Required]
         [StringLength(100)]
-        [Display(Name = "Guest Name")]
+        [Display(Name = "Customer Name")]
         public string GuestName { get; set; }
+
+        // Property that controller expects 
+        public string CustomerName 
+        { 
+            get { return GuestName; }
+            set { GuestName = value; }
+        }
+        
+        // Property for full name that some controllers expect
+        public string FullName
+        {
+            get { return GuestName; }
+            set { GuestName = value; }
+        }
 
         [Required]
         [Phone]
@@ -22,6 +36,13 @@ namespace RestaurantManagementSystem.Models
         [StringLength(100)]
         [Display(Name = "Email Address")]
         public string? EmailAddress { get; set; }
+
+        // Property that controller expects
+        public string? Email
+        {
+            get { return EmailAddress; }
+            set { EmailAddress = value; }
+        }
 
         [Required]
         [Display(Name = "Party Size")]

@@ -1,0 +1,253 @@
+@model RestaurantManagementSystem.ViewModels.KitchenTicketDetailsViewModel
+
+@{
+    ViewData["Title"] = "Ticket Details";
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Ticket #@Model.Ticket.TicketNumber</h1>
+        <div>
+            <a href="@Url.Action("Dashboard", "Kitchen")" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            @if (Model.CanUpdateStatus)
+            {
+                if (Model.Ticket.Status == 0) // New
+                {
+                    <form method="post" action="@Url.Action("UpdateTicketStatus", "Kitchen")" class="d-inline">
+                        <input type="hidden" name="TicketId" value="@Model.Ticket.Id" />
+                        <input type="hidden" name="Status" value="1" />
+                        <button type="submit" class="btn btn-info me-2">
+                            <i class="fas fa-play"></i> Start Preparation
+                        </button>
+                    </form>
+                }
+                else if (Model.Ticket.Status == 1) // In Progress
+                {
+                    <form method="post" action="@Url.Action("UpdateTicketStatus", "Kitchen")" class="d-inline">
+                        <input type="hidden" name="TicketId" value="@Model.Ticket.Id" />
+                        <input type="hidden" name="Status" value="2" />
+                        <button type="submit" class="btn btn-success me-2">
+                            <i class="fas fa-check"></i> Mark Ready
+                        </button>
+                    </form>
+                }
+                else if (Model.Ticket.Status == 2) // Ready
+                {
+                    <form method="post" action="@Url.Action("UpdateTicketStatus", "Kitchen")" class="d-inline">
+                        <input type="hidden" name="TicketId" value="@Model.Ticket.Id" />
+                        <input type="hidden" name="Status" value="3" />
+                        <button type="submit" class="btn btn-secondary me-2">
+                            <i class="fas fa-utensils"></i> Mark Delivered
+                        </button>
+                    </form>
+                }
+
+                @if (Model.Ticket.Status < 3) // Can cancel if not delivered
+                {
+                    <form method="post" action="@Url.Action("UpdateTicketStatus", "Kitchen")" class="d-inline">
+                        <input type="hidden" name="TicketId" value="@Model.Ticket.Id" />
+                        <input type="hidden" name="Status" value="4" />
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to cancel this ticket?');">
+                            <i class="fas fa-times"></i> Cancel Ticket
+                        </button>
+                    </form>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <!-- Ticket Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Ticket Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-sm-4 fw-bold">Status:</div>
+                        <div class="col-sm-8">
+                            <span class="badge @(Model.Ticket.Status == 0 ? "bg-warning text-dark" : 
+                                               Model.Ticket.Status == 1 ? "bg-info" : 
+                                               Model.Ticket.Status == 2 ? "bg-success" : 
+                                               Model.Ticket.Status == 3 ? "bg-secondary" : 
+                                               "bg-danger")">
+                                @Model.Ticket.StatusDisplay
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-4 fw-bold">Table:</div>
+                        <div class="col-sm-8">@Model.Ticket.TableName</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-4 fw-bold">Order #:</div>
+                        <div class="col-sm-8">@Model.Ticket.OrderNumber</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-4 fw-bold">Station:</div>
+                        <div class="col-sm-8">@Model.Ticket.StationName</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-4 fw-bold">Created:</div>
+                        <div class="col-sm-8">@Model.Ticket.CreatedAt.ToString("MM/dd/yyyy HH:mm")</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-4 fw-bold">Wait Time:</div>
+                        <div class="col-sm-8">
+                            <span class="@(Model.Ticket.MinutesSinceCreated > 15 ? "text-danger" : "")">
+                                @Model.Ticket.MinutesSinceCreated minutes
+                            </span>
+                        </div>
+                    </div>
+                    @if (Model.Ticket.CompletedAt.HasValue)
+                    {
+                        <div class="row mb-2">
+                            <div class="col-sm-4 fw-bold">Completed:</div>
+                            <div class="col-sm-8">@Model.Ticket.CompletedAt.Value.ToString("MM/dd/yyyy HH:mm")</div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(Model.OrderNotes))
+                    {
+                        <hr />
+                        <div class="row mb-2">
+                            <div class="col-12 fw-bold">Order Notes:</div>
+                            <div class="col-12 mt-1">
+                                <div class="alert alert-warning">@Model.OrderNotes</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <!-- Ticket Items -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Items</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Qty</th>
+                                    <th>Status</th>
+                                    <th>Time</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.Items)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div>
+                                                <strong>@item.MenuItemName</strong>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(item.SpecialInstructions))
+                                            {
+                                                <div class="text-danger">
+                                                    <small>@item.SpecialInstructions</small>
+                                                </div>
+                                            }
+                                            @if (item.Modifiers.Any())
+                                            {
+                                                <div class="mt-1">
+                                                    @foreach (var modifier in item.Modifiers)
+                                                    {
+                                                        <span class="badge bg-secondary me-1">@modifier</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </td>
+                                        <td>@item.Quantity</td>
+                                        <td>
+                                            <span class="badge @(item.Status == 0 ? "bg-warning text-dark" : 
+                                                                 item.Status == 1 ? "bg-info" : 
+                                                                 item.Status == 2 ? "bg-success" : 
+                                                                 item.Status == 3 ? "bg-secondary" : 
+                                                                 "bg-danger")">
+                                                @item.StatusDisplay
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (item.StartTime.HasValue && !item.CompletionTime.HasValue)
+                                            {
+                                                <span class="@(item.MinutesCooking > item.PrepTime ? "text-danger" : "")">
+                                                    @item.MinutesCooking min
+                                                </span>
+                                            }
+                                            else if (item.StartTime.HasValue && item.CompletionTime.HasValue)
+                                            {
+                                                <span>Completed in @item.MinutesCooking min</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Not started</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (Model.CanUpdateStatus)
+                                            {
+                                                if (item.Status == 0) // New
+                                                {
+                                                    <form method="post" action="@Url.Action("UpdateItemStatus", "Kitchen")" class="d-inline">
+                                                        <input type="hidden" name="ItemId" value="@item.Id" />
+                                                        <input type="hidden" name="TicketId" value="@Model.Ticket.Id" />
+                                                        <input type="hidden" name="Status" value="1" />
+                                                        <button type="submit" class="btn btn-sm btn-info">
+                                                            <i class="fas fa-play"></i> Start
+                                                        </button>
+                                                    </form>
+                                                }
+                                                else if (item.Status == 1) // In Progress
+                                                {
+                                                    <form method="post" action="@Url.Action("UpdateItemStatus", "Kitchen")" class="d-inline">
+                                                        <input type="hidden" name="ItemId" value="@item.Id" />
+                                                        <input type="hidden" name="TicketId" value="@Model.Ticket.Id" />
+                                                        <input type="hidden" name="Status" value="2" />
+                                                        <button type="submit" class="btn btn-sm btn-success">
+                                                            <i class="fas fa-check"></i> Ready
+                                                        </button>
+                                                    </form>
+                                                }
+
+                                                @if (item.Status < 3) // Can cancel if not delivered
+                                                {
+                                                    <form method="post" action="@Url.Action("UpdateItemStatus", "Kitchen")" class="d-inline ms-1">
+                                                        <input type="hidden" name="ItemId" value="@item.Id" />
+                                                        <input type="hidden" name="TicketId" value="@Model.Ticket.Id" />
+                                                        <input type="hidden" name="Status" value="4" />
+                                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to cancel this item?');">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </form>
+                                                }
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Auto refresh the ticket details every 30 seconds
+            setInterval(function() {
+                location.reload();
+            }, 30000);
+        });
+    </script>
+}

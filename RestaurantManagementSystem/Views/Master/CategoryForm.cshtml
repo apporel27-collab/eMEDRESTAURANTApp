@@ -7,8 +7,8 @@
 <form asp-action="CategoryForm" method="post">
     <input type="hidden" asp-for="Id" value="0" />
     <div class="mb-3">
-        <label asp-for="CategoryName" class="form-label"></label>
-        <input asp-for="CategoryName" class="form-control" required />
+        <label asp-for="Name" class="form-label">Category Name</label>
+        <input asp-for="Name" class="form-control" required />
     </div>
     <div class="mb-3 form-check">
         <input asp-for="IsActive" class="form-check-input" />
@@ -22,11 +22,17 @@
     <script>
         $(document).ready(function () {
             var id = '@Model.Id';
+            var isView = '@ViewBag.IsView' === 'True';
+            
             if (id != '0') {
                 // Edit mode
                 $('#Id').val(id);
-                $('#CategoryName').prop('disabled', true);
-                $('#IsActive').prop('disabled', true);
+                
+                // Only disable fields if in view mode
+                if (isView) {
+                    $('#Name').prop('disabled', true);
+                    $('#IsActive').prop('disabled', true);
+                }
             }
         });
     </script>

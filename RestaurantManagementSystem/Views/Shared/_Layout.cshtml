@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/RestaurantManagementSystem.styles.css" asp-append-version="true" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="~/css/datatables.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.13.18/jquery.timepicker.min.css" />
 </head>
 <body>
     <header>
@@ -55,6 +58,27 @@
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="kitchenDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Kitchen
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="kitchenDropdown">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Dashboard">Kitchen Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Tickets">All Tickets</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Stations">Kitchen Stations</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="onlineOrderDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Online Orders
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="onlineOrderDropdown">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="Dashboard">Order Hub Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="Index">Order List</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="OrderSources">Order Sources</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="MenuItemMappings">Menu Item Mappings</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-dark" href="#" id="masterDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 Master
                             </a>
@@ -86,6 +110,10 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/datatables.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.13.18/jquery.timepicker.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

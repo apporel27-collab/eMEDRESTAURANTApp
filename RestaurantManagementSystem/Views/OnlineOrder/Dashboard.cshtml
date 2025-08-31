@@ -1,0 +1,250 @@
+@model RestaurantManagementSystem.ViewModels.OnlineOrderDashboardViewModel
+@{
+    ViewData["Title"] = "Online Orders Dashboard";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Online Orders Dashboard</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="/Home">Home</a></li>
+        <li class="breadcrumb-item active">Online Orders Dashboard</li>
+    </ol>
+    
+    <div class="row">
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-warning text-white mb-4">
+                <div class="card-body">
+                    <h4>New Orders</h4>
+                    <h2>@Model.Stats.NewOrdersCount</h2>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="@Url.Action("Index", "OnlineOrder", new { statusId = 1 })">View Details</a>
+                    <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-primary text-white mb-4">
+                <div class="card-body">
+                    <h4>In Preparation</h4>
+                    <h2>@Model.Stats.InPreparationOrdersCount</h2>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="@Url.Action("Index", "OnlineOrder", new { statusId = 3 })">View Details</a>
+                    <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-success text-white mb-4">
+                <div class="card-body">
+                    <h4>Ready for Pickup</h4>
+                    <h2>@Model.Stats.ReadyForPickupOrdersCount</h2>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="@Url.Action("Index", "OnlineOrder", new { statusId = 4 })">View Details</a>
+                    <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-info text-white mb-4">
+                <div class="card-body">
+                    <h4>Out for Delivery</h4>
+                    <h2>@Model.Stats.OutForDeliveryOrdersCount</h2>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="@Url.Action("Index", "OnlineOrder", new { statusId = 5 })">View Details</a>
+                    <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar me-1"></i>
+                    Today's Orders
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h3>@Model.Stats.TodayOrdersCount Orders</h3>
+                            <p class="text-muted">Total orders received today</p>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <h3>$@Model.Stats.TodayOrdersTotal.ToString("F2")</h3>
+                            <p class="text-muted">Total revenue today</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-sync me-1"></i>
+                    Synchronization Status
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h3>@Model.Stats.UnsyncedOrdersCount</h3>
+                            <p class="text-muted">Orders waiting to be synced</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h3 class="text-danger">@Model.Stats.FailedSyncOrdersCount</h3>
+                            <p class="text-muted">Orders with sync errors</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-table me-1"></i>
+            Recent Online Orders
+        </div>
+        <div class="card-body">
+            <table id="recentOrdersTable" class="table table-striped table-bordered">
+                <thead>
+                    <tr>
+                        <th>Order #</th>
+                        <th>Source</th>
+                        <th>Customer</th>
+                        <th>Status</th>
+                        <th>Total</th>
+                        <th>Type</th>
+                        <th>Date</th>
+                        <th>Sync</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in Model.RecentOrders)
+                    {
+                        <tr>
+                            <td>@order.OrderNumber</td>
+                            <td>@order.OrderSourceName</td>
+                            <td>@order.CustomerName</td>
+                            <td>
+                                <span class="badge" style="background-color: @order.StatusColor">@order.StatusName</span>
+                            </td>
+                            <td>$@order.OrderTotal.ToString("F2")</td>
+                            <td>@(order.IsDelivery ? "Delivery" : "Pickup")</td>
+                            <td>@order.FormattedOrderDate</td>
+                            <td>
+                                @if (order.SyncStatus == 0)
+                                {
+                                    <span class="badge bg-secondary">Not Synced</span>
+                                }
+                                else if (order.SyncStatus == 1)
+                                {
+                                    <span class="badge bg-success">Synced #@order.SyncedToLocalOrderId</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Failed</span>
+                                }
+                            </td>
+                            <td>
+                                <a href="@Url.Action("Details", "OnlineOrder", new { id = order.Id })" class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-globe me-1"></i>
+                    Order Sources
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @foreach (var source in Model.OrderSources)
+                        {
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">@source.Name</h5>
+                                        <p class="card-text text-muted">@source.Description</p>
+                                        <a href="@Url.Action("OrderSourceDetails", "OnlineOrder", new { id = source.Id })" class="btn btn-sm btn-outline-primary">
+                                            View Details
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-webhook me-1"></i>
+                    Recent Webhook Events
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Event</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var webhook in Model.RecentWebhookEvents)
+                            {
+                                <tr>
+                                    <td>@webhook.OrderSourceName</td>
+                                    <td>@webhook.EventType</td>
+                                    <td>
+                                        @if (webhook.ProcessStatus == 0)
+                                        {
+                                            <span class="badge bg-secondary">New</span>
+                                        }
+                                        else if (webhook.ProcessStatus == 1)
+                                        {
+                                            <span class="badge bg-success">Processed</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">Error</span>
+                                        }
+                                    </td>
+                                    <td>@webhook.FormattedCreatedAt</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            $('#recentOrdersTable').DataTable({
+                order: [[6, 'desc']],
+                pageLength: 10
+            });
+        });
+    </script>
+}

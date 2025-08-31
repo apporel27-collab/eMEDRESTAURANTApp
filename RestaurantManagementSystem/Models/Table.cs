@@ -10,7 +10,14 @@ namespace RestaurantManagementSystem.Models
         [Required]
         [StringLength(20)]
         [Display(Name = "Table Number")]
-        public string TableNumber { get; set; }
+        public string TableNumber { get; set; } = string.Empty;
+        
+        // Property that controller expects
+        public string TableName
+        {
+            get { return TableNumber; }
+            set { TableNumber = value; }
+        }
 
         [Required]
         [Display(Name = "Seating Capacity")]

@@ -211,12 +211,12 @@ namespace RestaurantManagementSystem.Controllers
                     SELECT TOP 5
                         t.Id,
                         tb.Id AS TableId,
-                        tb.TableName,
+                        tb.TableNumber,
                         t.GuestName,
                         t.PartySize,
                         t.SeatedAt,
                         t.Status,
-                        u.FullName AS ServerName,
+                        (u.FirstName + ' ' + ISNULL(u.LastName,'')) AS ServerName,
                         DATEDIFF(MINUTE, t.SeatedAt, GETDATE()) AS MinutesSinceSeated
                     FROM TableTurnovers t
                     INNER JOIN Tables tb ON t.TableId = tb.Id
@@ -279,38 +279,36 @@ namespace RestaurantManagementSystem.Controllers
             return tables;
         }
         
-        private List<SelectListItem> GetAvailableServers()
+    private List<SelectListItem> GetAvailableServers()
+    {
+        var servers = new List<SelectListItem>();
+        
+        using (SqlConnection connection = new SqlConnection(_connectionString))
         {
-            var servers = new List<SelectListItem>();
-            
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            connection.Open();
+            using (SqlCommand command = new SqlCommand(@"
+                SELECT Id, FirstName + ' ' + ISNULL(LastName, '') AS FullName
+                FROM Users
+                WHERE Role = 2 -- Server role
+                AND IsActive = 1
+                ORDER BY FirstName, LastName", connection))
             {
-                connection.Open();
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, FullName
-                    FROM Users
-                    WHERE Role = 2 -- Server role
-                    AND IsActive = 1
-                    ORDER BY FullName", connection))
+                using (SqlDataReader reader = command.ExecuteReader())
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    while (reader.Read())
                     {
-                        while (reader.Read())
+                        servers.Add(new SelectListItem
                         {
-                            servers.Add(new SelectListItem
-                            {
-                                Value = reader.GetInt32(0).ToString(),
-                                Text = reader.GetString(1)
-                            });
-                        }
+                            Value = reader.GetInt32(0).ToString(),
+                            Text = reader.GetString(1)
+                        });
                     }
                 }
             }
-            
-            return servers;
         }
         
-        private Reservation GetReservationById(int id)
+        return servers;
+    }        private Reservation GetReservationById(int id)
         {
             Reservation reservation = null;
             
@@ -337,7 +335,7 @@ namespace RestaurantManagementSystem.Controllers
                                 PartySize = reader.GetInt32(4),
                                 ReservationTime = reader.GetDateTime(5),
                                 SpecialRequests = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                Status = reader.GetInt32(7)
+                                Status = (ReservationStatus)reader.GetInt32(7)
                             };
                         }
                     }
@@ -374,7 +372,7 @@ namespace RestaurantManagementSystem.Controllers
                                 CheckInTime = reader.GetDateTime(4),
                                 EstimatedWaitMinutes = reader.GetInt32(5),
                                 SpecialRequests = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                Status = reader.GetInt32(7)
+                                Status = (WaitlistStatus)reader.GetInt32(7)
                             };
                         }
                     }

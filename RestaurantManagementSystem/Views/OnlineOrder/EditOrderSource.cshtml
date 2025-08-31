@@ -1,0 +1,92 @@
+@model RestaurantManagementSystem.ViewModels.OrderSourceDetailsViewModel
+@{
+    ViewData["Title"] = Model.Id > 0 ? "Edit Order Source" : "Add Order Source";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid px-4">
+    <h1 class="mt-4">@(Model.Id > 0 ? "Edit Order Source" : "Add Order Source")</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="/Home">Home</a></li>
+        <li class="breadcrumb-item"><a href="@Url.Action("Dashboard", "OnlineOrder")">Online Orders Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="@Url.Action("OrderSources", "OnlineOrder")">Order Sources</a></li>
+        <li class="breadcrumb-item active">@(Model.Id > 0 ? "Edit" : "Add")</li>
+    </ol>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-edit me-1"></i>
+            @(Model.Id > 0 ? "Edit Order Source" : "Add Order Source")
+        </div>
+        <div class="card-body">
+            <form asp-action="SaveOrderSource" method="post">
+                <input type="hidden" asp-for="Id" />
+                
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                
+                <div class="mb-3 row">
+                    <label asp-for="Name" class="col-sm-3 col-form-label">Order Source Name</label>
+                    <div class="col-sm-9">
+                        <input asp-for="Name" class="form-control" />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                </div>
+                
+                <div class="mb-3 row">
+                    <label asp-for="Description" class="col-sm-3 col-form-label">Description</label>
+                    <div class="col-sm-9">
+                        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                        <span asp-validation-for="Description" class="text-danger"></span>
+                    </div>
+                </div>
+                
+                <div class="mb-3 row">
+                    <label asp-for="ApiKey" class="col-sm-3 col-form-label">API Key</label>
+                    <div class="col-sm-9">
+                        <input asp-for="ApiKey" class="form-control" />
+                        <span asp-validation-for="ApiKey" class="text-danger"></span>
+                    </div>
+                </div>
+                
+                <div class="mb-3 row">
+                    <label asp-for="ApiSecret" class="col-sm-3 col-form-label">API Secret</label>
+                    <div class="col-sm-9">
+                        <input asp-for="ApiSecret" class="form-control" type="password" />
+                        <span asp-validation-for="ApiSecret" class="text-danger"></span>
+                        <small class="form-text text-muted">Leave blank to keep existing secret.</small>
+                    </div>
+                </div>
+                
+                <div class="mb-3 row">
+                    <label asp-for="WebhookUrl" class="col-sm-3 col-form-label">Webhook URL</label>
+                    <div class="col-sm-9">
+                        <input asp-for="WebhookUrl" class="form-control" />
+                        <span asp-validation-for="WebhookUrl" class="text-danger"></span>
+                        <small class="form-text text-muted">URL to send webhooks to the external platform.</small>
+                    </div>
+                </div>
+                
+                <div class="mb-3 row">
+                    <div class="col-sm-3">Active</div>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                            <label asp-for="IsActive" class="form-check-label">Is Active</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3 row">
+                    <div class="col-sm-9 offset-sm-3">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <a asp-action="OrderSources" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

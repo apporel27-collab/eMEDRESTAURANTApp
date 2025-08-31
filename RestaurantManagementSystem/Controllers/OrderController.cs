@@ -124,6 +124,14 @@ namespace RestaurantManagementSystem.Controllers
                                     
                                     if (orderId > 0)
                                     {
+                                        // Create kitchen tickets for the new order if it has items
+                                        using (SqlCommand kitchenCommand = new SqlCommand("UpdateKitchenTicketsForOrder", connection))
+                                        {
+                                            kitchenCommand.CommandType = CommandType.StoredProcedure;
+                                            kitchenCommand.Parameters.AddWithValue("@OrderId", orderId);
+                                            kitchenCommand.ExecuteNonQuery();
+                                        }
+                                        
                                         TempData["SuccessMessage"] = $"Order {orderNumber} created successfully.";
                                         return RedirectToAction("Details", new { id = orderId });
                                     }
@@ -439,6 +447,14 @@ namespace RestaurantManagementSystem.Controllers
                                     
                                     if (orderItemId > 0)
                                     {
+                                        // Create or update kitchen ticket after adding an item
+                                        using (SqlCommand kitchenCommand = new SqlCommand("UpdateKitchenTicketsForOrder", connection))
+                                        {
+                                            kitchenCommand.CommandType = CommandType.StoredProcedure;
+                                            kitchenCommand.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                            kitchenCommand.ExecuteNonQuery();
+                                        }
+                                        
                                         TempData["SuccessMessage"] = "Item added to order successfully.";
                                         return RedirectToAction("Details", new { id = model.OrderId });
                                     }

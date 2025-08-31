@@ -1,0 +1,249 @@
+@model RestaurantManagementSystem.ViewModels.OrderSourceDetailsViewModel
+@{
+    ViewData["Title"] = Model.Name;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid px-4">
+    <h1 class="mt-4">@Model.Name</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="/Home">Home</a></li>
+        <li class="breadcrumb-item"><a href="@Url.Action("Dashboard", "OnlineOrder")">Online Orders Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="@Url.Action("OrderSources", "OnlineOrder")">Order Sources</a></li>
+        <li class="breadcrumb-item active">@Model.Name</li>
+    </ol>
+    
+    <div class="row">
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-info-circle me-1"></i>
+                        Order Source Details
+                    </div>
+                    <div>
+                        <a href="@Url.Action("EditOrderSource", "OnlineOrder", new { id = Model.Id })" class="btn btn-primary btn-sm">
+                            <i class="fas fa-edit me-1"></i> Edit
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3 row">
+                        <label class="col-sm-4 col-form-label"><strong>Name:</strong></label>
+                        <div class="col-sm-8">
+                            <p class="form-control-plaintext">@Model.Name</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-4 col-form-label"><strong>Description:</strong></label>
+                        <div class="col-sm-8">
+                            <p class="form-control-plaintext">@Model.Description</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-4 col-form-label"><strong>API Key:</strong></label>
+                        <div class="col-sm-8">
+                            <p class="form-control-plaintext">
+                                @if (string.IsNullOrEmpty(Model.ApiKey))
+                                {
+                                    <span class="text-muted">Not set</span>
+                                }
+                                else
+                                {
+                                    <code>@Model.ApiKey</code>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-4 col-form-label"><strong>API Secret:</strong></label>
+                        <div class="col-sm-8">
+                            <p class="form-control-plaintext">
+                                @if (string.IsNullOrEmpty(Model.ApiSecret))
+                                {
+                                    <span class="text-muted">Not set</span>
+                                }
+                                else
+                                {
+                                    <span>********</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-4 col-form-label"><strong>Webhook URL:</strong></label>
+                        <div class="col-sm-8">
+                            <p class="form-control-plaintext">
+                                @if (string.IsNullOrEmpty(Model.WebhookUrl))
+                                {
+                                    <span class="text-muted">Not set</span>
+                                }
+                                else
+                                {
+                                    <code>@Model.WebhookUrl</code>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-4 col-form-label"><strong>Status:</strong></label>
+                        <div class="col-sm-8">
+                            <p class="form-control-plaintext">
+                                @if (Model.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Inactive</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h5>Endpoint Information</h5>
+                        <hr />
+                        <div class="alert alert-info">
+                            <p><strong>Webhook Endpoint URL:</strong></p>
+                            <code>https://yourdomain.com/api/webhook/@(Model.Name.ToLower().Replace(" ", ""))</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-cogs me-1"></i>
+                    Configurations
+                </div>
+                <div class="card-body">
+                    @if (!Model.Configurations.Any())
+                    {
+                        <div class="alert alert-info">No configurations have been added yet.</div>
+                    }
+                    else
+                    {
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Value</th>
+                                    <th>Encrypted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var config in Model.Configurations)
+                                {
+                                    <tr>
+                                        <td>@config.ConfigKey</td>
+                                        <td>
+                                            @if (config.IsEncrypted)
+                                            {
+                                                <span>********</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@config.ConfigValue</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (config.IsEncrypted)
+                                            {
+                                                <span class="badge bg-success">Yes</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">No</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-webhook me-1"></i>
+                    Recent Webhook Events
+                </div>
+                <div class="card-body">
+                    @if (!Model.RecentEvents.Any())
+                    {
+                        <div class="alert alert-info">No webhook events have been received yet.</div>
+                    }
+                    else
+                    {
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Event Type</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var webhook in Model.RecentEvents)
+                                {
+                                    <tr>
+                                        <td>@webhook.EventType</td>
+                                        <td>
+                                            @if (webhook.ProcessStatus == 0)
+                                            {
+                                                <span class="badge bg-secondary">New</span>
+                                            }
+                                            else if (webhook.ProcessStatus == 1)
+                                            {
+                                                <span class="badge bg-success">Processed</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">Error</span>
+                                            }
+                                        </td>
+                                        <td>@webhook.FormattedCreatedAt</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-link me-1"></i>
+                    Menu Item Mappings
+                </div>
+                <div class="card-body">
+                    <a href="@Url.Action("MenuItemMappings", "OnlineOrder", new { orderSourceId = Model.Id })" class="btn btn-primary">
+                        <i class="fas fa-list me-1"></i> View Menu Item Mappings
+                    </a>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar me-1"></i>
+                    Order Statistics
+                </div>
+                <div class="card-body">
+                    <!-- Placeholder for future statistics -->
+                    <div class="alert alert-info">
+                        Order statistics will be available soon.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

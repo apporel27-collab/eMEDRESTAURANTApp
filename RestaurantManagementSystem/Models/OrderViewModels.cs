@@ -102,6 +102,8 @@ namespace RestaurantManagementSystem.Models
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal Subtotal { get; set; }
+        public decimal TotalPrice { get; set; }
+        public string Name { get; set; } // Added to resolve the error
         public string SpecialInstructions { get; set; }
         public int? CourseId { get; set; }
         public string CourseName { get; set; }
@@ -207,6 +209,7 @@ namespace RestaurantManagementSystem.Models
     public class ModifierViewModel
     {
         public int Id { get; set; }
+        public int ModifierId { get; set; } // Added to fix the errors
         public string Name { get; set; }
         public decimal Price { get; set; }
         public bool IsDefault { get; set; }

@@ -8,7 +8,12 @@
             <h2>Reservation Management Dashboard</h2>
         </div>
         <div class="col-md-6 text-md-end">
-            <a asp-action="Create" class="btn btn-primary">New Reservation</a>
+            <a asp-action="Create" class="b                            @if (ViewBag.TomorrowsReservations.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center">No reservations for tomorrow</td>
+                                </tr>
+                            }-primary">New Reservation</a>
             <a asp-action="AddToWaitlist" class="btn btn-secondary">Add to Waitlist</a>
             <a asp-action="Tables" class="btn btn-info">Manage Tables</a>
         </div>
@@ -139,7 +144,7 @@
                                     </td>
                                 </tr>
                             }
-                            @if (!ViewBag.TodaysReservations.Count)
+                            @if (ViewBag.TodaysReservations.Count == 0)
                             {
                                 <tr>
                                     <td colspan="6" class="text-center">No reservations today</td>
@@ -226,7 +231,7 @@
                                     </td>
                                 </tr>
                             }
-                            @if (!ViewBag.Waitlist.Count)
+                            @if (ViewBag.Waitlist.Count == 0)
                             {
                                 <tr>
                                     <td colspan="6" class="text-center">Waitlist is empty</td>
@@ -307,7 +312,7 @@
                                     <td>@(string.IsNullOrEmpty(res.SpecialRequests) ? "-" : res.SpecialRequests)</td>
                                 </tr>
                             }
-                            @if (!ViewBag.TomorrowsReservations.Count)
+                            @if (ViewBag.TomorrowsReservations.Count == 0)
                             {
                                 <tr>
                                     <td colspan="6" class="text-center">No reservations for tomorrow</td>

@@ -11,6 +11,13 @@ namespace RestaurantManagementSystem.Models
         [StringLength(100)]
         [Display(Name = "Guest Name")]
         public string GuestName { get; set; }
+        
+        // Property that controller expects
+        public string CustomerName
+        {
+            get { return GuestName; }
+            set { GuestName = value; }
+        }
 
         [Required]
         [Phone]
@@ -26,15 +33,36 @@ namespace RestaurantManagementSystem.Models
         [Required]
         [Display(Name = "Added At")]
         public DateTime AddedAt { get; set; } = DateTime.Now;
+        
+        // Property that controller expects
+        public DateTime CheckInTime
+        {
+            get { return AddedAt; }
+            set { AddedAt = value; }
+        }
 
         [Display(Name = "Quoted Wait Time (minutes)")]
         public int QuotedWaitTime { get; set; } = 30; // Default 30 minutes
+        
+        // Property that controller expects
+        public int EstimatedWaitMinutes
+        {
+            get { return QuotedWaitTime; }
+            set { QuotedWaitTime = value; }
+        }
 
         [Display(Name = "Notify When Ready")]
         public bool NotifyWhenReady { get; set; } = true;
 
         [StringLength(200)]
         public string? Notes { get; set; }
+        
+        // Property that controller expects
+        public string? SpecialRequests
+        {
+            get { return Notes; }
+            set { Notes = value; }
+        }
 
         [Display(Name = "Status")]
         public WaitlistStatus Status { get; set; } = WaitlistStatus.Waiting;

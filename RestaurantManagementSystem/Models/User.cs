@@ -21,6 +21,12 @@ namespace RestaurantManagementSystem.Models
 
         [StringLength(50)]
         public string LastName { get; set; }
+        
+        // Property for full name that controllers expect
+        public string FullName 
+        {
+            get { return $"{FirstName} {LastName}".Trim(); }
+        }
 
         [EmailAddress]
         [StringLength(100)]

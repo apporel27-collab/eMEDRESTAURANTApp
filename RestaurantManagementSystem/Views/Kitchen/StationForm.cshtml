@@ -1,0 +1,114 @@
+@model RestaurantManagementSystem.ViewModels.KitchenStationViewModel
+
+@{
+    ViewData["Title"] = Model.Id > 0 ? "Edit Kitchen Station" : "Add Kitchen Station";
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">@(Model.Id > 0 ? "Edit" : "Add") Kitchen Station</h1>
+        <div>
+            <a href="@Url.Action("Stations", "Kitchen")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Stations
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Station Information</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" action="@Url.Action("SaveStation", "Kitchen")">
+                <input type="hidden" asp-for="Id" />
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label asp-for="Name" class="form-label">Station Name</label>
+                        <input asp-for="Name" class="form-control" />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Status</label>
+                        <div class="form-check form-switch mt-2">
+                            <input asp-for="IsActive" class="form-check-input" />
+                            <label asp-for="IsActive" class="form-check-label">Active</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <label asp-for="Description" class="form-label">Description</label>
+                        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                        <span asp-validation-for="Description" class="text-danger"></span>
+                    </div>
+                </div>
+                
+                <hr class="my-4" />
+                
+                <div class="mb-3">
+                    <h5>Menu Item Assignments</h5>
+                    <p class="text-muted small">Assign menu items to this kitchen station for preparation.</p>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" id="menuItemSearch" class="form-control" placeholder="Search menu items...">
+                            </div>
+                        </div>
+                        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                            @if (Model.AvailableMenuItems.Any())
+                            {
+                                var categories = Model.AvailableMenuItems.Select(m => m.Category).Distinct().OrderBy(c => c).ToList();
+                                
+                                foreach (var category in categories)
+                                {
+                                    <h6 class="mt-3 mb-2">@category</h6>
+                                    <div class="row">
+                                        @foreach (var item in Model.AvailableMenuItems.Where(m => m.Category == category))
+                                        {
+                                            <div class="col-md-6 menu-item-option">
+                                                <div class="form-check mb-2">
+                                                    <input type="checkbox" id="menuItem_@item.Id" name="AssignedMenuItemIds" value="@item.Id" 
+                                                           class="form-check-input" @(item.IsAssigned ? "checked" : "") />
+                                                    <label for="menuItem_@item.Id" class="form-check-label">@item.Name</label>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="text-center">No menu items available</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-end">
+                    <a href="@Url.Action("Stations", "Kitchen")" class="btn btn-outline-secondary me-2">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save Station</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    
+    <script>
+        $(document).ready(function() {
+            // Menu item search functionality
+            $("#menuItemSearch").on("keyup", function() {
+                var value = $(this).val().toLowerCase();
+                $(".menu-item-option").filter(function() {
+                    $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+                });
+            });
+        });
+    </script>
+}

@@ -1,0 +1,314 @@
+@model RestaurantManagementSystem.ViewModels.OnlineOrderDetailsViewModel
+@{
+    ViewData["Title"] = "Order Details";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Order #@Model.OrderNumber</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="/Home">Home</a></li>
+        <li class="breadcrumb-item"><a href="@Url.Action("Dashboard", "OnlineOrder")">Online Orders Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="@Url.Action("Index", "OnlineOrder")">Order List</a></li>
+        <li class="breadcrumb-item active">Order #@Model.OrderNumber</li>
+    </ol>
+    
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Order Information
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-0"><strong>Order #:</strong> @Model.OrderNumber</p>
+                            <p class="mb-0"><strong>External ID:</strong> @Model.ExternalOrderId</p>
+                            <p class="mb-0"><strong>Order Source:</strong> @Model.OrderSourceName</p>
+                            <p class="mb-0"><strong>Order Date:</strong> @Model.FormattedOrderDate</p>
+                            <p class="mb-0"><strong>Last Updated:</strong> @Model.FormattedUpdateDate</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-0">
+                                <strong>Status:</strong> 
+                                <span class="badge" style="background-color: @Model.StatusColor">@Model.StatusName</span>
+                            </p>
+                            <p class="mb-0"><strong>Order Type:</strong> @(Model.IsDelivery ? "Delivery" : "Pickup")</p>
+                            <p class="mb-0"><strong>Sync Status:</strong> @Model.SyncStatusText</p>
+                            @if (Model.SyncStatus == 1)
+                            {
+                                <p class="mb-0"><strong>Local Order ID:</strong> @Model.SyncedToLocalOrderId</p>
+                            }
+                            @if (Model.IsPreOrder)
+                            {
+                                <p class="mb-0"><strong>Pre-Order</strong></p>
+                            }
+                        </div>
+                    </div>
+                    
+                    <form asp-action="UpdateStatus" method="post" class="mt-4">
+                        <input type="hidden" name="OrderId" value="@Model.Id" />
+                        <div class="row">
+                            <div class="col-md-5">
+                                <select name="StatusId" id="StatusId" class="form-select">
+                                    @foreach (var status in Model.AvailableStatuses)
+                                    {
+                                        <option value="@status.Id" 
+                                                selected="@(status.Id == Model.StatusId)" 
+                                                style="background-color: @status.Color; color: white;">
+                                            @status.Name
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-7">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" name="Notes" placeholder="Status notes (optional)" />
+                                    <button class="btn btn-primary" type="submit">Update Status</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    
+                    @if (Model.SyncStatus == 0)
+                    {
+                        <div class="mt-3">
+                            <form asp-action="SyncOrder" method="post">
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-sync-alt me-1"></i> Sync to Local System
+                                </button>
+                            </form>
+                        </div>
+                    }
+                    else if (Model.SyncStatus == 2)
+                    {
+                        <div class="mt-3">
+                            <div class="alert alert-danger">
+                                <strong>Sync Error:</strong> @Model.ErrorDetails
+                                <form asp-action="SyncOrder" method="post" class="mt-2">
+                                    <input type="hidden" name="id" value="@Model.Id" />
+                                    <button type="submit" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-sync-alt me-1"></i> Retry Sync
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-user me-1"></i>
+                    Customer Information
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-0"><strong>Name:</strong> @Model.CustomerName</p>
+                            @if (!string.IsNullOrEmpty(Model.CustomerPhone))
+                            {
+                                <p class="mb-0">
+                                    <strong>Phone:</strong> 
+                                    <a href="tel:@Model.CustomerPhone">@Model.CustomerPhone</a>
+                                </p>
+                            }
+                            @if (!string.IsNullOrEmpty(Model.CustomerEmail))
+                            {
+                                <p class="mb-0">
+                                    <strong>Email:</strong> 
+                                    <a href="mailto:@Model.CustomerEmail">@Model.CustomerEmail</a>
+                                </p>
+                            }
+                        </div>
+                        <div class="col-md-6">
+                            @if (Model.IsDelivery)
+                            {
+                                <p class="mb-0"><strong>Delivery Address:</strong></p>
+                                <p class="mb-0">@Model.DeliveryAddress</p>
+                                
+                                @if (!string.IsNullOrEmpty(Model.DeliveryNotes))
+                                {
+                                    <p class="mb-0"><strong>Delivery Notes:</strong> @Model.DeliveryNotes</p>
+                                }
+                                
+                                <p class="mb-0"><strong>Requested Time:</strong> @(Model.FormattedRequestedDeliveryTime ?? "ASAP")</p>
+                                
+                                @if (Model.ActualDeliveryTime.HasValue)
+                                {
+                                    <p class="mb-0"><strong>Actual Delivery Time:</strong> @Model.FormattedActualDeliveryTime</p>
+                                }
+                            }
+                            else
+                            {
+                                <p class="mb-0"><strong>Pickup Time:</strong> @(Model.FormattedRequestedDeliveryTime ?? "ASAP")</p>
+                            }
+                        </div>
+                    </div>
+                    
+                    @if (Model.IsDelivery && !string.IsNullOrEmpty(Model.DeliveryDriverName))
+                    {
+                        <div class="mt-3">
+                            <p class="mb-0"><strong>Delivery Driver:</strong> @Model.DeliveryDriverName</p>
+                            @if (!string.IsNullOrEmpty(Model.DeliveryDriverPhone))
+                            {
+                                <p class="mb-0">
+                                    <strong>Driver Phone:</strong> 
+                                    <a href="tel:@Model.DeliveryDriverPhone">@Model.DeliveryDriverPhone</a>
+                                </p>
+                            }
+                        </div>
+                    }
+                    
+                    @if (!string.IsNullOrEmpty(Model.SpecialInstructions))
+                    {
+                        <div class="mt-3">
+                            <p><strong>Special Instructions:</strong></p>
+                            <div class="alert alert-info">
+                                @Html.Raw(Model.SpecialInstructions.Replace("\n", "<br />"))
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-shopping-cart me-1"></i>
+            Order Items
+        </div>
+        <div class="card-body">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>External ID</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@item.ProductName</strong>
+                                @if (item.MenuItemId.HasValue)
+                                {
+                                    <span class="text-muted"> (Mapped to: @item.MenuItemName)</span>
+                                }
+                                @if (!string.IsNullOrEmpty(item.SpecialInstructions))
+                                {
+                                    <div class="text-muted small">@item.SpecialInstructions</div>
+                                }
+                                @if (item.Modifiers.Any())
+                                {
+                                    <ul class="list-unstyled ps-3 small">
+                                        @foreach (var modifier in item.Modifiers)
+                                        {
+                                            <li>
+                                                <em>@modifier.ModifierName</em> 
+                                                @if (modifier.Quantity > 1) { <span>x@(modifier.Quantity)</span> }
+                                                <span class="ms-2">$@modifier.UnitPrice.ToString("F2")</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </td>
+                            <td>@item.ExternalProductId</td>
+                            <td>@item.Quantity</td>
+                            <td>$@item.UnitPrice.ToString("F2")</td>
+                            <td>$@item.TotalPrice.ToString("F2")</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
+                        <td>$@((Model.OrderTotal - Model.TaxAmount - Model.DeliveryFee - Model.ServiceFee + Model.DiscountAmount).ToString("F2"))</td>
+                    </tr>
+                    @if (Model.DiscountAmount > 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Discount:</strong> @(string.IsNullOrEmpty(Model.CouponCode) ? "" : $"({Model.CouponCode})")</td>
+                            <td>-$@Model.DiscountAmount.ToString("F2")</td>
+                        </tr>
+                    }
+                    <tr>
+                        <td colspan="4" class="text-end"><strong>Tax:</strong></td>
+                        <td>$@Model.TaxAmount.ToString("F2")</td>
+                    </tr>
+                    @if (Model.DeliveryFee > 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Delivery Fee:</strong></td>
+                            <td>$@Model.DeliveryFee.ToString("F2")</td>
+                        </tr>
+                    }
+                    @if (Model.ServiceFee > 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Service Fee:</strong></td>
+                            <td>$@Model.ServiceFee.ToString("F2")</td>
+                        </tr>
+                    }
+                    @if (Model.Tip > 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Tip:</strong></td>
+                            <td>$@Model.Tip.ToString("F2")</td>
+                        </tr>
+                    }
+                    <tr class="table-primary">
+                        <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                        <td><strong>$@Model.OrderTotal.ToString("F2")</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div class="mt-3">
+                <strong>Payment Method:</strong> @(string.IsNullOrEmpty(Model.PaymentMethod) ? "Not specified" : Model.PaymentMethod)
+                @if (!string.IsNullOrEmpty(Model.PaymentStatus))
+                {
+                    <span class="ms-3">
+                        <strong>Payment Status:</strong>
+                        @if (Model.PaymentStatus.ToLower() == "paid")
+                        {
+                            <span class="badge bg-success">@Model.PaymentStatus</span>
+                        }
+                        else if (Model.PaymentStatus.ToLower() == "pending")
+                        {
+                            <span class="badge bg-warning">@Model.PaymentStatus</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">@Model.PaymentStatus</span>
+                        }
+                    </span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
