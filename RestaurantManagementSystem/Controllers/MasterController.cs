@@ -1,27 +1,67 @@
 using Microsoft.AspNetCore.Mvc;
 using RestaurantManagementSystem.Models;
 using System.Collections.Generic;
+using System.Data;
+using Microsoft.Data.SqlClient;
 
 public class MasterController : Controller
 {
+    private readonly IConfiguration _config;
+    public MasterController(IConfiguration config)
+    {
+        _config = config;
+    }
+
     // Category List
     public IActionResult CategoryList()
     {
-        // Replace with actual DB fetch. For now, use sample data:
-        var categories = new List<Category>
+        var categories = new List<Category>();
+        using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
         {
-            new Category { Id = 1, CategoryName = "Vegetarian", IsActive = true },
-            new Category { Id = 2, CategoryName = "Non-Vegetarian", IsActive = false }
-        };
+            con.Open();
+            using (var cmd = new SqlCommand("SELECT Id, CategoryName, IsActive FROM Category", con))
+            {
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        categories.Add(new Category
+                        {
+                            Id = reader.GetInt32(0),
+                            CategoryName = reader.IsDBNull(1) ? "" : reader.GetString(1), // Fix warning
+                            IsActive = reader.GetBoolean(2)
+                        });
+                    }
+                }
+            }
+        }
         return View(categories);
     }
 
     // Category Add/Edit/View Form
     public IActionResult CategoryForm(int? id, bool isView = false)
     {
-        Category model = id.HasValue
-            ? new Category { Id = id.Value, CategoryName = "Sample", IsActive = true }
-            : new Category { CategoryName = "" };
+        Category model = new Category { CategoryName = "" };
+        if (id.HasValue)
+        {
+            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            {
+                con.Open();
+                using (var cmd = new SqlCommand("SELECT Id, CategoryName, IsActive FROM Category WHERE Id = @Id", con))
+                {
+                    cmd.Parameters.AddWithValue("@Id", id.Value);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            model.Id = reader.GetInt32(0);
+                            model.CategoryName = reader.IsDBNull(1) ? "" : reader.GetString(1); // Fix warning
+                            model.IsActive = reader.GetBoolean(2);
+                        }
+                    }
+                }
+            }
+        }
         ViewBag.IsView = isView;
         return View(model);
     }
@@ -29,19 +69,42 @@ public class MasterController : Controller
     [HttpPost]
     public IActionResult CategoryForm(Category model)
     {
-        if (ModelState.IsValid)
+        string resultMessage = "";
+        using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
         {
-            if (model.Id == 0)
+            con.Open();
+            // Check if updating and Id exists
+            if (model.Id > 0)
             {
-                // TODO: Add new category
+                using (var checkCmd = new SqlCommand("SELECT COUNT(*) FROM Category WHERE Id = @Id", con))
+                {
+                    checkCmd.Parameters.AddWithValue("@Id", model.Id);
+                    int count = (int)checkCmd.ExecuteScalar();
+                    if (count == 0)
+                    {
+                        TempData["ResultMessage"] = "Category update failed. Id not found.";
+                        return RedirectToAction("CategoryList");
+                    }
+                }
             }
-            else
+            using (var cmd = new SqlCommand("usp_UpsertCategory", con))
             {
-                // TODO: Update existing category
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@Id", model.Id == 0 ? 0 : model.Id);
+                cmd.Parameters.AddWithValue("@CategoryName", model.CategoryName);
+                cmd.Parameters.AddWithValue("@IsActive", model.IsActive);
+
+                using (var reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        resultMessage = reader["Message"].ToString();
+                    }
+                }
             }
-            return RedirectToAction("CategoryList");
         }
-        return View(model);
+        TempData["ResultMessage"] = resultMessage;
+        return RedirectToAction("CategoryList");
     }
 
     // Ingredients List
