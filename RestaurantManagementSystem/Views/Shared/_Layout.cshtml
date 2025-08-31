@@ -23,6 +23,37 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="reservationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Reservations
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="reservationsDropdown">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Dashboard">Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="List">Reservations List</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Waitlist">Waitlist</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Tables">Tables</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="tableServiceDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Table Service
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="tableServiceDropdown">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="Dashboard">Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="ActiveTables">Active Tables</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="SeatGuest">Seat New Guest</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="masterDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Master
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="masterDropdown">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="CategoryList">Categories</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="IngredientsList">Ingredients</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="User" asp-action="UserList">Users & Roles</a></li>
+                            </ul>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
                         </li>
