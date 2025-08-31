@@ -1,0 +1,75 @@
+@model VoidPaymentViewModel
+@{
+    ViewData["Title"] = "Void Payment";
+}
+
+<div class="container-fluid p-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>@ViewData["Title"]</h1>
+        <div>
+            <a asp-action="Index" asp-route-id="@Model.OrderId" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Payment Management
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mx-auto">
+            <div class="card mb-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Warning: Void Payment</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <p><strong>Warning:</strong> Voiding a payment cannot be undone. This will remove the payment from the order and may reopen a closed order.</p>
+                    </div>
+                    
+                    <h5 class="mb-3">Payment Details</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Order:</dt>
+                        <dd class="col-sm-8">#@Model.OrderNumber</dd>
+                        
+                        <dt class="col-sm-4">Payment Method:</dt>
+                        <dd class="col-sm-8">@Model.PaymentMethodDisplay</dd>
+                        
+                        <dt class="col-sm-4">Amount:</dt>
+                        <dd class="col-sm-8">$@Model.PaymentAmount.ToString("F2")</dd>
+                        
+                        <dt class="col-sm-4">Tip:</dt>
+                        <dd class="col-sm-8">$@Model.TipAmount.ToString("F2")</dd>
+                        
+                        <dt class="col-sm-4">Date/Time:</dt>
+                        <dd class="col-sm-8">@Model.PaymentDate.ToString("MM/dd/yyyy HH:mm")</dd>
+                    </dl>
+                    
+                    <form asp-action="VoidPayment" method="post">
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                        <input type="hidden" asp-for="PaymentId" />
+                        <input type="hidden" asp-for="OrderId" />
+                        <input type="hidden" asp-for="OrderNumber" />
+                        <input type="hidden" asp-for="PaymentAmount" />
+                        <input type="hidden" asp-for="TipAmount" />
+                        <input type="hidden" asp-for="PaymentMethodDisplay" />
+                        <input type="hidden" asp-for="PaymentDate" />
+                        
+                        <div class="mb-3">
+                            <label asp-for="Reason" class="form-label"></label>
+                            <textarea asp-for="Reason" class="form-control" rows="3" required></textarea>
+                            <span asp-validation-for="Reason" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="fas fa-ban"></i> Void Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

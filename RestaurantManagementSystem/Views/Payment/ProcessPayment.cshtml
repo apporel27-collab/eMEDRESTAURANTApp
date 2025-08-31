@@ -1,0 +1,200 @@
+@model ProcessPaymentViewModel
+@{
+    ViewData["Title"] = "Process Payment";
+}
+
+<div class="container-fluid p-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>@ViewData["Title"]</h1>
+        <div>
+            <a asp-action="Index" asp-route-id="@Model.OrderId" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Payment Management
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Process Payment for Order #@Model.OrderNumber</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="ProcessPayment" method="post">
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                        <input type="hidden" asp-for="OrderId" />
+                        <input type="hidden" asp-for="OrderNumber" />
+                        <input type="hidden" asp-for="TotalAmount" />
+                        <input type="hidden" asp-for="RemainingAmount" />
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Order Total</label>
+                                    <div class="form-control-plaintext">$@Model.TotalAmount.ToString("F2")</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Remaining Balance</label>
+                                    <div class="form-control-plaintext">$@Model.RemainingAmount.ToString("F2")</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="PaymentMethodId" class="form-label"></label>
+                            <select asp-for="PaymentMethodId" asp-items="Model.AvailablePaymentMethods" class="form-select" id="paymentMethodSelect">
+                                <option value="">-- Select Payment Method --</option>
+                            </select>
+                            <span asp-validation-for="PaymentMethodId" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="Amount" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input asp-for="Amount" class="form-control" />
+                            </div>
+                            <span asp-validation-for="Amount" class="text-danger"></span>
+                            
+                            <div class="d-flex justify-content-between mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-amount" data-amount="@Math.Round(Model.RemainingAmount, 2)">Full Amount</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-amount" data-amount="@Math.Round(Model.RemainingAmount / 2, 2)">Half</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-amount" data-amount="10.00">$10.00</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-amount" data-amount="20.00">$20.00</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-amount" data-amount="50.00">$50.00</button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="TipAmount" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input asp-for="TipAmount" class="form-control" />
+                            </div>
+                            <span asp-validation-for="TipAmount" class="text-danger"></span>
+                            
+                            <div class="d-flex justify-content-between mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-tip" data-percent="15">15%</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-tip" data-percent="18">18%</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-tip" data-percent="20">20%</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-tip" data-percent="25">25%</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary quick-tip" data-amount="0">No Tip</button>
+                            </div>
+                        </div>
+                        
+                        <div id="cardPaymentFields" style="display: none;">
+                            <hr />
+                            <h5>Card Information</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label asp-for="CardType" class="form-label"></label>
+                                        <select asp-for="CardType" asp-items="Model.CardTypes" class="form-select">
+                                            <option value="">-- Select Card Type --</option>
+                                        </select>
+                                        <span asp-validation-for="CardType" class="text-danger"></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label asp-for="LastFourDigits" class="form-label"></label>
+                                        <input asp-for="LastFourDigits" class="form-control" maxlength="4" />
+                                        <span asp-validation-for="LastFourDigits" class="text-danger"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label asp-for="AuthorizationCode" class="form-label"></label>
+                                        <input asp-for="AuthorizationCode" class="form-control" />
+                                        <span asp-validation-for="AuthorizationCode" class="text-danger"></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label asp-for="ReferenceNumber" class="form-label"></label>
+                                        <input asp-for="ReferenceNumber" class="form-control" />
+                                        <span asp-validation-for="ReferenceNumber" class="text-danger"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="Notes" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-check-circle"></i> Process Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    
+    <script>
+        $(document).ready(function() {
+            // Show/hide card payment fields based on payment method
+            $('#paymentMethodSelect').change(function() {
+                var selectedOption = $(this).find('option:selected');
+                var requiresCardInfo = false;
+                
+                // We'll use AJAX to get payment method details or store this in data attributes
+                $.ajax({
+                    url: '/Payment/GetPaymentMethodDetails',
+                    type: 'GET',
+                    data: { id: $(this).val() },
+                    success: function(data) {
+                        if (data && data.requiresCardInfo) {
+                            $('#cardPaymentFields').show();
+                        } else {
+                            $('#cardPaymentFields').hide();
+                        }
+                    },
+                    error: function() {
+                        // Fallback: simple check if payment method contains "card"
+                        var paymentMethodText = selectedOption.text().toLowerCase();
+                        if (paymentMethodText.includes('card') || paymentMethodText.includes('credit') || paymentMethodText.includes('debit')) {
+                            $('#cardPaymentFields').show();
+                        } else {
+                            $('#cardPaymentFields').hide();
+                        }
+                    }
+                });
+            });
+            
+            // Quick amount buttons
+            $('.quick-amount').click(function() {
+                var amount = $(this).data('amount');
+                $('#Amount').val(amount.toFixed(2));
+            });
+            
+            // Quick tip buttons
+            $('.quick-tip').click(function() {
+                var amount = parseFloat($('#Amount').val()) || 0;
+                
+                if ($(this).data('percent')) {
+                    var percent = $(this).data('percent');
+                    var tipAmount = amount * (percent / 100);
+                    $('#TipAmount').val(tipAmount.toFixed(2));
+                } else {
+                    $('#TipAmount').val($(this).data('amount').toFixed(2));
+                }
+            });
+        });
+    </script>
+}

@@ -13,6 +13,9 @@
             <a asp-action="BrowseMenu" asp-route-id="@Model.Id" class="btn btn-primary">
                 <i class="fas fa-utensils"></i> Add Items
             </a>
+            <a asp-controller="Payment" asp-action="Index" asp-route-id="@Model.Id" class="btn btn-success">
+                <i class="fas fa-credit-card"></i> Process Payment
+            </a>
         </div>
     </div>
 
