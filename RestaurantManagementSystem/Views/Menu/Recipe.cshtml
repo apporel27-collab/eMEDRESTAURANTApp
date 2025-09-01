@@ -1,0 +1,320 @@
+@model RestaurantManagementSystem.ViewModels.RecipeViewModel
+
+@{
+    ViewData["Title"] = "Recipe Management";
+    var menuItemId = Model.MenuItemId;
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>@(Model.Id > 0 ? "Edit" : "Create") Recipe for @Model.MenuItemName</h4>
+                    <div class="float-right">
+                        <a asp-action="Details" asp-route-id="@menuItemId" class="btn btn-secondary">
+                            <i class="fa fa-arrow-left"></i> Back to Menu Item
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Recipe" method="post" enctype="multipart/form-data">
+                        <input type="hidden" asp-for="Id" />
+                        <input type="hidden" asp-for="MenuItemId" />
+                        <input type="hidden" asp-for="MenuItemName" />
+                        <input type="hidden" asp-for="CreatedById" />
+                        <input type="hidden" asp-for="Version" />
+                        
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label asp-for="Title" class="control-label"></label>
+                                    <input asp-for="Title" class="form-control" />
+                                    <span asp-validation-for="Title" class="text-danger"></span>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label asp-for="Yield" class="control-label"></label>
+                                    <input asp-for="Yield" class="form-control" type="number" min="1" />
+                                    <span asp-validation-for="Yield" class="text-danger"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label asp-for="PreparationTimeMinutes" class="control-label"></label>
+                                    <input asp-for="PreparationTimeMinutes" class="form-control" type="number" min="1" />
+                                    <span asp-validation-for="PreparationTimeMinutes" class="text-danger"></span>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label asp-for="CookingTimeMinutes" class="control-label"></label>
+                                    <input asp-for="CookingTimeMinutes" class="form-control" type="number" min="0" />
+                                    <span asp-validation-for="CookingTimeMinutes" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label asp-for="PreparationInstructions" class="control-label"></label>
+                            <textarea asp-for="PreparationInstructions" class="form-control" rows="5"></textarea>
+                            <span asp-validation-for="PreparationInstructions" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label asp-for="CookingInstructions" class="control-label"></label>
+                            <textarea asp-for="CookingInstructions" class="form-control" rows="5"></textarea>
+                            <span asp-validation-for="CookingInstructions" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label asp-for="PlatingInstructions" class="control-label"></label>
+                            <textarea asp-for="PlatingInstructions" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="PlatingInstructions" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label asp-for="Notes" class="control-label"></label>
+                            <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="Notes" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="form-check mb-4">
+                            <input asp-for="IsArchived" class="form-check-input" />
+                            <label asp-for="IsArchived" class="form-check-label"></label>
+                        </div>
+                        
+                        <h4>Recipe Steps</h4>
+                        <p class="text-muted">Break down the recipe into sequential steps</p>
+                        
+                        <div class="mb-3">
+                            <button type="button" id="addStepButton" class="btn btn-success">
+                                <i class="fa fa-plus"></i> Add Step
+                            </button>
+                        </div>
+                        
+                        <div id="stepsContainer">
+                            @for (var i = 0; i < Model.Steps.Count; i++)
+                            {
+                                <div class="card mb-3 step-card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5>Step <span class="step-number">@Model.Steps[i].StepNumber</span></h5>
+                                        <button type="button" class="btn btn-sm btn-danger remove-step">
+                                            <i class="fa fa-times"></i> Remove
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <input type="hidden" name="Steps[@i].Id" value="@Model.Steps[i].Id" />
+                                        <input type="hidden" name="Steps[@i].ImagePath" value="@Model.Steps[i].ImagePath" />
+
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label>Step Number</label>
+                                                    <input type="number" name="Steps[@i].StepNumber" value="@Model.Steps[i].StepNumber" class="form-control step-number-input" min="1" required />
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label>Description</label>
+                                                    <textarea name="Steps[@i].Description" class="form-control" rows="3" required>@Model.Steps[i].Description</textarea>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label>Time Required (minutes)</label>
+                                                            <input type="number" name="Steps[@i].TimeRequiredMinutes" value="@Model.Steps[i].TimeRequiredMinutes" class="form-control" min="0" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label>Temperature</label>
+                                                            <input type="text" name="Steps[@i].Temperature" value="@Model.Steps[i].Temperature" class="form-control" placeholder="e.g. 350°F, Medium-High" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label>Special Equipment</label>
+                                                    <input type="text" name="Steps[@i].SpecialEquipment" value="@Model.Steps[i].SpecialEquipment" class="form-control" />
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label>Tips</label>
+                                                    <textarea name="Steps[@i].Tips" class="form-control" rows="2">@Model.Steps[i].Tips</textarea>
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label>Image</label>
+                                                    @if (!string.IsNullOrEmpty(Model.Steps[i].ImagePath))
+                                                    {
+                                                        <div class="mb-2">
+                                                            <img src="@Model.Steps[i].ImagePath" class="img-thumbnail" style="max-height: 100px;" />
+                                                        </div>
+                                                    }
+                                                    <div class="custom-file">
+                                                        <input type="file" name="Steps[@i].ImageFile" class="custom-file-input" accept="image/*" onchange="displayFileName(this)" />
+                                                        <label class="custom-file-label">Choose file</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        
+                        <div class="form-group mt-4 text-right">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-save"></i> Save Recipe
+                            </button>
+                            <a asp-action="Details" asp-route-id="@menuItemId" class="btn btn-secondary">
+                                <i class="fa fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template for new step -->
+<template id="stepTemplate">
+    <div class="card mb-3 step-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5>Step <span class="step-number">{number}</span></h5>
+            <button type="button" class="btn btn-sm btn-danger remove-step">
+                <i class="fa fa-times"></i> Remove
+            </button>
+        </div>
+        <div class="card-body">
+            <input type="hidden" name="Steps[{index}].Id" value="0" />
+            <input type="hidden" name="Steps[{index}].ImagePath" value="" />
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Step Number</label>
+                        <input type="number" name="Steps[{index}].StepNumber" value="{number}" class="form-control step-number-input" min="1" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea name="Steps[{index}].Description" class="form-control" rows="3" required></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Time Required (minutes)</label>
+                                <input type="number" name="Steps[{index}].TimeRequiredMinutes" class="form-control" min="0" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Temperature</label>
+                                <input type="text" name="Steps[{index}].Temperature" class="form-control" placeholder="e.g. 350°F, Medium-High" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Special Equipment</label>
+                        <input type="text" name="Steps[{index}].SpecialEquipment" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tips</label>
+                        <textarea name="Steps[{index}].Tips" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Image</label>
+                        <div class="custom-file">
+                            <input type="file" name="Steps[{index}].ImageFile" class="custom-file-input" accept="image/*" onchange="displayFileName(this)" />
+                            <label class="custom-file-label">Choose file</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+
+    <script>
+        // Display filename when selecting an image
+        function displayFileName(input) {
+            if (input.files && input.files[0]) {
+                var fileName = input.files[0].name;
+                $(input).next('.custom-file-label').html(fileName);
+            }
+        }
+        
+        $(document).ready(function() {
+            let stepIndex = @Model.Steps.Count;
+            let nextStepNumber = @(Model.Steps.Count > 0 ? Model.Steps.Max(s => s.StepNumber) + 1 : 1);
+            
+            // Add step
+            $("#addStepButton").click(function() {
+                const template = $("#stepTemplate").html();
+                const newStep = template
+                    .replace(/{index}/g, stepIndex)
+                    .replace(/{number}/g, nextStepNumber);
+                
+                $("#stepsContainer").append(newStep);
+                stepIndex++;
+                nextStepNumber++;
+            });
+            
+            // Remove step
+            $(document).on("click", ".remove-step", function() {
+                $(this).closest(".step-card").remove();
+                updateStepNumbers();
+            });
+            
+            // Update step numbers when step number input changes
+            $(document).on("change", ".step-number-input", function() {
+                updateStepNumbers();
+            });
+            
+            // Update step numbers
+            function updateStepNumbers() {
+                // Sort cards by step number
+                const cards = $(".step-card").toArray();
+                cards.sort((a, b) => {
+                    const numA = parseInt($(a).find(".step-number-input").val());
+                    const numB = parseInt($(b).find(".step-number-input").val());
+                    return numA - numB;
+                });
+                
+                // Update the displayed step number
+                $(cards).each(function(i) {
+                    $(this).find(".step-number").text(i+1);
+                });
+                
+                // Update nextStepNumber
+                if (cards.length > 0) {
+                    const maxStepNumber = Math.max(...cards.map(c => parseInt($(c).find(".step-number-input").val())));
+                    nextStepNumber = maxStepNumber + 1;
+                } else {
+                    nextStepNumber = 1;
+                }
+            }
+            
+            // Add one step if none exist
+            if ($("#stepsContainer").children().length === 0) {
+                $("#addStepButton").click();
+            }
+        });
+    </script>
+}

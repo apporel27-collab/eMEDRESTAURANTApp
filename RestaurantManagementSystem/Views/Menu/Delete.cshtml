@@ -1,0 +1,81 @@
+@model RestaurantManagementSystem.Models.MenuItem
+
+@{
+    ViewData["Title"] = "Delete Menu Item";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4>Delete Menu Item</h4>
+                    <div class="float-right">
+                        <a asp-action="Index" class="btn btn-outline-light">
+                            <i class="fa fa-arrow-left"></i> Back to List
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fa fa-exclamation-triangle"></i> Are you sure you want to delete this menu item? This action cannot be undone.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            @if (!string.IsNullOrEmpty(Model.ImagePath))
+                            {
+                                <img src="@Model.ImagePath" alt="@Model.Name" class="img-fluid rounded mb-3" style="max-height:200px;" />
+                            }
+                            else
+                            {
+                                <div class="bg-light p-5 rounded text-center text-muted mb-3">
+                                    <i class="fa fa-image fa-5x"></i>
+                                    <p>No image available</p>
+                                </div>
+                            }
+                        </div>
+                        <div class="col-md-8">
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <tr>
+                                        <th>PLU Code</th>
+                                        <td>@Model.PLUCode</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Name</th>
+                                        <td>@Model.Name</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Price</th>
+                                        <td>@Model.Price.ToString("C")</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Category</th>
+                                        <td>@Model.Category?.Name</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Description</th>
+                                        <td>@Model.Description</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form asp-action="Delete" method="post" class="mt-4">
+                        <input type="hidden" asp-for="Id" />
+                        <div class="text-right">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fa fa-trash"></i> Delete
+                            </button>
+                            <a asp-action="Index" class="btn btn-secondary">
+                                <i class="fa fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

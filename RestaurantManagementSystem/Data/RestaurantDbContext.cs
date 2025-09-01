@@ -15,6 +15,16 @@ namespace RestaurantManagementSystem.Data
         public DbSet<Ingredients> Ingredients { get; set; } = null!;
         public DbSet<Table> Tables { get; set; } = null!;
         public DbSet<Reservation> Reservations { get; set; } = null!;
+        
+        // Menu and Recipe Management
+        public DbSet<MenuItem> MenuItems { get; set; } = null!;
+        public DbSet<Allergen> Allergens { get; set; } = null!;
+        public DbSet<MenuItemAllergen> MenuItemAllergens { get; set; } = null!;
+        public DbSet<Modifier> Modifiers { get; set; } = null!;
+        public DbSet<MenuItemModifier> MenuItemModifiers { get; set; } = null!;
+        public DbSet<MenuItemIngredient> MenuItemIngredients { get; set; } = null!;
+        public DbSet<Recipe> Recipes { get; set; } = null!;
+        public DbSet<RecipeStep> RecipeSteps { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

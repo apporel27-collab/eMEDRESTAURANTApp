@@ -1,0 +1,221 @@
+@model RestaurantManagementSystem.Models.Recipe
+
+@{
+    ViewData["Title"] = "Recipe Details";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Recipe Details: @Model.Title</h4>
+                    <div class="float-right">
+                        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">
+                            <i class="fa fa-edit"></i> Edit
+                        </a>
+                        <a asp-controller="Menu" asp-action="Details" asp-route-id="@Model.MenuItemId" class="btn btn-secondary">
+                            <i class="fa fa-utensils"></i> Menu Item
+                        </a>
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="fa fa-list"></i> Back to List
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5>Recipe Information</h5>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <th>Menu Item:</th>
+                                            <td>@Model.MenuItem?.Name</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Yield:</th>
+                                            <td>@Model.Yield serving(s)</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Prep Time:</th>
+                                            <td>@Model.PreparationTimeMinutes minutes</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Cooking Time:</th>
+                                            <td>@Model.CookingTimeMinutes minutes</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Total Time:</th>
+                                            <td>@(Model.PreparationTimeMinutes + Model.CookingTimeMinutes) minutes</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Version:</th>
+                                            <td>@Model.Version</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Status:</th>
+                                            <td>
+                                                @if (Model.IsArchived)
+                                                {
+                                                    <span class="badge badge-secondary">Archived</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge badge-success">Active</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>Last Updated:</th>
+                                            <td>@Model.LastUpdated.ToString("MM/dd/yyyy h:mm tt")</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            @if (!string.IsNullOrEmpty(Model.Notes))
+                            {
+                                <div class="card mb-4">
+                                    <div class="card-header bg-info text-white">
+                                        <h5>Chef's Notes</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <p>@Model.Notes</p>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="col-md-8">
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white">
+                                    <h5>Preparation Instructions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p style="white-space: pre-line;">@Model.PreparationInstructions</p>
+                                </div>
+                            </div>
+
+                            <div class="card mb-4">
+                                <div class="card-header bg-warning">
+                                    <h5>Cooking Instructions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p style="white-space: pre-line;">@Model.CookingInstructions</p>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(Model.PlatingInstructions))
+                            {
+                                <div class="card mb-4">
+                                    <div class="card-header bg-secondary text-white">
+                                        <h5>Plating Instructions</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <p style="white-space: pre-line;">@Model.PlatingInstructions</p>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @if (Model.Steps != null && Model.Steps.Any())
+                    {
+                        <hr />
+                        <h4 class="mt-4 mb-3">Recipe Steps</h4>
+                        
+                        <div class="timeline">
+                            @foreach (var step in Model.Steps.OrderBy(s => s.StepNumber))
+                            {
+                                <div class="card mb-4">
+                                    <div class="card-header bg-light">
+                                        <h5>Step @step.StepNumber</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="@(string.IsNullOrEmpty(step.ImagePath) ? "col-md-12" : "col-md-8")">
+                                                <p style="white-space: pre-line;">@step.Description</p>
+                                                
+                                                <div class="row mt-3">
+                                                    @if (step.TimeRequiredMinutes.HasValue)
+                                                    {
+                                                        <div class="col-md-4 mb-2">
+                                                            <strong><i class="fa fa-clock"></i> Time Required:</strong>
+                                                            <p>@step.TimeRequiredMinutes minutes</p>
+                                                        </div>
+                                                    }
+                                                    
+                                                    @if (!string.IsNullOrEmpty(step.Temperature))
+                                                    {
+                                                        <div class="col-md-4 mb-2">
+                                                            <strong><i class="fa fa-temperature-high"></i> Temperature:</strong>
+                                                            <p>@step.Temperature</p>
+                                                        </div>
+                                                    }
+                                                    
+                                                    @if (!string.IsNullOrEmpty(step.SpecialEquipment))
+                                                    {
+                                                        <div class="col-md-4 mb-2">
+                                                            <strong><i class="fa fa-tools"></i> Equipment:</strong>
+                                                            <p>@step.SpecialEquipment</p>
+                                                        </div>
+                                                    }
+                                                </div>
+                                                
+                                                @if (!string.IsNullOrEmpty(step.Tips))
+                                                {
+                                                    <div class="alert alert-info mt-2">
+                                                        <strong><i class="fa fa-lightbulb"></i> Tip:</strong>
+                                                        <p class="mb-0">@step.Tips</p>
+                                                    </div>
+                                                }
+                                            </div>
+                                            
+                                            @if (!string.IsNullOrEmpty(step.ImagePath))
+                                            {
+                                                <div class="col-md-4">
+                                                    <img src="@step.ImagePath" class="img-fluid rounded" alt="Step @step.StepNumber" />
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .timeline .card {
+        position: relative;
+        margin-left: 30px;
+    }
+    
+    .timeline .card::before {
+        content: '';
+        position: absolute;
+        left: -30px;
+        top: 0;
+        height: 100%;
+        width: 2px;
+        background-color: #ddd;
+    }
+    
+    .timeline .card-header:before {
+        content: '';
+        position: absolute;
+        left: -38px;
+        top: 15px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background-color: #007bff;
+    }
+</style>

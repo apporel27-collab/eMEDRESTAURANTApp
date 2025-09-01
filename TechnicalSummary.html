@@ -1,0 +1,291 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="ProgId" content="Word.Document" />
+<meta name="Generator" content="Microsoft Word 15" />
+<meta name="Originator" content="Microsoft Word 15" />
+<style>
+@page {
+    size: 8.5in 11in;
+    margin: 1in 1in 1in 1in;
+}
+body {
+    font-family: 'Calibri', sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+}
+h1 {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #2F5496;
+    margin-top: 24pt;
+    margin-bottom: 6pt;
+}
+h2 {
+    font-size: 14pt;
+    font-weight: bold;
+    color: #2F5496;
+    margin-top: 18pt;
+    margin-bottom: 6pt;
+}
+h3 {
+    font-size: 12pt;
+    font-weight: bold;
+    color: #1F3864;
+    margin-top: 12pt;
+    margin-bottom: 6pt;
+}
+p {
+    margin-top: 0pt;
+    margin-bottom: 10pt;
+}
+.code {
+    font-family: 'Courier New', monospace;
+    background-color: #F5F5F5;
+    padding: 5pt;
+    border: 1px solid #E0E0E0;
+    font-size: 10pt;
+}
+ul {
+    margin-top: 0pt;
+    margin-bottom: 10pt;
+}
+li {
+    margin-bottom: 5pt;
+}
+</style>
+</head>
+<body>
+<h1 style="text-align: center;">Restaurant Management System</h1>
+<h2 style="text-align: center;">Technical Summary Document</h2>
+<p style="text-align: center;">Date: August 31, 2025</p>
+
+<h2>Overview</h2>
+<p>This technical document summarizes the development work performed on the Restaurant Management System application, including feature implementations, bug fixes, and architectural improvements. The system is built using ASP.NET Core MVC with Entity Framework Core for data access and Microsoft SQL Server for data storage.</p>
+
+<h2>System Architecture</h2>
+<p>The application follows an MVC (Model-View-Controller) architecture pattern with the following components:</p>
+<ul>
+    <li><strong>Models</strong>: Data representations for business entities</li>
+    <li><strong>Views</strong>: UI templates implemented with Razor views</li>
+    <li><strong>Controllers</strong>: Handle user requests and coordinate interactions</li>
+    <li><strong>Middleware</strong>: Custom components for cross-cutting concerns</li>
+    <li><strong>Data Layer</strong>: Entity Framework Core for database interactions</li>
+</ul>
+
+<h2>Core Modules Implemented</h2>
+
+<h3>1. Table Service Module</h3>
+<ul>
+    <li>Implemented dashboard for restaurant floor management</li>
+    <li>Added ability to seat guests from reservations or waitlist</li>
+    <li>Created server assignment functionality for tables</li>
+    <li>Developed table status tracking (Available, Occupied, Dirty)</li>
+    <li>Fixed issue with server dropdown in SeatGuest view by correcting SQL query to concatenate FirstName and LastName fields</li>
+</ul>
+
+<h3>2. Category Management</h3>
+<ul>
+    <li>Implemented CRUD operations for menu categories</li>
+    <li>Fixed bug in CategoryForm.cshtml that prevented editing of categories</li>
+    <li>Modified CategoryForm view to properly handle edit/view states</li>
+    <li>Resolved issue with computed column "CategoryName" by refactoring model to use "Name" as primary property</li>
+</ul>
+
+<h3>3. Kitchen Management System</h3>
+<ul>
+    <li>Developed kitchen ticket tracking system</li>
+    <li>Created kitchen stations configuration</li>
+    <li>Implemented order routing to appropriate kitchen stations</li>
+    <li>Added ticket status tracking and updates</li>
+    <li>Developed kitchen dashboard for monitoring active tickets</li>
+</ul>
+
+<h3>4. Online Order Integration</h3>
+<ul>
+    <li>Built framework for integrating with third-party delivery services</li>
+    <li>Created order source configuration management</li>
+    <li>Implemented menu item mapping for external services</li>
+    <li>Developed order processing pipeline</li>
+    <li>Added API webhook handlers for order status updates</li>
+</ul>
+
+<h3>5. Database Improvements</h3>
+<ul>
+    <li>Created DatabaseColumnFixMiddleware for automatic schema reconciliation</li>
+    <li>Implemented proper Entity Framework Core model configurations</li>
+    <li>Added SQL migration scripts for database schema changes</li>
+    <li>Fixed issues with computed columns in database</li>
+</ul>
+
+<h2>Technical Implementations</h2>
+
+<h3>Entity Framework Core Integration</h3>
+<ul>
+    <li>Configured DbContext with fluent API for entity mapping</li>
+    <li>Set up proper relationships between entities</li>
+    <li>Implemented data access patterns for efficient querying</li>
+</ul>
+
+<h3>Middleware Components</h3>
+<ul>
+    <li>Created DatabaseColumnFixMiddleware that:</li>
+    <ul>
+        <li>Automatically detects database schema mismatches</li>
+        <li>Fixes computed column issues (e.g., CategoryName)</li>
+        <li>Ensures database schema compatibility with models</li>
+    </ul>
+</ul>
+
+<h3>Model Refactoring</h3>
+<p>Refactored Category model to resolve computed column issues:</p>
+<div class="code">
+public class Category<br />
+{<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public int Id { get; set; }<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public required string Name { get; set; }<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public bool IsActive { get; set; }<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;// Property wrapper that maps to the old computed column<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public string CategoryName<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get => Name;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set => Name = value;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}<br />
+}
+</div>
+
+<h3>User Interface Enhancements</h3>
+<ul>
+    <li>Improved form handling for edit/view modes</li>
+    <li>Fixed disabled fields in CategoryForm</li>
+    <li>Enhanced table service interface for better usability</li>
+    <li>Created dashboards for different functional areas</li>
+</ul>
+
+<h3>SQL Query Optimization</h3>
+<p>Fixed TableServiceController.GetAvailableServers() method:</p>
+<div class="code">
+private List&lt;SelectListItem&gt; GetAvailableServers()<br />
+{<br />
+&nbsp;&nbsp;&nbsp;&nbsp;var servers = new List&lt;SelectListItem&gt;();<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;using (SqlConnection connection = new SqlConnection(_connectionString))<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.Open();<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;using (SqlCommand command = new SqlCommand(@"<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SELECT Id, FirstName + ' ' + ISNULL(LastName, '') AS FullName<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FROM Users<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WHERE Role = 2 -- Server role<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AND IsActive = 1<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ORDER BY FirstName, LastName", connection))<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;using (SqlDataReader reader = command.ExecuteReader())<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while (reader.Read())<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;servers.Add(new SelectListItem<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Value = reader.GetInt32(0).ToString(),<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Text = reader.GetString(1)<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;return servers;<br />
+}
+</div>
+
+<h2>Bug Fixes</h2>
+
+<h3>1. Category Edit Functionality</h3>
+<ul>
+    <li><strong>Problem:</strong> Category edit form had disabled input fields in edit mode</li>
+    <li><strong>Solution:</strong> Modified JavaScript in CategoryForm.cshtml to only disable fields in view mode</li>
+    <li><strong>Impact:</strong> Users can now properly edit category information</li>
+</ul>
+
+<h3>2. Server Dropdown Empty Issue</h3>
+<ul>
+    <li><strong>Problem:</strong> Server dropdown in SeatGuest page was empty</li>
+    <li><strong>Solution:</strong> Fixed SQL query in GetAvailableServers() to use FirstName + LastName instead of non-existent FullName column</li>
+    <li><strong>Impact:</strong> Restaurant hosts can now assign servers to tables</li>
+</ul>
+
+<h3>3. Computed Column Database Conflicts</h3>
+<ul>
+    <li><strong>Problem:</strong> EF Core was trying to modify computed columns in the database</li>
+    <li><strong>Solution:</strong></li>
+    <ul>
+        <li>Created DatabaseColumnFixMiddleware to detect and fix schema issues</li>
+        <li>Refactored models to use appropriate property mappings</li>
+        <li>Updated DbContext configurations to ignore computed columns</li>
+    </ul>
+    <li><strong>Impact:</strong> System now handles database schema properly without errors</li>
+</ul>
+
+<h2>Architecture Improvements</h2>
+
+<h3>1. Middleware for Database Schema Management</h3>
+<ul>
+    <li>Created custom middleware that runs at application startup</li>
+    <li>Automatically detects and fixes schema mismatches</li>
+    <li>Prevents runtime errors due to database column conflicts</li>
+</ul>
+
+<h3>2. Model Separation</h3>
+<ul>
+    <li>Separated view models from data models</li>
+    <li>Created dedicated ViewModels folder structure</li>
+    <li>Improved code organization and maintainability</li>
+</ul>
+
+<h3>3. SQL Scripts for Database Management</h3>
+<ul>
+    <li>Added SQL setup scripts for new modules</li>
+    <li>Created migration scripts for schema changes</li>
+    <li>Improved deployment process documentation</li>
+</ul>
+
+<h2>Development Workflow</h2>
+<ol>
+    <li>Source code managed with Git</li>
+    <li>Local development and testing performed with:
+        <div class="code">dotnet run --project RestaurantManagementSystem</div>
+    </li>
+    <li>Commits made to local repository with descriptive messages</li>
+    <li>Changes pushed to remote repository at github.com/apporel27-collab/eMEDRestaurant</li>
+</ol>
+
+<h2>Future Recommendations</h2>
+
+<h3>1. Code Modernization</h3>
+<ul>
+    <li>Replace deprecated System.Data.SqlClient with Microsoft.Data.SqlClient</li>
+    <li>Address numerous warning messages in the codebase</li>
+    <li>Implement proper nullable reference type handling</li>
+</ul>
+
+<h3>2. Architecture Improvements</h3>
+<ul>
+    <li>Consider implementing repository pattern for better separation of concerns</li>
+    <li>Add unit tests for critical business logic</li>
+    <li>Implement dependency injection more consistently</li>
+</ul>
+
+<h3>3. Database Optimizations</h3>
+<ul>
+    <li>Consider using migrations instead of custom middleware</li>
+    <li>Optimize database queries for better performance</li>
+    <li>Implement database indexing strategy</li>
+</ul>
+
+<h2>Conclusion</h2>
+<p>The Restaurant Management System has been significantly enhanced with new modules for Kitchen Management and Online Orders, along with fixes to existing functionality. The system architecture has been improved with better database handling, and critical bugs have been resolved.</p>
+
+<p>The codebase is now better structured and more maintainable, though there are still opportunities for further improvement as outlined in the recommendations section.</p>
+
+</body>
+</html>

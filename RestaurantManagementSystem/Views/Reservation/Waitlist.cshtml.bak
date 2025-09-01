@@ -1,0 +1,217 @@
+@model IEnumerable<RestaurantManagementSystem.Models.WaitlistEntry>
+@{
+    ViewData["Title"] = "Waitlist Management";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <h2>Waitlist Management</h2>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <a asp-action="AddToWaitlist" class="btn btn-primary">Add to Waitlist</a>
+        </div>
+    </div>
+
+    @if (TempData["ResultMessage"] != null)
+    {
+        <div class="alert alert-info">@TempData["ResultMessage"]</div>
+    }
+    
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    }
+
+    <div class="row mb-4">
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Current Waitlist</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="waitlistTable">
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Guest</th>
+                                    <th>Phone</th>
+                                    <th>Party Size</th>
+                                    <th>Added At</th>
+                                    <th>Wait Time</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    int position = 1;
+                                }
+                                @foreach (var entry in Model)
+                                {
+                                    <tr class="@(entry.IsWaitTimeExceeded ? "table-danger" : (entry.Status == WaitlistStatus.Notified ? "table-warning" : ""))">
+                                        <td>@(position++)</td>
+                                        <td>@entry.GuestName</td>
+                                        <td>@entry.PhoneNumber</td>
+                                        <td>@entry.PartySize</td>
+                                        <td>@entry.AddedAt.ToString("h:mm tt")</td>
+                                        <td>
+                                            <span class="@(entry.ElapsedWaitTime > entry.QuotedWaitTime ? "text-danger fw-bold" : "")">
+                                                @entry.ElapsedWaitTime min
+                                            </span> 
+                                            / @entry.QuotedWaitTime min
+                                        </td>
+                                        <td>@entry.Status</td>
+                                        <td>
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                    Actions
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    @if (entry.Status == WaitlistStatus.Waiting)
+                                                    {
+                                                        <li>
+                                                            <form asp-action="UpdateWaitlistStatus" method="post">
+                                                                <input type="hidden" name="id" value="@entry.Id" />
+                                                                <input type="hidden" name="status" value="@((int)WaitlistStatus.Notified)" />
+                                                                <button type="submit" class="dropdown-item">Notify Guest</button>
+                                                            </form>
+                                                        </li>
+                                                    }
+                                                    
+                                                    <li>
+                                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#assignTableModal" 
+                                                                onclick="setWaitlistId(@entry.Id)">
+                                                            Assign Table
+                                                        </button>
+                                                    </li>
+
+                                                    <li>
+                                                        <form asp-action="UpdateWaitlistStatus" method="post">
+                                                            <input type="hidden" name="id" value="@entry.Id" />
+                                                            <input type="hidden" name="status" value="@((int)WaitlistStatus.Left)" />
+                                                            <button type="submit" class="dropdown-item">Guest Left</button>
+                                                        </form>
+                                                    </li>
+                                                    
+                                                    <li>
+                                                        <form asp-action="UpdateWaitlistStatus" method="post">
+                                                            <input type="hidden" name="id" value="@entry.Id" />
+                                                            <input type="hidden" name="status" value="@((int)WaitlistStatus.NoResponse)" />
+                                                            <button type="submit" class="dropdown-item">No Response</button>
+                                                        </form>
+                                                    </li>
+                                                    
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    
+                                                    <li>
+                                                        <form asp-action="RemoveFromWaitlist" method="post">
+                                                            <input type="hidden" name="id" value="@entry.Id" />
+                                                            <button type="submit" class="dropdown-item text-danger">Remove from Waitlist</button>
+                                                        </form>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!Model.Any())
+                                {
+                                    <tr>
+                                        <td colspan="8" class="text-center">Waitlist is currently empty</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Available Tables</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        @if (ViewBag.AvailableTables != null && ((List<Table>)ViewBag.AvailableTables).Any())
+                        {
+                            foreach (var table in ViewBag.AvailableTables)
+                            {
+                                <li class="list-group-item">
+                                    <strong>Table @table.TableNumber</strong>
+                                    <br>Seats: @table.Capacity
+                                    @if (!string.IsNullOrEmpty(table.Section))
+                                    {
+                                        <br>Section: @table.Section
+                                    }
+                                </li>
+                            }
+                        }
+                        else
+                        {
+                            <li class="list-group-item">No tables available</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <a asp-action="Dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+
+        <!-- Assign Table Modal -->
+        <div class="modal fade" id="assignTableModal" tabindex="-1" aria-labelledby="assignTableModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="assignTableModalLabel">Assign Table</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form asp-action="AssignTableToWaitlist" method="post" id="assignTableForm">
+                        <input type="hidden" name="waitlistId" id="waitlistIdInput" />
+                        <div class="mb-3">
+                            <label for="tableId" class="form-label">Select Table</label>
+                            <select name="tableId" id="tableId" class="form-select" required>
+                                <option value="">-- Select a Table --</option>
+                                @if (ViewBag.AvailableTables != null)
+                                {
+                                    foreach (var table in ViewBag.AvailableTables)
+                                    {
+                                                                                <option value="@table.Id">Table @table.TableNumber (Seats @table.Capacity)</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" form="assignTableForm" class="btn btn-primary">Assign Table</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function setWaitlistId(id) {
+            document.getElementById('waitlistIdInput').value = id;
+        }
+        
+        $(document).ready(function () {
+            $('#waitlistTable').DataTable({
+                "paging": false,
+                "ordering": true,
+                "info": false,
+                "searching": true
+            });
+        });
+    </script>
+}

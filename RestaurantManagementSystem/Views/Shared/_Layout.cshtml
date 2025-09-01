@@ -84,13 +84,23 @@
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="menuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-book-open me-1"></i> Menu & Recipes
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="menuDropdown" style="border-top: 3px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Menu" asp-action="Index"><i class="fas fa-utensils me-2 text-primary"></i>Menu Items</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Recipe" asp-action="Index"><i class="fas fa-book me-2 text-primary"></i>Recipes</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="CategoryList"><i class="fas fa-list me-2 text-primary"></i>Categories</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white" href="#" id="masterDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-cogs me-1"></i> Settings
                             </a>
-                            <ul class="dropdown-menu" aria-labelledby="masterDropdown">
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="CategoryList">Categories</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="IngredientsList">Ingredients</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="User" asp-action="UserList">Users & Roles</a></li>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="masterDropdown" style="border-top: 3px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="CategoryList"><i class="fas fa-tags me-2 text-primary"></i>Categories</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="IngredientsList"><i class="fas fa-carrot me-2 text-primary"></i>Ingredients</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="User" asp-action="UserList"><i class="fas fa-users me-2 text-primary"></i>Users & Roles</a></li>
                             </ul>
                         </li>
                         <li class="nav-item">
