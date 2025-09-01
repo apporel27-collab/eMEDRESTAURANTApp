@@ -429,10 +429,9 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT mi.Id, mi.PLUCode, mi.Name, mi.Description, mi.Price, 
+                    SELECT mi.Id, mi.Name, mi.Description, mi.Price, 
                            mi.CategoryId, c.Name AS CategoryName, mi.ImagePath, 
-                           mi.IsAvailable, mi.PreparationTimeMinutes, mi.CalorieCount, 
-                           mi.IsFeatured, mi.IsSpecial, mi.DiscountPercentage, mi.KitchenStationId
+                           mi.IsAvailable
                     FROM MenuItems mi
                     LEFT JOIN Categories c ON mi.CategoryId = c.Id
                     ORDER BY mi.Name", connection))
@@ -444,20 +443,20 @@ namespace RestaurantManagementSystem.Controllers
                             menuItems.Add(new MenuItem
                             {
                                 Id = reader.GetInt32(0),
-                                PLUCode = reader.GetString(1),
-                                Name = reader.GetString(2),
-                                Description = reader.GetString(3),
-                                Price = reader.GetDecimal(4),
-                                CategoryId = reader.GetInt32(5),
-                                Category = new Category { Name = reader.GetString(6) },
-                                ImagePath = reader.IsDBNull(7) ? null : reader.GetString(7),
-                                IsAvailable = reader.GetBoolean(8),
-                                PreparationTimeMinutes = reader.GetInt32(9),
-                                CalorieCount = reader.IsDBNull(10) ? null : (int?)reader.GetInt32(10),
-                                IsFeatured = reader.GetBoolean(11),
-                                IsSpecial = reader.GetBoolean(12),
-                                DiscountPercentage = reader.IsDBNull(13) ? null : (decimal?)reader.GetDecimal(13),
-                                KitchenStationId = reader.IsDBNull(14) ? null : (int?)reader.GetInt32(14)
+                                PLUCode = "N/A", // Default value
+                                Name = reader.GetString(1),
+                                Description = reader.GetString(2),
+                                Price = reader.GetDecimal(3),
+                                CategoryId = reader.GetInt32(4),
+                                Category = new Category { Name = reader.GetString(5) },
+                                ImagePath = reader.IsDBNull(6) ? null : reader.GetString(6),
+                                IsAvailable = reader.GetBoolean(7),
+                                PreparationTimeMinutes = 0, // Default value
+                                CalorieCount = null, // Default value
+                                IsFeatured = false, // Default value
+                                IsSpecial = false, // Default value
+                                DiscountPercentage = null, // Default value
+                                KitchenStationId = null // Default value
                             });
                         }
                     }
@@ -477,10 +476,9 @@ namespace RestaurantManagementSystem.Controllers
                 
                 // Get menu item details
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT mi.Id, mi.PLUCode, mi.Name, mi.Description, mi.Price, 
+                    SELECT mi.Id, mi.Name, mi.Description, mi.Price, 
                            mi.CategoryId, c.Name AS CategoryName, mi.ImagePath, 
-                           mi.IsAvailable, mi.PreparationTimeMinutes, mi.CalorieCount, 
-                           mi.IsFeatured, mi.IsSpecial, mi.DiscountPercentage, mi.KitchenStationId
+                           mi.IsAvailable
                     FROM MenuItems mi
                     LEFT JOIN Categories c ON mi.CategoryId = c.Id
                     WHERE mi.Id = @Id", connection))
@@ -494,20 +492,20 @@ namespace RestaurantManagementSystem.Controllers
                             menuItem = new MenuItem
                             {
                                 Id = reader.GetInt32(0),
-                                PLUCode = reader.GetString(1),
-                                Name = reader.GetString(2),
-                                Description = reader.GetString(3),
-                                Price = reader.GetDecimal(4),
-                                CategoryId = reader.GetInt32(5),
-                                Category = new Category { Name = reader.GetString(6) },
-                                ImagePath = reader.IsDBNull(7) ? null : reader.GetString(7),
-                                IsAvailable = reader.GetBoolean(8),
-                                PreparationTimeMinutes = reader.GetInt32(9),
-                                CalorieCount = reader.IsDBNull(10) ? null : (int?)reader.GetInt32(10),
-                                IsFeatured = reader.GetBoolean(11),
-                                IsSpecial = reader.GetBoolean(12),
-                                DiscountPercentage = reader.IsDBNull(13) ? null : (decimal?)reader.GetDecimal(13),
-                                KitchenStationId = reader.IsDBNull(14) ? null : (int?)reader.GetInt32(14),
+                                PLUCode = "N/A", // Default value
+                                Name = reader.GetString(1),
+                                Description = reader.GetString(2),
+                                Price = reader.GetDecimal(3),
+                                CategoryId = reader.GetInt32(4),
+                                Category = new Category { Name = reader.GetString(5) },
+                                ImagePath = reader.IsDBNull(6) ? null : reader.GetString(6),
+                                IsAvailable = reader.GetBoolean(7),
+                                PreparationTimeMinutes = 0, // Default value
+                                CalorieCount = null, // Default value
+                                IsFeatured = false, // Default value
+                                IsSpecial = false, // Default value
+                                DiscountPercentage = null, // Default value
+                                KitchenStationId = null, // Default value
                                 Allergens = new List<MenuItemAllergen>(),
                                 Ingredients = new List<MenuItemIngredient>(),
                                 Modifiers = new List<MenuItemModifier>()
@@ -561,7 +559,7 @@ namespace RestaurantManagementSystem.Controllers
                                     Id = reader.GetInt32(0),
                                     MenuItemId = id,
                                     IngredientId = reader.GetInt32(1),
-                                    Ingredient = new Ingredients { Name = reader.GetString(2) },
+                                    Ingredient = new Ingredients { IngredientsName = reader.GetString(2) },
                                     Quantity = reader.GetDecimal(3),
                                     Unit = reader.GetString(4),
                                     IsOptional = reader.GetBoolean(5),
@@ -612,15 +610,12 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
-                                          IsAvailable, PreparationTimeMinutes, CalorieCount, 
-                                          IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId)
-                    VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @ImagePath,
-                            @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
-                            @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId);
+                    INSERT INTO MenuItems (Name, Description, Price, CategoryId, ImagePath,
+                                          IsAvailable)
+                    VALUES (@Name, @Description, @Price, @CategoryId, @ImagePath,
+                            @IsAvailable);
                     SELECT SCOPE_IDENTITY();", connection))
                 {
-                    command.Parameters.AddWithValue("@PLUCode", model.PLUCode);
                     command.Parameters.AddWithValue("@Name", model.Name);
                     command.Parameters.AddWithValue("@Description", model.Description);
                     command.Parameters.AddWithValue("@Price", model.Price);
@@ -632,25 +627,6 @@ namespace RestaurantManagementSystem.Controllers
                         command.Parameters.AddWithValue("@ImagePath", DBNull.Value);
                     
                     command.Parameters.AddWithValue("@IsAvailable", model.IsAvailable);
-                    command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
-                    
-                    if (model.CalorieCount.HasValue)
-                        command.Parameters.AddWithValue("@CalorieCount", model.CalorieCount.Value);
-                    else
-                        command.Parameters.AddWithValue("@CalorieCount", DBNull.Value);
-                    
-                    command.Parameters.AddWithValue("@IsFeatured", model.IsFeatured);
-                    command.Parameters.AddWithValue("@IsSpecial", model.IsSpecial);
-                    
-                    if (model.DiscountPercentage.HasValue)
-                        command.Parameters.AddWithValue("@DiscountPercentage", model.DiscountPercentage.Value);
-                    else
-                        command.Parameters.AddWithValue("@DiscountPercentage", DBNull.Value);
-                    
-                    if (model.KitchenStationId.HasValue)
-                        command.Parameters.AddWithValue("@KitchenStationId", model.KitchenStationId.Value);
-                    else
-                        command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
                     
                     menuItemId = Convert.ToInt32(command.ExecuteScalar());
                 }
@@ -667,23 +643,15 @@ namespace RestaurantManagementSystem.Controllers
                 
                 using (SqlCommand command = new SqlCommand(@"
                     UPDATE MenuItems
-                    SET PLUCode = @PLUCode,
-                        Name = @Name,
+                    SET Name = @Name,
                         Description = @Description,
                         Price = @Price,
                         CategoryId = @CategoryId,
                         ImagePath = @ImagePath,
-                        IsAvailable = @IsAvailable,
-                        PreparationTimeMinutes = @PreparationTimeMinutes,
-                        CalorieCount = @CalorieCount,
-                        IsFeatured = @IsFeatured,
-                        IsSpecial = @IsSpecial,
-                        DiscountPercentage = @DiscountPercentage,
-                        KitchenStationId = @KitchenStationId
+                        IsAvailable = @IsAvailable
                     WHERE Id = @Id", connection))
                 {
                     command.Parameters.AddWithValue("@Id", model.Id);
-                    command.Parameters.AddWithValue("@PLUCode", model.PLUCode);
                     command.Parameters.AddWithValue("@Name", model.Name);
                     command.Parameters.AddWithValue("@Description", model.Description);
                     command.Parameters.AddWithValue("@Price", model.Price);
@@ -695,25 +663,6 @@ namespace RestaurantManagementSystem.Controllers
                         command.Parameters.AddWithValue("@ImagePath", DBNull.Value);
                     
                     command.Parameters.AddWithValue("@IsAvailable", model.IsAvailable);
-                    command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
-                    
-                    if (model.CalorieCount.HasValue)
-                        command.Parameters.AddWithValue("@CalorieCount", model.CalorieCount.Value);
-                    else
-                        command.Parameters.AddWithValue("@CalorieCount", DBNull.Value);
-                    
-                    command.Parameters.AddWithValue("@IsFeatured", model.IsFeatured);
-                    command.Parameters.AddWithValue("@IsSpecial", model.IsSpecial);
-                    
-                    if (model.DiscountPercentage.HasValue)
-                        command.Parameters.AddWithValue("@DiscountPercentage", model.DiscountPercentage.Value);
-                    else
-                        command.Parameters.AddWithValue("@DiscountPercentage", DBNull.Value);
-                    
-                    if (model.KitchenStationId.HasValue)
-                        command.Parameters.AddWithValue("@KitchenStationId", model.KitchenStationId.Value);
-                    else
-                        command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
                     
                     command.ExecuteNonQuery();
                 }
@@ -1126,7 +1075,6 @@ namespace RestaurantManagementSystem.Controllers
                 using (SqlCommand command = new SqlCommand(@"
                     SELECT Id, Name 
                     FROM Categories
-                    WHERE IsActive = 1
                     ORDER BY Name", connection))
                 {
                     using (SqlDataReader reader = command.ExecuteReader())
@@ -1157,7 +1105,6 @@ namespace RestaurantManagementSystem.Controllers
                 using (SqlCommand command = new SqlCommand(@"
                     SELECT Id, Name, Description, IconPath
                     FROM Allergens
-                    WHERE IsActive = 1
                     ORDER BY Name", connection))
                 {
                     using (SqlDataReader reader = command.ExecuteReader())
@@ -1188,10 +1135,9 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, Name
+                    SELECT Id, IngredientsName
                     FROM Ingredients
-                    WHERE IsActive = 1
-                    ORDER BY Name", connection))
+                    ORDER BY IngredientsName", connection))
                 {
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
@@ -1219,9 +1165,8 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, Name, Description, ModifierType
+                    SELECT Id, Name, Name as Description
                     FROM Modifiers
-                    WHERE IsActive = 1
                     ORDER BY Name", connection))
                 {
                     using (SqlDataReader reader = command.ExecuteReader())
@@ -1233,7 +1178,7 @@ namespace RestaurantManagementSystem.Controllers
                                 Id = reader.GetInt32(0),
                                 Name = reader.GetString(1),
                                 Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-                                ModifierType = reader.GetString(3)
+                                ModifierType = "Standard" // Default value since ModifierType column doesn't exist in Orders_Setup.sql
                             });
                         }
                     }
@@ -1254,7 +1199,6 @@ namespace RestaurantManagementSystem.Controllers
                 using (SqlCommand command = new SqlCommand(@"
                     SELECT Id, Name
                     FROM KitchenStations
-                    WHERE IsActive = 1
                     ORDER BY Name", connection))
                 {
                     using (SqlDataReader reader = command.ExecuteReader())
