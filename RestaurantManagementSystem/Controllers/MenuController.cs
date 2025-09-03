@@ -11,6 +11,8 @@ using RestaurantManagementSystem.Models;
 using RestaurantManagementSystem.ViewModels;
 using System.IO;
 using Microsoft.AspNetCore.Hosting;
+using MenuItemIngredientViewModelView = RestaurantManagementSystem.ViewModels.MenuItemIngredientViewModel;
+using MenuItemIngredientViewModelModel = RestaurantManagementSystem.Models.MenuItemIngredientViewModel;
 
 namespace RestaurantManagementSystem.Controllers
 {
@@ -97,7 +99,8 @@ namespace RestaurantManagementSystem.Controllers
                     // Add ingredients
                     if (model.Ingredients != null && model.Ingredients.Any())
                     {
-                        AddMenuItemIngredients(menuItemId, model.Ingredients);
+                        var modelIngredients = ConvertIngredientsViewModelToModel(model.Ingredients);
+                        AddMenuItemIngredients(menuItemId, modelIngredients);
                     }
 
                     // Add modifiers
@@ -152,7 +155,7 @@ namespace RestaurantManagementSystem.Controllers
                 DiscountPercentage = menuItem.DiscountPercentage,
                 KitchenStationId = menuItem.KitchenStationId,
                 SelectedAllergens = menuItem.Allergens.Select(a => a.AllergenId).ToList(),
-                Ingredients = menuItem.Ingredients.Select(i => new MenuItemIngredientViewModel
+                Ingredients = menuItem.Ingredients.Select(i => new RestaurantManagementSystem.ViewModels.MenuItemIngredientViewModel
                 {
                     IngredientId = i.IngredientId,
                     Quantity = i.Quantity,
@@ -231,7 +234,17 @@ namespace RestaurantManagementSystem.Controllers
                     RemoveMenuItemIngredients(id);
                     if (model.Ingredients != null && model.Ingredients.Any())
                     {
-                        AddMenuItemIngredients(id, model.Ingredients);
+                        // Convert from ViewModels.MenuItemIngredientViewModel to Models.MenuItemIngredientViewModel
+                        var modelIngredients = model.Ingredients.Select(i => new Models.MenuItemIngredientViewModel
+                        {
+                            IngredientId = i.IngredientId,
+                            Quantity = i.Quantity,
+                            Unit = i.Unit,
+                            IsOptional = i.IsOptional,
+                            Instructions = i.Instructions
+                        }).ToList();
+                        
+                        AddMenuItemIngredients(id, modelIngredients);
                     }
 
                     // Update modifiers (remove all and add selected)
@@ -428,35 +441,31 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT mi.Id, mi.Name, mi.Description, mi.Price, 
-                           mi.CategoryId, c.Name AS CategoryName, mi.ImagePath, 
-                           mi.IsAvailable
-                    FROM MenuItems mi
-                    LEFT JOIN Categories c ON mi.CategoryId = c.Id
-                    ORDER BY mi.Name", connection))
+                using (SqlCommand command = new SqlCommand("sp_GetAllMenuItems", connection))
                 {
+                    command.CommandType = System.Data.CommandType.StoredProcedure;
+                    
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
                             menuItems.Add(new MenuItem
                             {
-                                Id = reader.GetInt32(0),
-                                PLUCode = "N/A", // Default value
-                                Name = reader.GetString(1),
-                                Description = reader.GetString(2),
-                                Price = reader.GetDecimal(3),
-                                CategoryId = reader.GetInt32(4),
-                                Category = new Category { Name = reader.GetString(5) },
-                                ImagePath = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                IsAvailable = reader.GetBoolean(7),
-                                PreparationTimeMinutes = 0, // Default value
-                                CalorieCount = null, // Default value
-                                IsFeatured = false, // Default value
-                                IsSpecial = false, // Default value
-                                DiscountPercentage = null, // Default value
-                                KitchenStationId = null // Default value
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                PLUCode = reader.GetString(reader.GetOrdinal("PLUCode")),
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                Price = reader.GetDecimal(reader.GetOrdinal("Price")),
+                                CategoryId = reader.GetInt32(reader.GetOrdinal("CategoryId")),
+                                Category = new Category { Name = reader.GetString(reader.GetOrdinal("CategoryName")) },
+                                ImagePath = reader.IsDBNull(reader.GetOrdinal("ImagePath")) ? null : reader.GetString(reader.GetOrdinal("ImagePath")),
+                                IsAvailable = reader.GetBoolean(reader.GetOrdinal("IsAvailable")),
+                                PreparationTimeMinutes = reader.GetInt32(reader.GetOrdinal("PreparationTimeMinutes")),
+                                CalorieCount = reader.IsDBNull(reader.GetOrdinal("CalorieCount")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("CalorieCount")),
+                                IsFeatured = reader.GetBoolean(reader.GetOrdinal("IsFeatured")),
+                                IsSpecial = reader.GetBoolean(reader.GetOrdinal("IsSpecial")),
+                                DiscountPercentage = reader.IsDBNull(reader.GetOrdinal("DiscountPercentage")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("DiscountPercentage")),
+                                TargetGP = reader.IsDBNull(reader.GetOrdinal("TargetGP")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("TargetGP"))
                             });
                         }
                     }
@@ -474,15 +483,10 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                // Get menu item details
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT mi.Id, mi.Name, mi.Description, mi.Price, 
-                           mi.CategoryId, c.Name AS CategoryName, mi.ImagePath, 
-                           mi.IsAvailable
-                    FROM MenuItems mi
-                    LEFT JOIN Categories c ON mi.CategoryId = c.Id
-                    WHERE mi.Id = @Id", connection))
+                // Get menu item details using stored procedure
+                using (SqlCommand command = new SqlCommand("sp_GetMenuItemById", connection))
                 {
+                    command.CommandType = System.Data.CommandType.StoredProcedure;
                     command.Parameters.AddWithValue("@Id", id);
                     
                     using (SqlDataReader reader = command.ExecuteReader())
@@ -491,21 +495,21 @@ namespace RestaurantManagementSystem.Controllers
                         {
                             menuItem = new MenuItem
                             {
-                                Id = reader.GetInt32(0),
-                                PLUCode = "N/A", // Default value
-                                Name = reader.GetString(1),
-                                Description = reader.GetString(2),
-                                Price = reader.GetDecimal(3),
-                                CategoryId = reader.GetInt32(4),
-                                Category = new Category { Name = reader.GetString(5) },
-                                ImagePath = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                IsAvailable = reader.GetBoolean(7),
-                                PreparationTimeMinutes = 0, // Default value
-                                CalorieCount = null, // Default value
-                                IsFeatured = false, // Default value
-                                IsSpecial = false, // Default value
-                                DiscountPercentage = null, // Default value
-                                KitchenStationId = null, // Default value
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                PLUCode = reader.GetString(reader.GetOrdinal("PLUCode")),
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                Price = reader.GetDecimal(reader.GetOrdinal("Price")),
+                                CategoryId = reader.GetInt32(reader.GetOrdinal("CategoryId")),
+                                Category = new Category { Name = reader.GetString(reader.GetOrdinal("CategoryName")) },
+                                ImagePath = reader.IsDBNull(reader.GetOrdinal("ImagePath")) ? null : reader.GetString(reader.GetOrdinal("ImagePath")),
+                                IsAvailable = reader.GetBoolean(reader.GetOrdinal("IsAvailable")),
+                                PreparationTimeMinutes = reader.GetInt32(reader.GetOrdinal("PreparationTimeMinutes")),
+                                CalorieCount = reader.IsDBNull(reader.GetOrdinal("CalorieCount")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("CalorieCount")),
+                                IsFeatured = reader.GetBoolean(reader.GetOrdinal("IsFeatured")),
+                                IsSpecial = reader.GetBoolean(reader.GetOrdinal("IsSpecial")),
+                                DiscountPercentage = reader.IsDBNull(reader.GetOrdinal("DiscountPercentage")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("DiscountPercentage")),
+                                TargetGP = reader.IsDBNull(reader.GetOrdinal("TargetGP")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("TargetGP")),
                                 Allergens = new List<MenuItemAllergen>(),
                                 Ingredients = new List<MenuItemIngredient>(),
                                 Modifiers = new List<MenuItemModifier>()
@@ -610,12 +614,15 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    INSERT INTO MenuItems (Name, Description, Price, CategoryId, ImagePath,
-                                          IsAvailable)
-                    VALUES (@Name, @Description, @Price, @CategoryId, @ImagePath,
-                            @IsAvailable);
+                    INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
+                                          IsAvailable, PreparationTimeMinutes, CalorieCount, 
+                                          IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId)
+                    VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @ImagePath,
+                            @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
+                            @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId);
                     SELECT SCOPE_IDENTITY();", connection))
                 {
+                    command.Parameters.AddWithValue("@PLUCode", model.PLUCode);
                     command.Parameters.AddWithValue("@Name", model.Name);
                     command.Parameters.AddWithValue("@Description", model.Description);
                     command.Parameters.AddWithValue("@Price", model.Price);
@@ -627,6 +634,25 @@ namespace RestaurantManagementSystem.Controllers
                         command.Parameters.AddWithValue("@ImagePath", DBNull.Value);
                     
                     command.Parameters.AddWithValue("@IsAvailable", model.IsAvailable);
+                    command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
+                    
+                    if (model.CalorieCount.HasValue)
+                        command.Parameters.AddWithValue("@CalorieCount", model.CalorieCount);
+                    else
+                        command.Parameters.AddWithValue("@CalorieCount", DBNull.Value);
+                        
+                    command.Parameters.AddWithValue("@IsFeatured", model.IsFeatured);
+                    command.Parameters.AddWithValue("@IsSpecial", model.IsSpecial);
+                    
+                    if (model.DiscountPercentage.HasValue)
+                        command.Parameters.AddWithValue("@DiscountPercentage", model.DiscountPercentage);
+                    else
+                        command.Parameters.AddWithValue("@DiscountPercentage", DBNull.Value);
+                        
+                    if (model.KitchenStationId.HasValue)
+                        command.Parameters.AddWithValue("@KitchenStationId", model.KitchenStationId);
+                    else
+                        command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
                     
                     menuItemId = Convert.ToInt32(command.ExecuteScalar());
                 }
@@ -723,7 +749,7 @@ namespace RestaurantManagementSystem.Controllers
             }
         }
 
-        private void AddMenuItemIngredients(int menuItemId, List<MenuItemIngredientViewModel> ingredients)
+        private void AddMenuItemIngredients(int menuItemId, List<Models.MenuItemIngredientViewModel> ingredients)
         {
             if (ingredients == null || !ingredients.Any())
                 return;
@@ -850,7 +876,7 @@ namespace RestaurantManagementSystem.Controllers
                                 PreparationTimeMinutes = reader.GetInt32(6),
                                 CookingTimeMinutes = reader.GetInt32(7),
                                 LastUpdated = reader.GetDateTime(8),
-                                CreatedById = reader.IsDBNull(9) ? null : (int?)reader.GetInt32(9),
+                                CreatedById = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
                                 Notes = reader.IsDBNull(10) ? null : reader.GetString(10),
                                 IsArchived = reader.GetBoolean(11),
                                 Version = reader.GetInt32(12),
@@ -928,10 +954,8 @@ namespace RestaurantManagementSystem.Controllers
                     command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
                     command.Parameters.AddWithValue("@CookingTimeMinutes", model.CookingTimeMinutes);
                     
-                    if (model.CreatedById.HasValue)
-                        command.Parameters.AddWithValue("@CreatedById", model.CreatedById.Value);
-                    else
-                        command.Parameters.AddWithValue("@CreatedById", DBNull.Value);
+                    // CreatedById is now an int instead of int?
+                    command.Parameters.AddWithValue("@CreatedById", model.CreatedById);
                     
                     if (!string.IsNullOrEmpty(model.Notes))
                         command.Parameters.AddWithValue("@Notes", model.Notes);
@@ -1165,7 +1189,7 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, Name, Name as Description
+                    SELECT Id, Name, Price, IsDefault
                     FROM Modifiers
                     ORDER BY Name", connection))
                 {
@@ -1177,8 +1201,10 @@ namespace RestaurantManagementSystem.Controllers
                             {
                                 Id = reader.GetInt32(0),
                                 Name = reader.GetString(1),
-                                Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-                                ModifierType = "Standard" // Default value since ModifierType column doesn't exist in Orders_Setup.sql
+                                // Setting default values for the properties not in the database
+                                Description = "Standard modifier",
+                                ModifierType = "Addition",
+                                IsActive = true
                             });
                         }
                     }
@@ -1216,6 +1242,39 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             return kitchenStations;
+        }
+
+        // Convert ViewModels to Models for ingredient list
+        private List<Models.MenuItemIngredientViewModel> ConvertIngredientsViewModelToModel(List<ViewModels.MenuItemIngredientViewModel> viewModelIngredients)
+        {
+            var modelIngredients = new List<Models.MenuItemIngredientViewModel>();
+            
+            foreach (var ingredient in viewModelIngredients)
+            {
+                modelIngredients.Add(new Models.MenuItemIngredientViewModel
+                {
+                    IngredientId = ingredient.IngredientId,
+                    Quantity = ingredient.Quantity,
+                    Unit = ingredient.Unit,
+                    IsOptional = ingredient.IsOptional,
+                    Instructions = ingredient.Instructions
+                });
+            }
+            
+            return modelIngredients;
+        }
+
+        // Convert Models to ViewModels for ingredient list
+        private ViewModels.MenuItemIngredientViewModel ConvertToViewModelMenuItemIngredient(Models.MenuItemIngredientViewModel modelIngredient)
+        {
+            return new ViewModels.MenuItemIngredientViewModel
+            {
+                IngredientId = modelIngredient.IngredientId,
+                Quantity = modelIngredient.Quantity,
+                Unit = modelIngredient.Unit,
+                IsOptional = modelIngredient.IsOptional,
+                Instructions = modelIngredient.Instructions
+            };
         }
     }
 }

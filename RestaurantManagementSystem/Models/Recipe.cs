@@ -32,6 +32,10 @@ namespace RestaurantManagementSystem.Models
         [Range(1, 100, ErrorMessage = "Yield must be between 1 and 100 servings")]
         public int Yield { get; set; } = 1;
         
+        [Display(Name = "Yield Percentage")]
+        [Range(0, 100, ErrorMessage = "Yield percentage must be between 0 and 100")]
+        public decimal YieldPercentage { get; set; } = 100;
+        
         [Display(Name = "Preparation Time (Minutes)")]
         [Range(1, 180, ErrorMessage = "Preparation time must be between 1 and 180 minutes")]
         public int PreparationTimeMinutes { get; set; }

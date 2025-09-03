@@ -1,0 +1,297 @@
+@model RestaurantManagementSystem.Models.RecipeViewModel
+
+@{
+    ViewData["Title"] = "Create Recipe";
+    var menuItem = ViewBag.MenuItem as RestaurantManagementSystem.Models.MenuItem;
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2>Create Recipe for @menuItem?.Name</h2>
+            <hr />
+            
+            <form asp-action="Create" method="post" enctype="multipart/form-data">
+                <input type="hidden" asp-for="MenuItemId" />
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4>Basic Information</h4>
+                    </div>
+                    <div class="card-body">
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label asp-for="Title" class="control-label"></label>
+                                    <input asp-for="Title" class="form-control" />
+                                    <span asp-validation-for="Title" class="text-danger"></span>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label asp-for="Yield" class="control-label"></label>
+                                    <input asp-for="Yield" class="form-control" />
+                                    <span asp-validation-for="Yield" class="text-danger"></span>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label asp-for="YieldPercentage" class="control-label"></label>
+                                    <input asp-for="YieldPercentage" class="form-control" />
+                                    <span asp-validation-for="YieldPercentage" class="text-danger"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label asp-for="PreparationTimeMinutes" class="control-label"></label>
+                                    <input asp-for="PreparationTimeMinutes" class="form-control" />
+                                    <span asp-validation-for="PreparationTimeMinutes" class="text-danger"></span>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label asp-for="CookingTimeMinutes" class="control-label"></label>
+                                    <input asp-for="CookingTimeMinutes" class="form-control" />
+                                    <span asp-validation-for="CookingTimeMinutes" class="text-danger"></span>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label asp-for="Notes" class="control-label"></label>
+                                    <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                                    <span asp-validation-for="Notes" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ingredients Section -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4>Ingredients</h4>
+                        <button type="button" id="addIngredientBtn" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Add Ingredient
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="ingredientsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Ingredient</th>
+                                        <th>Quantity</th>
+                                        <th>Unit</th>
+                                        <th>Optional</th>
+                                        <th>Instructions</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ingredientsList">
+                                    <!-- Ingredient rows will be added here dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Instructions Section -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4>Instructions</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group mb-3">
+                                    <label asp-for="PreparationInstructions" class="control-label"></label>
+                                    <textarea asp-for="PreparationInstructions" class="form-control" rows="10"></textarea>
+                                    <span asp-validation-for="PreparationInstructions" class="text-danger"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group mb-3">
+                                    <label asp-for="CookingInstructions" class="control-label"></label>
+                                    <textarea asp-for="CookingInstructions" class="form-control" rows="10"></textarea>
+                                    <span asp-validation-for="CookingInstructions" class="text-danger"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group mb-3">
+                                    <label asp-for="PlatingInstructions" class="control-label"></label>
+                                    <textarea asp-for="PlatingInstructions" class="form-control" rows="10"></textarea>
+                                    <span asp-validation-for="PlatingInstructions" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Steps Section -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4>Step-by-Step Instructions</h4>
+                        <button type="button" id="addStepBtn" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Add Step
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="stepsList">
+                            <!-- Steps will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Create Recipe
+                    </button>
+                    <a asp-controller="Menu" asp-action="Details" asp-route-id="@Model.MenuItemId" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        $(document).ready(function() {
+            // Add ingredient functionality
+            let ingredientIndex = 0;
+            
+            $("#addIngredientBtn").click(function() {
+                addIngredientRow();
+            });
+            
+            function addIngredientRow() {
+                const row = `
+                    <tr>
+                        <td>
+                            <select name="Ingredients[${ingredientIndex}].IngredientId" class="form-control" required>
+                                <option value="">-- Select Ingredient --</option>
+                                @foreach (var ingredient in ViewBag.Ingredients as SelectList)
+                                {
+                                    <option value="@ingredient.Value">@ingredient.Text</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" name="Ingredients[${ingredientIndex}].Quantity" class="form-control" step="0.01" min="0.01" required />
+                        </td>
+                        <td>
+                            <input type="text" name="Ingredients[${ingredientIndex}].Unit" class="form-control" required />
+                        </td>
+                        <td>
+                            <div class="form-check">
+                                <input type="checkbox" name="Ingredients[${ingredientIndex}].IsOptional" class="form-check-input" value="true" />
+                            </div>
+                        </td>
+                        <td>
+                            <input type="text" name="Ingredients[${ingredientIndex}].Instructions" class="form-control" />
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm remove-ingredient">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                
+                $("#ingredientsList").append(row);
+                ingredientIndex++;
+                
+                // Bind remove event to new row
+                $(".remove-ingredient").last().click(function() {
+                    $(this).closest("tr").remove();
+                });
+            }
+            
+            // Add at least one ingredient row by default
+            if ($("#ingredientsList tr").length === 0) {
+                addIngredientRow();
+            }
+            
+            // Add step functionality
+            let stepIndex = 0;
+            
+            $("#addStepBtn").click(function() {
+                addStepCard();
+            });
+            
+            function addStepCard() {
+                const stepNumber = stepIndex + 1;
+                const card = `
+                    <div class="card mb-3 step-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5>Step ${stepNumber}</h5>
+                            <button type="button" class="btn btn-danger btn-sm remove-step">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <input type="hidden" name="Steps[${stepIndex}].StepNumber" value="${stepNumber}" />
+                            
+                            <div class="form-group mb-3">
+                                <label>Description</label>
+                                <textarea name="Steps[${stepIndex}].Description" class="form-control" rows="3" required></textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group mb-3">
+                                        <label>Time Required (minutes)</label>
+                                        <input type="number" name="Steps[${stepIndex}].TimeRequiredMinutes" class="form-control" min="0" />
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group mb-3">
+                                        <label>Temperature</label>
+                                        <input type="text" name="Steps[${stepIndex}].Temperature" class="form-control" />
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group mb-3">
+                                        <label>Special Equipment</label>
+                                        <input type="text" name="Steps[${stepIndex}].SpecialEquipment" class="form-control" />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label>Tips</label>
+                                <textarea name="Steps[${stepIndex}].Tips" class="form-control" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                $("#stepsList").append(card);
+                stepIndex++;
+                
+                // Bind remove event to new card
+                $(".remove-step").last().click(function() {
+                    $(this).closest(".step-card").remove();
+                    renumberSteps();
+                });
+            }
+            
+            function renumberSteps() {
+                $(".step-card").each(function(index) {
+                    const stepNumber = index + 1;
+                    $(this).find("h5").text(`Step ${stepNumber}`);
+                    $(this).find("input[name$='.StepNumber']").val(stepNumber);
+                });
+            }
+            
+            // Add at least one step by default
+            if ($("#stepsList .step-card").length === 0) {
+                addStepCard();
+            }
+        });
+    </script>
+}

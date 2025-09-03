@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 using System.Data.SqlClient;
-using RestaurantManagementSystem.Data;
 using RestaurantManagementSystem.Models;
 using RestaurantManagementSystem.ViewModels;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using System.IO;
 using Microsoft.AspNetCore.Hosting;
+using MenuItemIngredientViewModelModel = RestaurantManagementSystem.Models.MenuItemIngredientViewModel;
 
 namespace RestaurantManagementSystem.Controllers
 {
@@ -24,7 +23,7 @@ namespace RestaurantManagementSystem.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
             _webHostEnvironment = webHostEnvironment;
         }
-
+        
         // GET: Recipe
         public IActionResult Index()
         {
@@ -35,7 +34,7 @@ namespace RestaurantManagementSystem.Controllers
         // GET: Recipe/Details/5
         public IActionResult Details(int id)
         {
-            var recipe = GetRecipeById(id);
+            var recipe = GetRecipeByMenuItemId(id);
             if (recipe == null)
             {
                 return NotFound();
@@ -44,354 +43,579 @@ namespace RestaurantManagementSystem.Controllers
             return View(recipe);
         }
 
-        // GET: Recipe/Edit/5
-        public IActionResult Edit(int id)
+        // GET: Recipe/Create/5 (where 5 is the MenuItemId)
+        public IActionResult Create(int menuItemId)
         {
-            var recipe = GetRecipeById(id);
-            if (recipe == null)
+            var menuItem = GetMenuItemById(menuItemId);
+            if (menuItem == null)
             {
                 return NotFound();
             }
 
-            // Convert to view model
-            var viewModel = new RecipeViewModel
+            ViewBag.MenuItem = menuItem;
+            ViewBag.Ingredients = new SelectList(GetAllIngredients(), "Id", "IngredientsName");
+            
+            var recipeViewModel = new RecipeViewModel
             {
-                Id = recipe.Id,
-                MenuItemId = recipe.MenuItemId,
-                MenuItemName = recipe.MenuItem?.Name ?? "Unknown Menu Item",
-                Title = recipe.Title,
-                PreparationInstructions = recipe.PreparationInstructions,
-                CookingInstructions = recipe.CookingInstructions,
-                PlatingInstructions = recipe.PlatingInstructions ?? "",
-                Yield = recipe.Yield,
-                PreparationTimeMinutes = recipe.PreparationTimeMinutes,
-                CookingTimeMinutes = recipe.CookingTimeMinutes,
-                Notes = recipe.Notes ?? "",
-                IsArchived = recipe.IsArchived,
-                Version = recipe.Version,
-                Steps = recipe.Steps.OrderBy(s => s.StepNumber).Select(s => new RecipeStepViewModel
-                {
-                    Id = s.Id,
-                    StepNumber = s.StepNumber,
-                    Description = s.Description,
-                    TimeRequiredMinutes = s.TimeRequiredMinutes,
-                    Temperature = s.Temperature,
-                    SpecialEquipment = s.SpecialEquipment,
-                    Tips = s.Tips,
-                    ImagePath = s.ImagePath
-                }).ToList()
+                MenuItemId = menuItemId,
+                PreparationTimeMinutes = 15,
+                CookingTimeMinutes = 15,
+                Yield = 1,
+                YieldPercentage = 100
             };
-
-            // If no steps, add one empty step
-            if (!viewModel.Steps.Any())
-            {
-                viewModel.Steps.Add(new RecipeStepViewModel { StepNumber = 1 });
-            }
-
-            return View(viewModel);
+            
+            return View(recipeViewModel);
         }
 
-        // POST: Recipe/Edit/5
+        // POST: Recipe/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Edit(int id, RecipeViewModel model)
+        public IActionResult Create(RecipeViewModel model)
         {
-            if (id != model.Id)
+            if (ModelState.IsValid)
+            {
+                int recipeId;
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    using (SqlCommand command = new SqlCommand("sp_ManageRecipe", connection))
+                    {
+                        command.CommandType = System.Data.CommandType.StoredProcedure;
+                        
+                        command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
+                        command.Parameters.AddWithValue("@Title", model.Title);
+                        command.Parameters.AddWithValue("@PreparationInstructions", model.PreparationInstructions);
+                        command.Parameters.AddWithValue("@CookingInstructions", model.CookingInstructions);
+                        command.Parameters.AddWithValue("@PlatingInstructions", model.PlatingInstructions ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@Yield", model.Yield);
+                        command.Parameters.AddWithValue("@YieldPercentage", model.YieldPercentage);
+                        command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
+                        command.Parameters.AddWithValue("@CookingTimeMinutes", model.CookingTimeMinutes);
+                        command.Parameters.AddWithValue("@Notes", model.Notes ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@UserId", 1); // TODO: Get from authentication
+                        
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                recipeId = reader.GetInt32(reader.GetOrdinal("RecipeId"));
+                            }
+                            else
+                            {
+                                ModelState.AddModelError("", "Failed to create recipe");
+                                return View(model);
+                            }
+                        }
+                    }
+                    
+                    // Add recipe steps if provided
+                    if (model.Steps != null && model.Steps.Count > 0)
+                    {
+                        for (int i = 0; i < model.Steps.Count; i++)
+                        {
+                            var step = model.Steps[i];
+                            
+                            using (SqlCommand command = new SqlCommand("sp_ManageRecipeStep", connection))
+                            {
+                                command.CommandType = System.Data.CommandType.StoredProcedure;
+                                
+                                command.Parameters.AddWithValue("@RecipeId", recipeId);
+                                command.Parameters.AddWithValue("@StepNumber", i + 1);
+                                command.Parameters.AddWithValue("@Description", step.Description);
+                                command.Parameters.AddWithValue("@TimeRequiredMinutes", step.TimeRequiredMinutes ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@Temperature", step.Temperature ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@SpecialEquipment", step.SpecialEquipment ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@Tips", step.Tips ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@ImagePath", step.ImagePath ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@IsUpdate", false);
+                                
+                                command.ExecuteNonQuery();
+                            }
+                        }
+                    }
+                    
+                    // Add ingredients if provided
+                    if (model.Ingredients != null && model.Ingredients.Count > 0)
+                    {
+                        foreach (var ingredient in model.Ingredients)
+                        {
+                            using (SqlCommand command = new SqlCommand("sp_ManageMenuItemIngredient", connection))
+                            {
+                                command.CommandType = System.Data.CommandType.StoredProcedure;
+                                
+                                command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
+                                command.Parameters.AddWithValue("@IngredientId", ingredient.IngredientId);
+                                command.Parameters.AddWithValue("@Quantity", ingredient.Quantity);
+                                command.Parameters.AddWithValue("@Unit", ingredient.Unit);
+                                command.Parameters.AddWithValue("@IsOptional", ingredient.IsOptional);
+                                command.Parameters.AddWithValue("@Instructions", ingredient.Instructions ?? (object)DBNull.Value);
+                                
+                                command.ExecuteNonQuery();
+                            }
+                        }
+                    }
+                }
+                
+                TempData["SuccessMessage"] = "Recipe created successfully";
+                return RedirectToAction("Details", "Menu", new { id = model.MenuItemId });
+            }
+            
+            ViewBag.Ingredients = new SelectList(GetAllIngredients(), "Id", "IngredientsName");
+            return View(model);
+        }
+        
+        // GET: Recipe/Edit/5 (where 5 is the MenuItemId)
+        public IActionResult Edit(int menuItemId)
+        {
+            var recipe = GetRecipeByMenuItemId(menuItemId);
+            if (recipe == null)
+            {
+                return RedirectToAction("Create", new { menuItemId });
+            }
+            
+            var menuItem = GetMenuItemById(menuItemId);
+            ViewBag.MenuItem = menuItem;
+            ViewBag.Ingredients = new SelectList(GetAllIngredients(), "Id", "IngredientsName");
+            
+            return View(recipe);
+        }
+        
+        // POST: Recipe/Edit
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Edit(RecipeViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                int recipeId;
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    using (SqlCommand command = new SqlCommand("sp_ManageRecipe", connection))
+                    {
+                        command.CommandType = System.Data.CommandType.StoredProcedure;
+                        
+                        command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
+                        command.Parameters.AddWithValue("@Title", model.Title);
+                        command.Parameters.AddWithValue("@PreparationInstructions", model.PreparationInstructions);
+                        command.Parameters.AddWithValue("@CookingInstructions", model.CookingInstructions);
+                        command.Parameters.AddWithValue("@PlatingInstructions", model.PlatingInstructions ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@Yield", model.Yield);
+                        command.Parameters.AddWithValue("@YieldPercentage", model.YieldPercentage);
+                        command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
+                        command.Parameters.AddWithValue("@CookingTimeMinutes", model.CookingTimeMinutes);
+                        command.Parameters.AddWithValue("@Notes", model.Notes ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@UserId", 1); // TODO: Get from authentication
+                        
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                recipeId = reader.GetInt32(reader.GetOrdinal("RecipeId"));
+                            }
+                            else
+                            {
+                                ModelState.AddModelError("", "Failed to update recipe");
+                                return View(model);
+                            }
+                        }
+                    }
+                    
+                    // Update recipe steps
+                    if (model.Steps != null && model.Steps.Count > 0)
+                    {
+                        for (int i = 0; i < model.Steps.Count; i++)
+                        {
+                            var step = model.Steps[i];
+                            
+                            using (SqlCommand command = new SqlCommand("sp_ManageRecipeStep", connection))
+                            {
+                                command.CommandType = System.Data.CommandType.StoredProcedure;
+                                
+                                command.Parameters.AddWithValue("@RecipeId", recipeId);
+                                command.Parameters.AddWithValue("@StepNumber", i + 1);
+                                command.Parameters.AddWithValue("@Description", step.Description);
+                                command.Parameters.AddWithValue("@TimeRequiredMinutes", step.TimeRequiredMinutes ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@Temperature", step.Temperature ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@SpecialEquipment", step.SpecialEquipment ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@Tips", step.Tips ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@ImagePath", step.ImagePath ?? (object)DBNull.Value);
+                                command.Parameters.AddWithValue("@IsUpdate", true);
+                                
+                                command.ExecuteNonQuery();
+                            }
+                        }
+                    }
+                    
+                    // Update ingredients
+                    // First, remove all existing ingredients
+                    using (SqlCommand command = new SqlCommand("DELETE FROM MenuItemIngredients WHERE MenuItemId = @MenuItemId", connection))
+                    {
+                        command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
+                        command.ExecuteNonQuery();
+                    }
+                    
+                    // Add new ingredients
+                    if (model.Ingredients != null && model.Ingredients.Count > 0)
+                    {
+                        foreach (var ingredient in model.Ingredients)
+                        {
+                            using (SqlCommand command = new SqlCommand("sp_ManageMenuItemIngredient", connection))
+                            {
+                                command.CommandType = System.Data.CommandType.StoredProcedure;
+                                
+                                command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
+                                command.Parameters.AddWithValue("@IngredientId", ingredient.IngredientId);
+                                command.Parameters.AddWithValue("@Quantity", ingredient.Quantity);
+                                command.Parameters.AddWithValue("@Unit", ingredient.Unit);
+                                command.Parameters.AddWithValue("@IsOptional", ingredient.IsOptional);
+                                command.Parameters.AddWithValue("@Instructions", ingredient.Instructions ?? (object)DBNull.Value);
+                                
+                                command.ExecuteNonQuery();
+                            }
+                        }
+                    }
+                }
+                
+                TempData["SuccessMessage"] = "Recipe updated successfully";
+                return RedirectToAction("Details", "Menu", new { id = model.MenuItemId });
+            }
+            
+            ViewBag.Ingredients = new SelectList(GetAllIngredients(), "Id", "IngredientsName");
+            return View(model);
+        }
+        
+        // GET: Recipe/CalculateSuggestedPrice/5?targetGP=40
+        public IActionResult CalculateSuggestedPrice(int id, decimal targetGP = 40)
+        {
+            var menuItem = GetMenuItemById(id);
+            if (menuItem == null)
             {
                 return NotFound();
             }
-
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    // Update recipe
-                    UpdateRecipe(model);
-
-                    // Handle step images and save steps
-                    if (model.Steps != null)
-                    {
-                        foreach (var step in model.Steps)
-                        {
-                            if (step.ImageFile != null)
-                            {
-                                string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images/recipes");
-                                string uniqueFileName = Guid.NewGuid().ToString() + "_" + step.ImageFile.FileName;
-                                string filePath = Path.Combine(uploadsFolder, uniqueFileName);
-                                
-                                if (!Directory.Exists(uploadsFolder))
-                                {
-                                    Directory.CreateDirectory(uploadsFolder);
-                                }
-                                
-                                using (var fileStream = new FileStream(filePath, FileMode.Create))
-                                {
-                                    step.ImageFile.CopyTo(fileStream);
-                                }
-                                
-                                step.ImagePath = "/images/recipes/" + uniqueFileName;
-                            }
-                        }
-
-                        // Remove existing steps
-                        RemoveRecipeSteps(id);
-
-                        // Add updated steps
-                        AddRecipeSteps(id, model.Steps);
-                    }
-
-                    TempData["SuccessMessage"] = "Recipe updated successfully.";
-                    return RedirectToAction(nameof(Details), new { id = model.Id });
-                }
-                catch (Exception ex)
-                {
-                    ModelState.AddModelError("", "Error updating recipe: " + ex.Message);
-                }
-            }
-
-            // If we got this far, something failed, redisplay form
-            return View(model);
-        }
-
-        // Helper methods for database operations
-        private List<Recipe> GetAllRecipes()
-        {
-            var recipes = new List<Recipe>();
+            
+            PriceSuggestionViewModel priceViewModel = null;
             
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT r.Id, r.MenuItemId, mi.Name AS MenuItemName, r.Title, 
-                           r.PreparationTimeMinutes, r.CookingTimeMinutes, 
-                           r.LastUpdated, r.IsArchived, r.Version
-                    FROM Recipes r
-                    JOIN MenuItems mi ON r.MenuItemId = mi.Id
-                    ORDER BY r.Title", connection))
+                using (SqlCommand command = new SqlCommand("sp_CalculateSuggestedPrice", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            recipes.Add(new Recipe
-                            {
-                                Id = reader.GetInt32(0),
-                                MenuItemId = reader.GetInt32(1),
-                                MenuItem = new MenuItem { Name = reader.GetString(2) },
-                                Title = reader.GetString(3),
-                                PreparationTimeMinutes = reader.GetInt32(4),
-                                CookingTimeMinutes = reader.GetInt32(5),
-                                LastUpdated = reader.GetDateTime(6),
-                                IsArchived = reader.GetBoolean(7),
-                                Version = reader.GetInt32(8)
-                            });
-                        }
-                    }
-                }
-            }
-            
-            return recipes;
-        }
-
-        private Recipe GetRecipeById(int id)
-        {
-            Recipe recipe = null;
-            
-            using (SqlConnection connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                
-                // Get recipe details
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT r.Id, r.MenuItemId, mi.Name AS MenuItemName, r.Title, 
-                           r.PreparationInstructions, r.CookingInstructions, 
-                           r.PlatingInstructions, r.Yield, r.PreparationTimeMinutes, 
-                           r.CookingTimeMinutes, r.LastUpdated, r.CreatedById, 
-                           r.Notes, r.IsArchived, r.Version
-                    FROM Recipes r
-                    JOIN MenuItems mi ON r.MenuItemId = mi.Id
-                    WHERE r.Id = @Id", connection))
-                {
-                    command.Parameters.AddWithValue("@Id", id);
+                    command.CommandType = System.Data.CommandType.StoredProcedure;
+                    
+                    command.Parameters.AddWithValue("@MenuItemId", id);
+                    command.Parameters.AddWithValue("@TargetGPPercentage", targetGP);
                     
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
-                            recipe = new Recipe
+                            priceViewModel = new PriceSuggestionViewModel
                             {
-                                Id = reader.GetInt32(0),
-                                MenuItemId = reader.GetInt32(1),
-                                MenuItem = new MenuItem { Name = reader.GetString(2) },
-                                Title = reader.GetString(3),
-                                PreparationInstructions = reader.GetString(4),
-                                CookingInstructions = reader.GetString(5),
-                                PlatingInstructions = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                Yield = reader.GetInt32(7),
-                                PreparationTimeMinutes = reader.GetInt32(8),
-                                CookingTimeMinutes = reader.GetInt32(9),
-                                LastUpdated = reader.GetDateTime(10),
-                                CreatedById = reader.IsDBNull(11) ? null : (int?)reader.GetInt32(11),
-                                Notes = reader.IsDBNull(12) ? null : reader.GetString(12),
-                                IsArchived = reader.GetBoolean(13),
-                                Version = reader.GetInt32(14),
-                                Steps = new List<RecipeStep>()
+                                MenuItemId = reader.GetInt32(reader.GetOrdinal("MenuItemId")),
+                                TotalCost = reader.GetDecimal(reader.GetOrdinal("TotalCost")),
+                                TargetGPPercentage = reader.GetDecimal(reader.GetOrdinal("TargetGPPercentage")),
+                                SuggestedPrice = reader.GetDecimal(reader.GetOrdinal("SuggestedPrice")),
+                                CurrentPrice = menuItem.Price
                             };
                         }
                     }
                 }
-                
-                if (recipe != null)
+            }
+            
+            if (priceViewModel == null)
+            {
+                priceViewModel = new PriceSuggestionViewModel
                 {
-                    // Get recipe steps
-                    using (SqlCommand command = new SqlCommand(@"
-                        SELECT rs.Id, rs.StepNumber, rs.Description, rs.TimeRequiredMinutes, 
-                               rs.Temperature, rs.SpecialEquipment, rs.Tips, rs.ImagePath
-                        FROM RecipeSteps rs
-                        WHERE rs.RecipeId = @RecipeId
-                        ORDER BY rs.StepNumber", connection))
+                    MenuItemId = id,
+                    TotalCost = 0,
+                    TargetGPPercentage = targetGP,
+                    SuggestedPrice = 0,
+                    CurrentPrice = menuItem.Price
+                };
+            }
+            
+            priceViewModel.MenuItemName = menuItem.Name;
+            
+            return View(priceViewModel);
+        }
+        
+        // POST: Recipe/UpdatePrice
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult UpdatePrice(PriceSuggestionViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    using (SqlCommand command = new SqlCommand("sp_UpdateMenuItem", connection))
                     {
-                        command.Parameters.AddWithValue("@RecipeId", recipe.Id);
+                        command.CommandType = System.Data.CommandType.StoredProcedure;
+                        
+                        // Get current menu item data
+                        var menuItem = GetMenuItemById(model.MenuItemId);
+                        
+                        command.Parameters.AddWithValue("@Id", model.MenuItemId);
+                        command.Parameters.AddWithValue("@PLUCode", menuItem.PLUCode);
+                        command.Parameters.AddWithValue("@Name", menuItem.Name);
+                        command.Parameters.AddWithValue("@Description", menuItem.Description);
+                        command.Parameters.AddWithValue("@Price", model.NewPrice);
+                        command.Parameters.AddWithValue("@CategoryId", menuItem.CategoryId);
+                        command.Parameters.AddWithValue("@ImagePath", menuItem.ImagePath ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@IsAvailable", menuItem.IsAvailable);
+                        command.Parameters.AddWithValue("@PreparationTimeMinutes", menuItem.PreparationTimeMinutes);
+                        command.Parameters.AddWithValue("@CalorieCount", menuItem.CalorieCount ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@IsFeatured", menuItem.IsFeatured);
+                        command.Parameters.AddWithValue("@IsSpecial", menuItem.IsSpecial);
+                        command.Parameters.AddWithValue("@DiscountPercentage", menuItem.DiscountPercentage ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@KitchenStationId", menuItem.KitchenStationId ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@TargetGP", model.TargetGPPercentage);
+                        command.Parameters.AddWithValue("@UserId", 1); // TODO: Get from authentication
                         
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            while (reader.Read())
+                            if (reader.Read())
                             {
-                                recipe.Steps.Add(new RecipeStep
+                                bool needsApproval = reader.GetBoolean(reader.GetOrdinal("NeedsPriceApproval"));
+                                if (needsApproval)
                                 {
-                                    Id = reader.GetInt32(0),
-                                    RecipeId = recipe.Id,
-                                    StepNumber = reader.GetInt32(1),
-                                    Description = reader.GetString(2),
-                                    TimeRequiredMinutes = reader.IsDBNull(3) ? null : (int?)reader.GetInt32(3),
-                                    Temperature = reader.IsDBNull(4) ? null : reader.GetString(4),
-                                    SpecialEquipment = reader.IsDBNull(5) ? null : reader.GetString(5),
-                                    Tips = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                    ImagePath = reader.IsDBNull(7) ? null : reader.GetString(7)
+                                    TempData["WarningMessage"] = "Price change requires approval. The current price will remain until approved.";
+                                }
+                                else
+                                {
+                                    TempData["SuccessMessage"] = "Price updated successfully.";
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return RedirectToAction("Details", "Menu", new { id = model.MenuItemId });
+            }
+            
+            return View("CalculateSuggestedPrice", model);
+        }
+        
+        // Helper methods
+        private RecipeViewModel GetRecipeByMenuItemId(int menuItemId)
+        {
+            RecipeViewModel recipe = null;
+            
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                
+                using (SqlCommand command = new SqlCommand("sp_GetRecipeByMenuItemId", connection))
+                {
+                    command.CommandType = System.Data.CommandType.StoredProcedure;
+                    command.Parameters.AddWithValue("@MenuItemId", menuItemId);
+                    
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            recipe = new RecipeViewModel
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                MenuItemId = reader.GetInt32(reader.GetOrdinal("MenuItemId")),
+                                Title = reader.GetString(reader.GetOrdinal("Title")),
+                                PreparationInstructions = reader.GetString(reader.GetOrdinal("PreparationInstructions")),
+                                CookingInstructions = reader.GetString(reader.GetOrdinal("CookingInstructions")),
+                                PlatingInstructions = reader.IsDBNull(reader.GetOrdinal("PlatingInstructions")) ? null : reader.GetString(reader.GetOrdinal("PlatingInstructions")),
+                                Yield = reader.GetInt32(reader.GetOrdinal("Yield")),
+                                YieldPercentage = reader.GetDecimal(reader.GetOrdinal("YieldPercentage")),
+                                PreparationTimeMinutes = reader.GetInt32(reader.GetOrdinal("PreparationTimeMinutes")),
+                                CookingTimeMinutes = reader.GetInt32(reader.GetOrdinal("CookingTimeMinutes")),
+                                Notes = reader.IsDBNull(reader.GetOrdinal("Notes")) ? null : reader.GetString(reader.GetOrdinal("Notes")),
+                                Version = reader.GetInt32(reader.GetOrdinal("Version")),
+                                Steps = new List<RecipeStepViewModel>(),
+                                Ingredients = new List<MenuItemIngredientViewModelModel>()
+                            };
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    }
+                    
+                    // Get recipe steps
+                    using (SqlCommand stepsCommand = new SqlCommand("sp_GetRecipeStepsByRecipeId", connection))
+                    {
+                        stepsCommand.CommandType = System.Data.CommandType.StoredProcedure;
+                        stepsCommand.Parameters.AddWithValue("@RecipeId", recipe.Id);
+                        
+                        using (SqlDataReader stepsReader = stepsCommand.ExecuteReader())
+                        {
+                            while (stepsReader.Read())
+                            {
+                                recipe.Steps.Add(new RecipeStepViewModel
+                                {
+                                    Id = stepsReader.GetInt32(stepsReader.GetOrdinal("Id")),
+                                    RecipeId = stepsReader.GetInt32(stepsReader.GetOrdinal("RecipeId")),
+                                    StepNumber = stepsReader.GetInt32(stepsReader.GetOrdinal("StepNumber")),
+                                    Description = stepsReader.GetString(stepsReader.GetOrdinal("Description")),
+                                    TimeRequiredMinutes = stepsReader.IsDBNull(stepsReader.GetOrdinal("TimeRequiredMinutes")) ? null : (int?)stepsReader.GetInt32(stepsReader.GetOrdinal("TimeRequiredMinutes")),
+                                    Temperature = stepsReader.IsDBNull(stepsReader.GetOrdinal("Temperature")) ? null : stepsReader.GetString(stepsReader.GetOrdinal("Temperature")),
+                                    SpecialEquipment = stepsReader.IsDBNull(stepsReader.GetOrdinal("SpecialEquipment")) ? null : stepsReader.GetString(stepsReader.GetOrdinal("SpecialEquipment")),
+                                    Tips = stepsReader.IsDBNull(stepsReader.GetOrdinal("Tips")) ? null : stepsReader.GetString(stepsReader.GetOrdinal("Tips")),
+                                    ImagePath = stepsReader.IsDBNull(stepsReader.GetOrdinal("ImagePath")) ? null : stepsReader.GetString(stepsReader.GetOrdinal("ImagePath"))
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Get ingredients
+                    using (SqlCommand ingredientsCommand = new SqlCommand("sp_GetMenuItemIngredientsByMenuItemId", connection))
+                    {
+                        ingredientsCommand.CommandType = System.Data.CommandType.StoredProcedure;
+                        ingredientsCommand.Parameters.AddWithValue("@MenuItemId", recipe.MenuItemId);
+                        
+                        using (SqlDataReader ingredientsReader = ingredientsCommand.ExecuteReader())
+                        {
+                            while (ingredientsReader.Read())
+                            {
+                                recipe.Ingredients.Add(new MenuItemIngredientViewModelModel
+                                {
+                                    Id = ingredientsReader.GetInt32(ingredientsReader.GetOrdinal("Id")),
+                                    MenuItemId = ingredientsReader.GetInt32(ingredientsReader.GetOrdinal("MenuItemId")),
+                                    IngredientId = ingredientsReader.GetInt32(ingredientsReader.GetOrdinal("IngredientId")),
+                                    IngredientName = ingredientsReader.GetString(ingredientsReader.GetOrdinal("IngredientsName")),
+                                    Quantity = ingredientsReader.GetDecimal(ingredientsReader.GetOrdinal("Quantity")),
+                                    Unit = ingredientsReader.GetString(ingredientsReader.GetOrdinal("Unit")),
+                                    IsOptional = ingredientsReader.GetBoolean(ingredientsReader.GetOrdinal("IsOptional"))
                                 });
                             }
                         }
                     }
                 }
             }
-            
             return recipe;
         }
-
-        private void UpdateRecipe(RecipeViewModel model)
+        
+        private MenuItem GetMenuItemById(int id)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                
-                using (SqlCommand command = new SqlCommand(@"
-                    UPDATE Recipes
-                    SET Title = @Title,
-                        PreparationInstructions = @PreparationInstructions,
-                        CookingInstructions = @CookingInstructions,
-                        PlatingInstructions = @PlatingInstructions,
-                        Yield = @Yield,
-                        PreparationTimeMinutes = @PreparationTimeMinutes,
-                        CookingTimeMinutes = @CookingTimeMinutes,
-                        LastUpdated = GETDATE(),
-                        Notes = @Notes,
-                        IsArchived = @IsArchived,
-                        Version = @Version
-                    WHERE Id = @Id", connection))
-                {
-                    command.Parameters.AddWithValue("@Id", model.Id);
-                    command.Parameters.AddWithValue("@Title", model.Title);
-                    command.Parameters.AddWithValue("@PreparationInstructions", model.PreparationInstructions);
-                    command.Parameters.AddWithValue("@CookingInstructions", model.CookingInstructions);
-                    
-                    if (!string.IsNullOrEmpty(model.PlatingInstructions))
-                        command.Parameters.AddWithValue("@PlatingInstructions", model.PlatingInstructions);
-                    else
-                        command.Parameters.AddWithValue("@PlatingInstructions", DBNull.Value);
-                    
-                    command.Parameters.AddWithValue("@Yield", model.Yield);
-                    command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
-                    command.Parameters.AddWithValue("@CookingTimeMinutes", model.CookingTimeMinutes);
-                    
-                    if (!string.IsNullOrEmpty(model.Notes))
-                        command.Parameters.AddWithValue("@Notes", model.Notes);
-                    else
-                        command.Parameters.AddWithValue("@Notes", DBNull.Value);
-                    
-                    command.Parameters.AddWithValue("@IsArchived", model.IsArchived);
-                    command.Parameters.AddWithValue("@Version", model.Version);
-                    
-                    command.ExecuteNonQuery();
-                }
-            }
-        }
-
-        private void AddRecipeSteps(int recipeId, List<RecipeStepViewModel> steps)
-        {
-            if (steps == null || !steps.Any())
-                return;
+            MenuItem menuItem = null;
             
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                foreach (var step in steps)
+                using (SqlCommand command = new SqlCommand("sp_GetMenuItemById", connection))
                 {
-                    using (SqlCommand command = new SqlCommand(@"
-                        INSERT INTO RecipeSteps (RecipeId, StepNumber, Description, TimeRequiredMinutes,
-                                               Temperature, SpecialEquipment, Tips, ImagePath)
-                        VALUES (@RecipeId, @StepNumber, @Description, @TimeRequiredMinutes,
-                                @Temperature, @SpecialEquipment, @Tips, @ImagePath)", connection))
+                    command.CommandType = System.Data.CommandType.StoredProcedure;
+                    command.Parameters.AddWithValue("@Id", id);
+                    
+                    using (SqlDataReader reader = command.ExecuteReader())
                     {
-                        command.Parameters.AddWithValue("@RecipeId", recipeId);
-                        command.Parameters.AddWithValue("@StepNumber", step.StepNumber);
-                        command.Parameters.AddWithValue("@Description", step.Description);
-                        
-                        if (step.TimeRequiredMinutes.HasValue)
-                            command.Parameters.AddWithValue("@TimeRequiredMinutes", step.TimeRequiredMinutes.Value);
-                        else
-                            command.Parameters.AddWithValue("@TimeRequiredMinutes", DBNull.Value);
-                        
-                        if (!string.IsNullOrEmpty(step.Temperature))
-                            command.Parameters.AddWithValue("@Temperature", step.Temperature);
-                        else
-                            command.Parameters.AddWithValue("@Temperature", DBNull.Value);
-                        
-                        if (!string.IsNullOrEmpty(step.SpecialEquipment))
-                            command.Parameters.AddWithValue("@SpecialEquipment", step.SpecialEquipment);
-                        else
-                            command.Parameters.AddWithValue("@SpecialEquipment", DBNull.Value);
-                        
-                        if (!string.IsNullOrEmpty(step.Tips))
-                            command.Parameters.AddWithValue("@Tips", step.Tips);
-                        else
-                            command.Parameters.AddWithValue("@Tips", DBNull.Value);
-                        
-                        if (!string.IsNullOrEmpty(step.ImagePath))
-                            command.Parameters.AddWithValue("@ImagePath", step.ImagePath);
-                        else
-                            command.Parameters.AddWithValue("@ImagePath", DBNull.Value);
-                        
-                        command.ExecuteNonQuery();
+                        if (reader.Read())
+                        {
+                            menuItem = new MenuItem
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                PLUCode = reader.GetString(reader.GetOrdinal("PLUCode")),
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                Price = reader.GetDecimal(reader.GetOrdinal("Price")),
+                                CategoryId = reader.GetInt32(reader.GetOrdinal("CategoryId")),
+                                Category = new Category { Name = reader.GetString(reader.GetOrdinal("CategoryName")) },
+                                ImagePath = reader.IsDBNull(reader.GetOrdinal("ImagePath")) ? null : reader.GetString(reader.GetOrdinal("ImagePath")),
+                                IsAvailable = reader.GetBoolean(reader.GetOrdinal("IsAvailable")),
+                                PreparationTimeMinutes = reader.GetInt32(reader.GetOrdinal("PreparationTimeMinutes")),
+                                CalorieCount = reader.IsDBNull(reader.GetOrdinal("CalorieCount")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("CalorieCount")),
+                                IsFeatured = reader.GetBoolean(reader.GetOrdinal("IsFeatured")),
+                                IsSpecial = reader.GetBoolean(reader.GetOrdinal("IsSpecial")),
+                                DiscountPercentage = reader.IsDBNull(reader.GetOrdinal("DiscountPercentage")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("DiscountPercentage")),
+                                TargetGP = reader.IsDBNull(reader.GetOrdinal("TargetGP")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("TargetGP")),
+                                KitchenStationId = null // Default value
+                            };
+                        }
                     }
                 }
             }
+            
+            return menuItem;
         }
-
-        private void RemoveRecipeSteps(int recipeId)
+        
+        private List<Ingredients> GetAllIngredients()
         {
+            var ingredients = new List<Ingredients>();
+            
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
-                    DELETE FROM RecipeSteps WHERE RecipeId = @RecipeId", connection))
+                using (SqlCommand command = new SqlCommand("SELECT Id, IngredientsName, DisplayName, Code FROM Ingredients ORDER BY IngredientsName", connection))
                 {
-                    command.Parameters.AddWithValue("@RecipeId", recipeId);
-                    command.ExecuteNonQuery();
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            ingredients.Add(new Ingredients
+                            {
+                                Id = reader.GetInt32(0),
+                                IngredientsName = reader.GetString(1),
+                                DisplayName = reader.IsDBNull(2) ? null : reader.GetString(2),
+                                Code = reader.IsDBNull(3) ? null : reader.GetString(3)
+                            });
+                        }
+                    }
                 }
             }
+            
+            return ingredients;
+        }
+        
+        private List<Recipe> GetAllRecipes()
+        {
+            List<Recipe> recipes = new List<Recipe>();
+            
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                
+                using (SqlCommand command = new SqlCommand("sp_GetAllRecipes", connection))
+                {
+                    command.CommandType = System.Data.CommandType.StoredProcedure;
+                    
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            Recipe recipe = new Recipe
+                            {
+                                Id = reader.GetInt32(0),
+                                MenuItemId = reader.GetInt32(1),
+                                Title = reader.GetString(3),
+                                PreparationInstructions = reader.IsDBNull(4) ? null : reader.GetString(4),
+                                CookingInstructions = reader.IsDBNull(5) ? null : reader.GetString(5),
+                                PlatingInstructions = reader.IsDBNull(6) ? null : reader.GetString(6),
+                                Yield = reader.GetInt32(7),
+                                YieldPercentage = reader.GetDecimal(8),
+                                PreparationTimeMinutes = reader.GetInt32(9),
+                                CookingTimeMinutes = reader.GetInt32(10),
+                                LastUpdated = reader.GetDateTime(11),
+                                Notes = reader.IsDBNull(12) ? null : reader.GetString(12),
+                                IsArchived = reader.GetBoolean(13),
+                                Version = reader.GetInt32(14),
+                                MenuItem = new MenuItem { 
+                                    Id = reader.GetInt32(1),
+                                    Name = reader.GetString(2) 
+                                }
+                            };
+                            
+                            recipes.Add(recipe);
+                        }
+                    }
+                }
+            }
+            
+            return recipes;
         }
     }
 }
