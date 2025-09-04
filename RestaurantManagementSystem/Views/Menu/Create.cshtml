@@ -20,110 +20,131 @@
                     <form asp-action="Create" method="post" enctype="multipart/form-data">
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                         
-                        <ul class="nav nav-tabs" id="menuItemTabs" role="tablist">
+                        <ul class="nav nav-tabs nav-fill mb-3" id="menuItemTabs" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-controls="general" aria-selected="true">General</button>
+                                <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-controls="general" aria-selected="true">
+                                    <i class="fas fa-info-circle me-1"></i> General
+                                </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="allergens-tab" data-bs-toggle="tab" data-bs-target="#allergens" type="button" role="tab" aria-controls="allergens" aria-selected="false">Allergens</button>
+                                <button class="nav-link" id="allergens-tab" data-bs-toggle="tab" data-bs-target="#allergens" type="button" role="tab" aria-controls="allergens" aria-selected="false">
+                                    <i class="fas fa-exclamation-triangle me-1"></i> Allergens
+                                </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="ingredients-tab" data-bs-toggle="tab" data-bs-target="#ingredients" type="button" role="tab" aria-controls="ingredients" aria-selected="false">Ingredients</button>
+                                <button class="nav-link" id="ingredients-tab" data-bs-toggle="tab" data-bs-target="#ingredients" type="button" role="tab" aria-controls="ingredients" aria-selected="false">
+                                    <i class="fas fa-carrot me-1"></i> Ingredients
+                                </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="modifiers-tab" data-bs-toggle="tab" data-bs-target="#modifiers" type="button" role="tab" aria-controls="modifiers" aria-selected="false">Modifiers</button>
+                                <button class="nav-link" id="modifiers-tab" data-bs-toggle="tab" data-bs-target="#modifiers" type="button" role="tab" aria-controls="modifiers" aria-selected="false">
+                                    <i class="fas fa-sliders-h me-1"></i> Modifiers
+                                </button>
                             </li>
                         </ul>
                         
-                        <div class="tab-content pt-4" id="menuItemTabsContent">
+                        <div class="tab-content py-3" id="menuItemTabsContent">
                             <!-- General Tab -->
                             <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label asp-for="PLUCode" class="control-label"></label>
-                                            <input asp-for="PLUCode" class="form-control" />
-                                            <span asp-validation-for="PLUCode" class="text-danger"></span>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="PLUCode" class="form-label small mb-1">PLU Code</label>
+                                            <input asp-for="PLUCode" class="form-control form-control-sm" placeholder="Enter PLU code" />
+                                            <span asp-validation-for="PLUCode" class="text-danger small"></span>
                                         </div>
                                         
-                                        <div class="form-group">
-                                            <label asp-for="Name" class="control-label"></label>
-                                            <input asp-for="Name" class="form-control" />
-                                            <span asp-validation-for="Name" class="text-danger"></span>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="Name" class="form-label small mb-1">Item Name</label>
+                                            <input asp-for="Name" class="form-control form-control-sm" placeholder="Enter item name" />
+                                            <span asp-validation-for="Name" class="text-danger small"></span>
                                         </div>
                                         
-                                        <div class="form-group">
-                                            <label asp-for="Price" class="control-label"></label>
-                                            <input asp-for="Price" class="form-control" type="number" step="0.01" />
-                                            <span asp-validation-for="Price" class="text-danger"></span>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="Price" class="form-label small mb-1">Price (₹)</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">₹</span>
+                                                <input asp-for="Price" class="form-control form-control-sm" type="number" step="0.01" placeholder="0.00" />
+                                            </div>
+                                            <span asp-validation-for="Price" class="text-danger small"></span>
                                         </div>
                                         
-                                        <div class="form-group">
-                                            <label asp-for="CategoryId" class="control-label"></label>
-                                            <select asp-for="CategoryId" class="form-control" asp-items="ViewBag.Categories">
+                                        <div class="form-group mb-2">
+                                            <label asp-for="CategoryId" class="form-label small mb-1">Category</label>
+                                            <select asp-for="CategoryId" class="form-select form-select-sm" asp-items="ViewBag.Categories">
                                                 <option value="">-- Select Category --</option>
                                             </select>
-                                            <span asp-validation-for="CategoryId" class="text-danger"></span>
+                                            <span asp-validation-for="CategoryId" class="text-danger small"></span>
                                         </div>
 
-                                        <div class="form-group">
-                                            <label asp-for="KitchenStationId" class="control-label"></label>
-                                            <select asp-for="KitchenStationId" class="form-control" asp-items="ViewBag.KitchenStations">
+                                        <div class="form-group mb-2">
+                                            <label asp-for="KitchenStationId" class="form-label small mb-1">Kitchen Station</label>
+                                            <select asp-for="KitchenStationId" class="form-select form-select-sm" asp-items="ViewBag.KitchenStations">
                                                 <option value="">-- Select Kitchen Station --</option>
                                             </select>
-                                            <span asp-validation-for="KitchenStationId" class="text-danger"></span>
+                                            <span asp-validation-for="KitchenStationId" class="text-danger small"></span>
                                         </div>
                                     </div>
                                     
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label asp-for="PreparationTimeMinutes" class="control-label"></label>
-                                            <input asp-for="PreparationTimeMinutes" class="form-control" type="number" />
-                                            <span asp-validation-for="PreparationTimeMinutes" class="text-danger"></span>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="PreparationTimeMinutes" class="form-label small mb-1">Prep Time (min)</label>
+                                            <input asp-for="PreparationTimeMinutes" class="form-control form-control-sm" type="number" placeholder="15" />
+                                            <span asp-validation-for="PreparationTimeMinutes" class="text-danger small"></span>
                                         </div>
                                         
-                                        <div class="form-group">
-                                            <label asp-for="CalorieCount" class="control-label"></label>
-                                            <input asp-for="CalorieCount" class="form-control" type="number" />
-                                            <span asp-validation-for="CalorieCount" class="text-danger"></span>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="CalorieCount" class="form-label small mb-1">Calories</label>
+                                            <input asp-for="CalorieCount" class="form-control form-control-sm" type="number" placeholder="Enter calories" />
+                                            <span asp-validation-for="CalorieCount" class="text-danger small"></span>
                                         </div>
                                         
-                                        <div class="form-group">
-                                            <label asp-for="DiscountPercentage" class="control-label"></label>
-                                            <input asp-for="DiscountPercentage" class="form-control" type="number" step="0.01" />
-                                            <span asp-validation-for="DiscountPercentage" class="text-danger"></span>
-                                        </div>
-                                        
-                                        <div class="form-group">
-                                            <label asp-for="ImageFile" class="control-label"></label>
-                                            <div class="custom-file">
-                                                <input asp-for="ImageFile" type="file" class="custom-file-input" id="customFile" accept="image/*" onchange="displayFileName(this)" />
-                                                <label class="custom-file-label" for="customFile">Choose file</label>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="DiscountPercentage" class="form-label small mb-1">Discount (%)</label>
+                                            <div class="input-group input-group-sm">
+                                                <input asp-for="DiscountPercentage" class="form-control form-control-sm" type="number" step="0.01" placeholder="0.00" />
+                                                <span class="input-group-text">%</span>
                                             </div>
-                                            <span asp-validation-for="ImageFile" class="text-danger"></span>
-                                        </div>
-
-                                        <div class="form-check form-check-inline mt-3">
-                                            <input asp-for="IsAvailable" class="form-check-input" />
-                                            <label asp-for="IsAvailable" class="form-check-label"></label>
+                                            <span asp-validation-for="DiscountPercentage" class="text-danger small"></span>
                                         </div>
                                         
-                                        <div class="form-check form-check-inline">
-                                            <input asp-for="IsFeatured" class="form-check-input" />
-                                            <label asp-for="IsFeatured" class="form-check-label"></label>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="ImageFile" class="form-label small mb-1">Item Image</label>
+                                            <input asp-for="ImageFile" type="file" class="form-control form-control-sm" accept="image/*" />
+                                            <span asp-validation-for="ImageFile" class="text-danger small"></span>
                                         </div>
                                         
-                                        <div class="form-check form-check-inline">
-                                            <input asp-for="IsSpecial" class="form-check-input" />
-                                            <label asp-for="IsSpecial" class="form-check-label"></label>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="Description" class="form-label small mb-1">Description</label>
+                                            <textarea asp-for="Description" class="form-control form-control-sm" rows="3" placeholder="Enter item description"></textarea>
+                                            <span asp-validation-for="Description" class="text-danger small"></span>
                                         </div>
-                                    </div>
 
-                                    <div class="col-md-12 mt-3">
-                                        <div class="form-group">
-                                            <label asp-for="Description" class="control-label"></label>
-                                            <textarea asp-for="Description" class="form-control" rows="5"></textarea>
-                                            <span asp-validation-for="Description" class="text-danger"></span>
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="form-check mb-2">
+                                                    <input asp-for="IsAvailable" class="form-check-input" />
+                                                    <label asp-for="IsAvailable" class="form-check-label small">Available</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check mb-2">
+                                                    <input asp-for="IsFeatured" class="form-check-input" />
+                                                    <label asp-for="IsFeatured" class="form-check-label small">Featured</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check mb-2">
+                                                    <input asp-for="IsSpecial" class="form-check-input" />
+                                                    <label asp-for="IsSpecial" class="form-check-label small">Special</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-3 d-flex justify-content-end">
+                                            <button type="button" class="btn btn-sm btn-primary" id="goToAllergensTab">
+                                                Next: Allergens <i class="fas fa-arrow-right ms-1"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -131,22 +152,24 @@
                             
                             <!-- Allergens Tab -->
                             <div class="tab-pane fade" id="allergens" role="tabpanel" aria-labelledby="allergens-tab">
-                                <div class="row">
+                                <div class="row g-2">
                                     @if (ViewBag.Allergens != null)
                                     {
                                         @foreach (var allergen in ViewBag.Allergens)
                                         {
-                                            <div class="col-md-4 mb-3">
-                                                <div class="card">
-                                                    <div class="card-body">
+                                            <div class="col-md-3 col-sm-4 mb-2">
+                                                <div class="card h-100 shadow-sm">
+                                                    <div class="card-body p-2">
                                                         <div class="form-check">
                                                             <input type="checkbox" name="SelectedAllergens" value="@allergen.Id" id="allergen-@allergen.Id" class="form-check-input" />
-                                                            <label class="form-check-label" for="allergen-@allergen.Id">
+                                                            <label class="form-check-label fw-bold" for="allergen-@allergen.Id">
                                                                 @allergen.Name
                                                             </label>
                                                             @if (!string.IsNullOrEmpty(allergen.Description))
                                                             {
-                                                                <small class="form-text text-muted">@allergen.Description</small>
+                                                                <div>
+                                                                    <small class="text-muted">@allergen.Description</small>
+                                                                </div>
                                                             }
                                                         </div>
                                                     </div>
@@ -156,66 +179,70 @@
                                     }
                                 </div>
 
-                                <div class="form-group mt-4 mb-3">
-                                    <button type="submit" class="btn btn-primary btn-lg">
-                                        <i class="fa fa-save"></i> Save Menu Item
+                                <div class="mt-3 d-flex justify-content-between">
+                                    <button type="button" class="btn btn-sm btn-secondary" id="goToGeneralTab">
+                                        <i class="fas fa-arrow-left me-1"></i> Previous
                                     </button>
-                                    <button type="button" class="btn btn-info" id="goToIngredientsTab">
-                                        Next: Ingredients <i class="fa fa-arrow-right"></i>
+                                    <button type="button" class="btn btn-sm btn-primary" id="goToIngredientsTab">
+                                        Next <i class="fas fa-arrow-right ms-1"></i>
                                     </button>
                                 </div>
-                            </div>                            <!-- Ingredients Tab -->
+                            </div>
+                            
+                            <!-- Ingredients Tab -->
                             <div class="tab-pane fade" id="ingredients" role="tabpanel" aria-labelledby="ingredients-tab">
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <button type="button" id="addIngredientButton" class="btn btn-success">
-                                            <i class="fa fa-plus"></i> Add Ingredient
-                                        </button>
-                                    </div>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="mb-0">Menu Item Ingredients</h6>
+                                    <button type="button" id="addIngredientButton" class="btn btn-sm btn-success">
+                                        <i class="fa fa-plus me-1"></i> Add Ingredient
+                                    </button>
                                 </div>
                                 
-                                <div id="ingredientsContainer">
+                                <div id="ingredientsContainer" class="mb-3">
                                     <!-- Ingredients will be added dynamically here -->
                                 </div>
 
-                                <div class="form-group mt-4 mb-3">
-                                    <button type="submit" class="btn btn-primary btn-lg">
-                                        <i class="fa fa-save"></i> Save Menu Item
+                                <div class="mt-3 d-flex justify-content-between">
+                                    <button type="button" class="btn btn-sm btn-secondary" id="goToAllergensTab">
+                                        <i class="fas fa-arrow-left me-1"></i> Previous
                                     </button>
-                                    <button type="button" class="btn btn-info" id="goToModifiersTab">
-                                        Next: Modifiers <i class="fa fa-arrow-right"></i>
+                                    <button type="button" class="btn btn-sm btn-primary" id="goToModifiersTab">
+                                        Next <i class="fas fa-arrow-right ms-1"></i>
                                     </button>
                                 </div>
                             </div>
                             
                             <!-- Modifiers Tab -->
                             <div class="tab-pane fade" id="modifiers" role="tabpanel" aria-labelledby="modifiers-tab">
-                                <div class="row">
+                                <div class="row g-2">
                                     @if (ViewBag.Modifiers != null)
                                     {
                                         @foreach (var modifier in ViewBag.Modifiers)
                                         {
-                                            <div class="col-md-6 mb-3">
-                                                <div class="card">
-                                                    <div class="card-body">
-                                                        <div class="form-check mb-2">
+                                            <div class="col-md-4 mb-2">
+                                                <div class="card h-100 shadow-sm">
+                                                    <div class="card-body p-2">
+                                                        <div class="form-check">
                                                             <input type="checkbox" name="SelectedModifiers" value="@modifier.Id" id="modifier-@modifier.Id" class="form-check-input modifier-checkbox" 
                                                                    onchange="togglePriceField(@modifier.Id)" />
-                                                            <label class="form-check-label" for="modifier-@modifier.Id">
-                                                                @modifier.Name (@modifier.ModifierType)
+                                                            <label class="form-check-label fw-bold" for="modifier-@modifier.Id">
+                                                                @modifier.Name 
+                                                                <span class="badge bg-light text-dark">@modifier.ModifierType</span>
                                                             </label>
                                                         </div>
                                                         
                                                         @if (!string.IsNullOrEmpty(modifier.Description))
                                                         {
-                                                            <small class="form-text text-muted mb-2">@modifier.Description</small>
+                                                            <div class="mt-1">
+                                                                <small class="text-muted">@modifier.Description</small>
+                                                            </div>
                                                         }
                                                         
-                                                        <div class="form-group price-adjustment-group" id="price-group-@modifier.Id" style="display:none;">
-                                                            <label>Price Adjustment</label>
-                                                            <div class="input-group">
+                                                        <div class="mt-2 price-adjustment-group" id="price-group-@modifier.Id" style="display:none;">
+                                                            <label class="form-label small mb-1">Price Adjustment</label>
+                                                            <div class="input-group input-group-sm">
                                                                 <span class="input-group-text">₹</span>
-                                                                <input type="number" name="ModifierPrices[@modifier.Id]" class="form-control" value="0.00" step="0.01" />
+                                                                <input type="number" name="ModifierPrices[@modifier.Id]" class="form-control form-control-sm" value="0.00" step="0.01" />
                                                             </div>
                                                         </div>
                                                     </div>
@@ -224,22 +251,25 @@
                                         }
                                     }
                                 </div>
-
-                                <div class="form-group mt-4 mb-3">
-                                    <button type="submit" class="btn btn-primary btn-lg">
-                                        <i class="fa fa-save"></i> Save Menu Item
+                                
+                                <div class="mt-3 d-flex justify-content-between">
+                                    <button type="button" class="btn btn-sm btn-secondary" id="goToIngredientsTab">
+                                        <i class="fas fa-arrow-left me-1"></i> Previous
+                                    </button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fa fa-save me-1"></i> Save Menu Item
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="form-group mt-4 text-end">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fa fa-save"></i> Save Menu Item
-                            </button>
-                            <a asp-action="Index" class="btn btn-secondary">
-                                <i class="fa fa-times"></i> Cancel
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="fa fa-times me-1"></i> Cancel
                             </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-save me-1"></i> Create Menu Item
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -250,15 +280,15 @@
 
 <!-- Template for ingredient items -->
 <template id="ingredientTemplate">
-    <div class="card mb-3 ingredient-card">
-        <div class="card-body">
-            <div class="row">
+    <div class="card mb-2 shadow-sm ingredient-card">
+        <div class="card-body p-2">
+            <div class="row g-2">
                 <div class="col-md-11">
-                    <div class="row">
+                    <div class="row g-2">
                         <div class="col-md-4">
-                            <div class="form-group">
-                                <label>Ingredient</label>
-                                <select name="Ingredients[{index}].IngredientId" class="form-control" required>
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">Ingredient</label>
+                                <select name="Ingredients[{index}].IngredientId" class="form-select form-select-sm" required>
                                     <option value="">-- Select Ingredient --</option>
                                     @if (ViewBag.Ingredients != null)
                                     {
@@ -271,31 +301,31 @@
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="form-group">
-                                <label>Quantity</label>
-                                <input type="number" name="Ingredients[{index}].Quantity" class="form-control" step="0.01" required />
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">Quantity</label>
+                                <input type="number" name="Ingredients[{index}].Quantity" class="form-control form-control-sm" step="0.01" required />
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="form-group">
-                                <label>Unit</label>
-                                <input type="text" name="Ingredients[{index}].Unit" class="form-control" required />
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">Unit</label>
+                                <input type="text" name="Ingredients[{index}].Unit" class="form-control form-control-sm" placeholder="g, ml, pcs" required />
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="form-group">
-                                <label>Instructions</label>
-                                <input type="text" name="Ingredients[{index}].Instructions" class="form-control" />
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">Instructions</label>
+                                <input type="text" name="Ingredients[{index}].Instructions" class="form-control form-control-sm" placeholder="Special instructions" />
                             </div>
                         </div>
                     </div>
-                    <div class="form-check">
+                    <div class="form-check mt-1">
                         <input type="checkbox" name="Ingredients[{index}].IsOptional" class="form-check-input" id="isOptional{index}" value="true" />
-                        <label class="form-check-label" for="isOptional{index}">Optional</label>
+                        <label class="form-check-label small" for="isOptional{index}">Optional ingredient</label>
                     </div>
                 </div>
                 <div class="col-md-1 d-flex align-items-center justify-content-center">
-                    <button type="button" class="btn btn-danger remove-ingredient">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-ingredient">
                         <i class="fa fa-trash"></i>
                     </button>
                 </div>
@@ -312,19 +342,21 @@
         function displayFileName(input) {
             if (input.files && input.files[0]) {
                 var fileName = input.files[0].name;
-                $(input).next('.custom-file-label').html(fileName);
+                $(input).siblings('.form-label').after('<small class="text-muted d-block mt-1">' + fileName + '</small>');
             }
         }
         
         // Toggle price adjustment field visibility
         function togglePriceField(modifierId) {
-            const checkbox = $(`#modifier-${modifierId}`);
-            const priceGroup = $(`#price-group-${modifierId}`);
+            const checkbox = document.getElementById('modifier-' + modifierId);
+            const priceGroup = document.getElementById('price-group-' + modifierId);
             
-            if (checkbox.is(':checked')) {
-                priceGroup.slideDown();
-            } else {
-                priceGroup.slideUp();
+            if (checkbox && priceGroup) {
+                if (checkbox.checked) {
+                    $(priceGroup).slideDown(200);
+                } else {
+                    $(priceGroup).slideUp(200);
+                }
             }
         }
         
@@ -368,12 +400,69 @@
             }
             
             // Tab navigation buttons
+            $("#goToGeneralTab").click(function() {
+                document.getElementById('general-tab').click();
+            });
+            
+            $("#goToAllergensTab").click(function() {
+                document.getElementById('allergens-tab').click();
+            });
+            
             $("#goToIngredientsTab").click(function() {
                 document.getElementById('ingredients-tab').click();
             });
             
             $("#goToModifiersTab").click(function() {
                 document.getElementById('modifiers-tab').click();
+            });
+            
+            // Toggle price fields for modifiers
+            function togglePriceField(modifierId) {
+                const checkbox = document.getElementById('modifier-' + modifierId);
+                const priceGroup = document.getElementById('price-group-' + modifierId);
+                
+                if (checkbox.checked) {
+                    $(priceGroup).slideDown(200);
+                } else {
+                    $(priceGroup).slideUp(200);
+                }
+            }
+            
+            // Initialize price fields for modifiers
+            $(".modifier-checkbox").each(function() {
+                const modifierId = $(this).val();
+                togglePriceField(modifierId);
+            });
+            
+            // Add event handler for modifier checkboxes
+            $(document).on("change", ".modifier-checkbox", function() {
+                const modifierId = $(this).val();
+                togglePriceField(modifierId);
+            });
+            
+            // Form validation before submission
+            $('form').on('submit', function(e) {
+                if (!this.checkValidity()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Find the first invalid field and activate its tab
+                    const invalidFields = $(this).find(':invalid');
+                    if (invalidFields.length > 0) {
+                        const tabPane = $(invalidFields[0]).closest('.tab-pane');
+                        const tabId = tabPane.attr('id') + '-tab';
+                        document.getElementById(tabId).click();
+                        
+                        // Scroll to and focus the first invalid field
+                        $('html, body').animate({
+                            scrollTop: $(invalidFields[0]).offset().top - 100
+                        }, 500);
+                        $(invalidFields[0]).focus();
+                        
+                        // Show validation message
+                        $(this).addClass('was-validated');
+                    }
+                }
             });
         });
     </script>
