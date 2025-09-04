@@ -5,7 +5,7 @@ using RestaurantManagementSystem.Models;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -400,7 +400,7 @@ namespace RestaurantManagementSystem.Controllers
                         t.StartedServiceAt,
                         t.CompletedAt,
                         t.Status,
-                        u.FullName AS ServerName,
+                        CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
                         u.Id AS ServerId,
                         DATEDIFF(MINUTE, t.SeatedAt, GETDATE()) AS MinutesSinceSeated,
                         t.TargetTurnTimeMinutes

@@ -63,6 +63,39 @@ namespace RestaurantManagementSystem.Middleware
                         }
                     }
                     
+                    // Add Phone column if it doesn't exist
+                    if (!ColumnExists(connection, "Users", "Phone"))
+                    {
+                        using (var command = new SqlCommand(
+                            "ALTER TABLE [dbo].[Users] ADD [Phone] NVARCHAR(20) NULL", 
+                            connection))
+                        {
+                            command.ExecuteNonQuery();
+                            Console.WriteLine("Added Phone column to Users table.");
+                        }
+                    }
+                    
+                    // Add Role column if it doesn't exist - maps RoleId to Role
+                    if (!ColumnExists(connection, "Users", "Role"))
+                    {
+                        using (var command = new SqlCommand(
+                            "ALTER TABLE [dbo].[Users] ADD [Role] INT NOT NULL DEFAULT 3", 
+                            connection))
+                        {
+                            command.ExecuteNonQuery();
+                            Console.WriteLine("Added Role column to Users table.");
+                        }
+                    }
+                    
+                    // Update Role column with RoleId values if needed
+                    using (var command = new SqlCommand(
+                        "UPDATE [dbo].[Users] SET [Role] = [RoleId] WHERE [Role] <> [RoleId]", 
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                        Console.WriteLine("Updated Role column with RoleId values.");
+                    }
+                    
                     // Check for missing tables and create them if needed
                     CreateRequiredTablesIfMissing(connection);
                     

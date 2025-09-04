@@ -1,0 +1,56 @@
+@using System.Security.Claims
+
+<ul class="navbar-nav">
+@if (User.Identity.IsAuthenticated)
+{
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-user-circle me-1"></i>
+            @(User.FindFirst(ClaimTypes.GivenName)?.Value ?? User.Identity.Name)
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+            <li>
+                <span class="dropdown-item-text">
+                    <strong>@User.FindFirst(ClaimTypes.Name)?.Value</strong><br />
+                    <small class="text-muted">@User.FindFirst(ClaimTypes.Email)?.Value</small>
+                </span>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">
+                    <i class="fas fa-key me-2"></i> Change Password
+                </a>
+            </li>
+            @if (User.IsInRole("Administrator"))
+            {
+                <li>
+                    <a class="dropdown-item" asp-controller="User" asp-action="UserList">
+                        <i class="fas fa-users me-2"></i> User Management
+                    </a>
+                </li>
+            }
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <form asp-controller="Account" asp-action="Logout" method="post" id="logoutForm">
+                    <button type="submit" class="dropdown-item">
+                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </li>
+}
+else
+{
+    <li class="nav-item">
+        <a class="nav-link" asp-controller="Account" asp-action="Register">
+            <i class="fas fa-user-plus me-1"></i> Register
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link btn btn-sm btn-primary text-white px-3" asp-controller="Account" asp-action="Login">
+            <i class="fas fa-sign-in-alt me-1"></i> Login
+        </a>
+    </li>
+}
+</ul>

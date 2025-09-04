@@ -1,58 +1,73 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantManagementSystem.Data;
 using RestaurantManagementSystem.Middleware;
+using RestaurantManagementSystem.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
-var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-builder.Services.AddControllersWithViews();
-
-// Configure SQL Server database connection using connection string from appsettings.json
-builder.Services.AddDbContext<RestaurantDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-var app = builder.Build();
-
-// Initialize database connection
-using (var scope = app.Services.CreateScope())
+namespace RestaurantManagementSystem
 {
-    var services = scope.ServiceProvider;
-    try
+    public class Program
     {
-        var dbContext = services.GetRequiredService<RestaurantDbContext>();
-        
-        // Just try to connect to the database to make sure the connection works
-        // The middleware will handle table creation
-        var canConnect = dbContext.Database.CanConnect();
-        Console.WriteLine($"Database connection established: {canConnect}");
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while initializing the database.");
+        public static void Main(string[] args)
+        {
+            var builder = WebApplication.CreateBuilder(args);
+            
+            // Add services to the container.
+            builder.Services.AddControllersWithViews();
+            builder.Services.AddHttpContextAccessor();
+
+            // Add authentication services
+            builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(options =>
+                {
+                    options.ExpireTimeSpan = TimeSpan.FromHours(12);
+                    options.SlidingExpiration = true;
+                    options.AccessDeniedPath = "/Account/AccessDenied";
+                    options.LoginPath = "/Account/Login";
+                    options.LogoutPath = "/Account/Logout";
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                    options.Cookie.SameSite = SameSiteMode.Strict;
+                });
+
+            // Add authorization services
+            builder.Services.AddAuthorization(options =>
+            {
+                options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Administrator"));
+                options.AddPolicy("RequireManagerRole", policy => policy.RequireRole("Administrator", "Manager"));
+                options.AddPolicy("RequireStaffRole", policy => policy.RequireRole("Administrator", "Manager", "Staff"));
+            });
+
+            // Register custom services
+            builder.Services.AddScoped<AuthService>();
+
+            // Configure SQL Server database connection using connection string from appsettings.json
+            builder.Services.AddDbContext<RestaurantDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+                
+            var app = builder.Build();
+
+            // Configure the HTTP request pipeline.
+            if (!app.Environment.IsDevelopment())
+            {
+                app.UseExceptionHandler("/Home/Error");
+                app.UseHsts();
+            }
+
+            app.UseHttpsRedirection();
+            app.UseStaticFiles();
+            app.UseRouting();
+            app.UseMiddleware<DatabaseColumnFixMiddleware>();
+            app.UseAuthentication();
+            app.UseAuthorization();
+
+            app.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=Home}/{action=Index}/{id?}");
+
+            app.Run();
+        }
     }
 }
-
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-
-// Enable database column fixes middleware for SQL Server
-app.UseDatabaseColumnFixes();
-
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-app.UseRouting();
-
-app.UseAuthorization();
-
-// Add route pattern for application
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
-
-app.Run();

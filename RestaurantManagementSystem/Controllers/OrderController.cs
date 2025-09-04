@@ -5,7 +5,7 @@ using RestaurantManagementSystem.Models;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -697,8 +697,7 @@ namespace RestaurantManagementSystem.Controllers
                                     Price = reader.GetDecimal(3),
                                     IsAvailable = reader.GetBoolean(4),
                                     ImagePath = reader.IsDBNull(5) ? null : reader.GetString(5),
-                                    CategoryId = category.CategoryId,
-                                    CategoryName = category.CategoryName
+                                    CategoryId = category.CategoryId
                                 });
                             }
                         }
@@ -764,7 +763,7 @@ namespace RestaurantManagementSystem.Controllers
                             WHEN o.OrderType = 0 THEN tt.GuestName 
                             ELSE o.CustomerName 
                         END AS GuestName,
-                        u.FullName AS ServerName,
+                        CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
                         (SELECT COUNT(1) FROM OrderItems WHERE OrderId = o.Id) AS ItemCount,
                         o.TotalAmount,
                         o.CreatedAt,
@@ -837,7 +836,7 @@ namespace RestaurantManagementSystem.Controllers
                             WHEN o.OrderType = 0 THEN tt.GuestName 
                             ELSE o.CustomerName 
                         END AS GuestName,
-                        u.FullName AS ServerName,
+                        CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
                         (SELECT COUNT(1) FROM OrderItems WHERE OrderId = o.Id) AS ItemCount,
                         o.TotalAmount,
                         o.CreatedAt,
@@ -905,7 +904,7 @@ namespace RestaurantManagementSystem.Controllers
                         o.OrderType,
                         o.Status,
                         o.UserId,
-                        u.FullName AS ServerName,
+                        CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
                         o.CustomerName,
                         o.CustomerPhone,
                         o.Subtotal,
