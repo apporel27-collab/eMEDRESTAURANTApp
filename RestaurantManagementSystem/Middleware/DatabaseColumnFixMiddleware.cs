@@ -99,6 +99,9 @@ namespace RestaurantManagementSystem.Middleware
                     // Check for missing tables and create them if needed
                     CreateRequiredTablesIfMissing(connection);
                     
+                    // Fix MenuItem columns
+                    FixMenuItemColumns(connection);
+                    
                     // Check for correct columns in existing tables
                     FixExistingTableColumns(connection);
                 }
@@ -490,6 +493,113 @@ namespace RestaurantManagementSystem.Middleware
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fixing table columns: {ex.Message}");
+            }
+        }
+
+        private void FixMenuItemColumns(SqlConnection connection)
+        {
+            try
+            {
+                // Check if MenuItems table exists
+                if (!TableExists(connection, "MenuItems"))
+                {
+                    Console.WriteLine("MenuItems table doesn't exist yet, skipping column fixes.");
+                    return;
+                }
+                
+                // Check and add PreparationTimeMinutes column
+                if (!ColumnExists(connection, "MenuItems", "PreparationTimeMinutes"))
+                {
+                    using (var command = new SqlCommand(
+                        "ALTER TABLE MenuItems ADD PreparationTimeMinutes INT NOT NULL DEFAULT 15", 
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                        Console.WriteLine("Added PreparationTimeMinutes column to MenuItems table.");
+                    }
+                }
+                
+                // Check and add KitchenStationId column
+                if (!ColumnExists(connection, "MenuItems", "KitchenStationId"))
+                {
+                    using (var command = new SqlCommand(
+                        "ALTER TABLE MenuItems ADD KitchenStationId INT NULL", 
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                        Console.WriteLine("Added KitchenStationId column to MenuItems table.");
+                    }
+                }
+                
+                // Check and add CalorieCount column
+                if (!ColumnExists(connection, "MenuItems", "CalorieCount"))
+                {
+                    using (var command = new SqlCommand(
+                        "ALTER TABLE MenuItems ADD CalorieCount INT NULL", 
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                        Console.WriteLine("Added CalorieCount column to MenuItems table.");
+                    }
+                }
+                
+                // Check and add IsFeatured column
+                if (!ColumnExists(connection, "MenuItems", "IsFeatured"))
+                {
+                    using (var command = new SqlCommand(
+                        "ALTER TABLE MenuItems ADD IsFeatured BIT NOT NULL DEFAULT 0", 
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                        Console.WriteLine("Added IsFeatured column to MenuItems table.");
+                    }
+                }
+                
+                // Check and add IsSpecial column
+                if (!ColumnExists(connection, "MenuItems", "IsSpecial"))
+                {
+                    using (var command = new SqlCommand(
+                        "ALTER TABLE MenuItems ADD IsSpecial BIT NOT NULL DEFAULT 0", 
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                        Console.WriteLine("Added IsSpecial column to MenuItems table.");
+                    }
+                }
+                
+                // Check and add DiscountPercentage column
+                if (!ColumnExists(connection, "MenuItems", "DiscountPercentage"))
+                {
+                    using (var command = new SqlCommand(
+                        "ALTER TABLE MenuItems ADD DiscountPercentage DECIMAL(5,2) NULL", 
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                        Console.WriteLine("Added DiscountPercentage column to MenuItems table.");
+                    }
+                }
+                
+                // Check and add PLUCode column if it doesn't exist
+                if (!ColumnExists(connection, "MenuItems", "PLUCode"))
+                {
+                    using (var command = new SqlCommand(
+                        "ALTER TABLE MenuItems ADD PLUCode NVARCHAR(20) NULL", 
+                        connection))
+                    {
+                        command.ExecuteNonQuery();
+                        Console.WriteLine("Added PLUCode column to MenuItems table.");
+                    }
+                }
+                
+                Console.WriteLine("MenuItems table columns check complete.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fixing MenuItems table columns: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Error: {ex.InnerException.Message}");
+                }
             }
         }
     }
