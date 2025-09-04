@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RestaurantManagementSystem.Models
 {
-    public class MenuItemModifierNew
+    public class MenuItemModifier
     {
         public int Id { get; set; }
         

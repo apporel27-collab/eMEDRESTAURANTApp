@@ -61,7 +61,7 @@ namespace RestaurantManagementSystem.ConsoleDemo
                 Console.WriteLine("==============================================");
                 Console.WriteLine();
                 
-                Console.WriteLine($"Today's Sales: ${dashboardData.TodaySales:N2} (↑ +$215.75)");
+                Console.WriteLine($"Today's Sales: ₹{dashboardData.TodaySales:N2} (↑ +₹215.75)");
                 Console.WriteLine($"Today's Orders: {dashboardData.TodayOrders} (↑ +3)");
                 Console.WriteLine($"Active Tables: {dashboardData.ActiveTables} (↑ +2)");
                 Console.WriteLine($"Upcoming Reservations: {dashboardData.UpcomingReservations} (↓ -1)");

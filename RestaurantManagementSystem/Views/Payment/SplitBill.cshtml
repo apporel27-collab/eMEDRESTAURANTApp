@@ -103,15 +103,15 @@
                                         
                                         <div class="row mb-2">
                                             <div class="col-6 text-end">Subtotal:</div>
-                                            <div class="col-6 text-end" id="splitSubtotal">$0.00</div>
+                                            <div class="col-6 text-end" id="splitSubtotal">₹0.00</div>
                                         </div>
                                         <div class="row mb-2">
                                             <div class="col-6 text-end">Tax:</div>
-                                            <div class="col-6 text-end" id="splitTax">$0.00</div>
+                                            <div class="col-6 text-end" id="splitTax">₹0.00</div>
                                         </div>
                                         <div class="row mb-3">
                                             <div class="col-6 text-end"><strong>Total:</strong></div>
-                                            <div class="col-6 text-end"><strong id="splitTotal">$0.00</strong></div>
+                                            <div class="col-6 text-end"><strong id="splitTotal">₹0.00</strong></div>
                                         </div>
                                         
                                         <div class="d-grid gap-2">
@@ -177,9 +177,9 @@
                 var tax = subtotal * taxRate;
                 var total = subtotal + tax;
                 
-                $('#splitSubtotal').text('$' + subtotal.toFixed(2));
-                $('#splitTax').text('$' + tax.toFixed(2));
-                $('#splitTotal').text('$' + total.toFixed(2));
+                $('#splitSubtotal').text('₹' + subtotal.toFixed(2));
+                $('#splitTax').text('₹' + tax.toFixed(2));
+                $('#splitTotal').text('₹' + total.toFixed(2));
                 
                 // Enable/disable submit button
                 if (hasSelectedItems) {
