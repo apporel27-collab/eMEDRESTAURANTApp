@@ -15,100 +15,134 @@
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body>
+    <style>
+        /* Compact navigation styles */
+        .navbar {
+            padding-top: 0.25rem !important;
+            padding-bottom: 0.25rem !important;
+        }
+        .navbar .nav-link {
+            padding: 0.4rem 0.6rem !important;
+            font-size: 0.9rem !important;
+        }
+        .navbar .dropdown-menu {
+            font-size: 0.85rem;
+        }
+        .navbar .dropdown-item {
+            padding: 0.35rem 0.75rem;
+        }
+        .navbar .navbar-brand {
+            font-size: 1.2rem !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        .compact-icon {
+            font-size: 0.8rem;
+            width: 16px;
+            text-align: center;
+        }
+        .navbar .dropdown-toggle::after {
+            vertical-align: middle;
+        }
+        .navbar-nav > li {
+            margin-right: 3px;
+        }
+    </style>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark bg-gradient mb-4" style="background-color: #1a3c5b; border-bottom: 3px solid #f8b133; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark bg-gradient mb-3" style="background-color: #1a3c5b; border-bottom: 3px solid #f8b133; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
             <div class="container-fluid">
-                <a class="navbar-brand fw-bold" asp-area="" asp-controller="Home" asp-action="Index" style="color: #ffffff; font-size: 1.4rem;">
-                    <i class="fas fa-utensils me-2"></i>Restaurant Management
+                <a class="navbar-brand fw-bold" asp-area="" asp-controller="Home" asp-action="Index" style="color: #ffffff;">
+                    <i class="fas fa-utensils me-1"></i>Restaurant Management
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+                    <ul class="navbar-nav flex-grow-1 align-items-center">
                         <li class="nav-item">
                             <a class="nav-link text-white" asp-area="" asp-controller="Home" asp-action="Index">
-                                <i class="fas fa-home me-1"></i> Dashboard
+                                <i class="fas fa-home compact-icon"></i> Home
                             </a>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white" href="#" id="reservationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="far fa-calendar-alt me-1"></i> Reservations
+                                <i class="far fa-calendar-alt compact-icon"></i> Reservations
                             </a>
-                            <ul class="dropdown-menu shadow-lg" aria-labelledby="reservationsDropdown" style="border-top: 3px solid #f8b133;">
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Dashboard"><i class="fas fa-th-large me-2 text-primary"></i>Dashboard</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="List"><i class="fas fa-list me-2 text-primary"></i>Reservations List</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Waitlist"><i class="fas fa-clock me-2 text-primary"></i>Waitlist</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Tables"><i class="fas fa-table me-2 text-primary"></i>Tables</a></li>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="reservationsDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="List"><i class="fas fa-list compact-icon text-primary"></i> Reservations</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Waitlist"><i class="fas fa-clock compact-icon text-primary"></i> Waitlist</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Tables"><i class="fas fa-table compact-icon text-primary"></i> Tables</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white" href="#" id="tableServiceDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-chair me-1"></i> Table Service
+                                <i class="fas fa-chair compact-icon"></i> Tables
                             </a>
-                            <ul class="dropdown-menu" aria-labelledby="tableServiceDropdown">
-                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="Dashboard">Dashboard</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="ActiveTables">Active Tables</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="SeatGuest">Seat New Guest</a></li>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="tableServiceDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="ActiveTables"><i class="fas fa-list-alt compact-icon text-primary"></i> Active Tables</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="SeatGuest"><i class="fas fa-user-plus compact-icon text-primary"></i> Seat Guest</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white" href="#" id="orderDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-clipboard-list me-1"></i> Orders
+                                <i class="fas fa-clipboard-list compact-icon"></i> Orders
                             </a>
-                            <ul class="dropdown-menu" aria-labelledby="orderDropdown">
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Order" asp-action="Dashboard">Order Dashboard</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Order" asp-action="Create">Create Order</a></li>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="orderDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Order" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Order" asp-action="Create"><i class="fas fa-plus compact-icon text-primary"></i> Create Order</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white" href="#" id="kitchenDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-fire me-1"></i> Kitchen
+                                <i class="fas fa-fire compact-icon"></i> Kitchen
                             </a>
-                            <ul class="dropdown-menu" aria-labelledby="kitchenDropdown">
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Dashboard">Kitchen Dashboard</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Tickets">All Tickets</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Stations">Kitchen Stations</a></li>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="kitchenDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Tickets"><i class="fas fa-receipt compact-icon text-primary"></i> Tickets</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Stations"><i class="fas fa-map-signs compact-icon text-primary"></i> Stations</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white" href="#" id="onlineOrderDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-globe me-1"></i> Online Orders
+                                <i class="fas fa-globe compact-icon"></i> Online
                             </a>
-                            <ul class="dropdown-menu" aria-labelledby="onlineOrderDropdown">
-                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="Dashboard">Order Hub Dashboard</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="Index">Order List</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="OrderSources">Order Sources</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="MenuItemMappings">Menu Item Mappings</a></li>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="onlineOrderDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="Index"><i class="fas fa-list compact-icon text-primary"></i> Order List</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="OrderSources"><i class="fas fa-external-link-alt compact-icon text-primary"></i> Sources</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="MenuItemMappings"><i class="fas fa-exchange-alt compact-icon text-primary"></i> Mappings</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white" href="#" id="menuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-book-open me-1"></i> Menu & Recipes
+                                <i class="fas fa-book-open compact-icon"></i> Menu
                             </a>
-                            <ul class="dropdown-menu shadow-lg" aria-labelledby="menuDropdown" style="border-top: 3px solid #f8b133;">
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Menu" asp-action="Index"><i class="fas fa-utensils me-2 text-primary"></i>Menu Items</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Recipe" asp-action="Index"><i class="fas fa-book me-2 text-primary"></i>Recipes</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="CategoryList"><i class="fas fa-list me-2 text-primary"></i>Categories</a></li>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="menuDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Menu" asp-action="Index"><i class="fas fa-utensils compact-icon text-primary"></i> Menu Items</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Recipe" asp-action="Index"><i class="fas fa-book compact-icon text-primary"></i> Recipes</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="CategoryList"><i class="fas fa-list compact-icon text-primary"></i> Categories</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white" href="#" id="masterDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-cogs me-1"></i> Settings
+                                <i class="fas fa-cogs compact-icon"></i> Settings
                             </a>
-                            <ul class="dropdown-menu shadow-lg" aria-labelledby="masterDropdown" style="border-top: 3px solid #f8b133;">
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="CategoryList"><i class="fas fa-tags me-2 text-primary"></i>Categories</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="IngredientsList"><i class="fas fa-carrot me-2 text-primary"></i>Ingredients</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-controller="User" asp-action="UserList"><i class="fas fa-users me-2 text-primary"></i>Users & Roles</a></li>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="masterDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="CategoryList"><i class="fas fa-tags compact-icon text-primary"></i> Categories</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="IngredientsList"><i class="fas fa-carrot compact-icon text-primary"></i> Ingredients</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="User" asp-action="UserList"><i class="fas fa-users compact-icon text-primary"></i> Users & Roles</a></li>
                             </ul>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white" asp-area="" asp-controller="Home" asp-action="Privacy">
-                                <i class="fas fa-shield-alt me-1"></i> Privacy
+                                <i class="fas fa-shield-alt compact-icon"></i> Privacy
                             </a>
                         </li>
                     </ul>
+                    <partial name="_LoginPartial" />
                 </div>
             </div>
         </nav>
