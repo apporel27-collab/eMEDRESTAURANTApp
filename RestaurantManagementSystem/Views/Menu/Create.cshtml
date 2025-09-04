@@ -21,17 +21,17 @@
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                         
                         <ul class="nav nav-tabs" id="menuItemTabs" role="tablist">
-                            <li class="nav-item">
-                                <a class="nav-link active" id="general-tab" data-toggle="tab" href="#general" role="tab" aria-controls="general" aria-selected="true">General</a>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-controls="general" aria-selected="true">General</button>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" id="allergens-tab" data-toggle="tab" href="#allergens" role="tab" aria-controls="allergens" aria-selected="false">Allergens</a>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="allergens-tab" data-bs-toggle="tab" data-bs-target="#allergens" type="button" role="tab" aria-controls="allergens" aria-selected="false">Allergens</button>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" id="ingredients-tab" data-toggle="tab" href="#ingredients" role="tab" aria-controls="ingredients" aria-selected="false">Ingredients</a>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="ingredients-tab" data-bs-toggle="tab" data-bs-target="#ingredients" type="button" role="tab" aria-controls="ingredients" aria-selected="false">Ingredients</button>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" id="modifiers-tab" data-toggle="tab" href="#modifiers" role="tab" aria-controls="modifiers" aria-selected="false">Modifiers</a>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="modifiers-tab" data-bs-toggle="tab" data-bs-target="#modifiers" type="button" role="tab" aria-controls="modifiers" aria-selected="false">Modifiers</button>
                             </li>
                         </ul>
                         
@@ -136,16 +136,12 @@
                                     {
                                         @foreach (var allergen in ViewBag.Allergens)
                                         {
-                                            <div class="col-md-3 mb-3">
+                                            <div class="col-md-4 mb-3">
                                                 <div class="card">
                                                     <div class="card-body">
                                                         <div class="form-check">
                                                             <input type="checkbox" name="SelectedAllergens" value="@allergen.Id" id="allergen-@allergen.Id" class="form-check-input" />
                                                             <label class="form-check-label" for="allergen-@allergen.Id">
-                                                                @if (!string.IsNullOrEmpty(allergen.IconPath))
-                                                                {
-                                                                    <img src="@allergen.IconPath" alt="@allergen.Name" style="width:20px; height:20px;" class="mr-1" />
-                                                                }
                                                                 @allergen.Name
                                                             </label>
                                                             @if (!string.IsNullOrEmpty(allergen.Description))
@@ -159,9 +155,16 @@
                                         }
                                     }
                                 </div>
-                            </div>
-                            
-                            <!-- Ingredients Tab -->
+
+                                <div class="form-group mt-4 mb-3">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fa fa-save"></i> Save Menu Item
+                                    </button>
+                                    <button type="button" class="btn btn-info" id="goToIngredientsTab">
+                                        Next: Ingredients <i class="fa fa-arrow-right"></i>
+                                    </button>
+                                </div>
+                            </div>                            <!-- Ingredients Tab -->
                             <div class="tab-pane fade" id="ingredients" role="tabpanel" aria-labelledby="ingredients-tab">
                                 <div class="row mb-3">
                                     <div class="col-md-12">
@@ -173,6 +176,15 @@
                                 
                                 <div id="ingredientsContainer">
                                     <!-- Ingredients will be added dynamically here -->
+                                </div>
+
+                                <div class="form-group mt-4 mb-3">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fa fa-save"></i> Save Menu Item
+                                    </button>
+                                    <button type="button" class="btn btn-info" id="goToModifiersTab">
+                                        Next: Modifiers <i class="fa fa-arrow-right"></i>
+                                    </button>
                                 </div>
                             </div>
                             
@@ -202,9 +214,7 @@
                                                         <div class="form-group price-adjustment-group" id="price-group-@modifier.Id" style="display:none;">
                                                             <label>Price Adjustment</label>
                                                             <div class="input-group">
-                                                                <div class="input-group-prepend">
-                                                                    <span class="input-group-text">$</span>
-                                                                </div>
+                                                                <span class="input-group-text">₹</span>
                                                                 <input type="number" name="ModifierPrices[@modifier.Id]" class="form-control" value="0.00" step="0.01" />
                                                             </div>
                                                         </div>
@@ -214,12 +224,18 @@
                                         }
                                     }
                                 </div>
+
+                                <div class="form-group mt-4 mb-3">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fa fa-save"></i> Save Menu Item
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="form-group mt-4 text-right">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fa fa-save"></i> Create
+                        <div class="form-group mt-4 text-end">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fa fa-save"></i> Save Menu Item
                             </button>
                             <a asp-action="Index" class="btn btn-secondary">
                                 <i class="fa fa-times"></i> Cancel
@@ -315,6 +331,24 @@
         $(document).ready(function() {
             let ingredientIndex = 0;
             
+            // Ensure tabs are working by manually initializing them
+            var triggerTabList = [].slice.call(document.querySelectorAll('#menuItemTabs button'));
+            triggerTabList.forEach(function (triggerEl) {
+                var tabTrigger = new bootstrap.Tab(triggerEl);
+                
+                triggerEl.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    tabTrigger.show();
+                });
+            });
+            
+            // Handle hash in URL to activate specific tab
+            if (window.location.hash) {
+                const hash = window.location.hash;
+                const tabId = hash.replace('#', '') + '-tab';
+                $('#' + tabId).tab('show');
+            }
+            
             // Add ingredient
             $("#addIngredientButton").click(function() {
                 const template = $("#ingredientTemplate").html();
@@ -332,6 +366,15 @@
             if ($("#ingredientsContainer").children().length === 0) {
                 $("#addIngredientButton").click();
             }
+            
+            // Tab navigation buttons
+            $("#goToIngredientsTab").click(function() {
+                document.getElementById('ingredients-tab').click();
+            });
+            
+            $("#goToModifiersTab").click(function() {
+                document.getElementById('modifiers-tab').click();
+            });
         });
     </script>
 }
