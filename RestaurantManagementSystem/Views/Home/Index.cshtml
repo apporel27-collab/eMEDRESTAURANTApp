@@ -39,6 +39,8 @@
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
     }
     
     .dashboard-header h1 {
@@ -51,6 +53,29 @@
         margin-top: 10px;
         opacity: 0.9;
         font-size: 1.1rem;
+    }
+    
+    .user-info {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .user-role-badge {
+        display: inline-block;
+        margin-right: 5px;
+        margin-bottom: 5px;
+        padding: 3px 8px;
+        background-color: rgba(255,255,255,0.2);
+        color: white;
+        border-radius: 15px;
+        font-size: 0.8rem;
+    }
+    
+    .last-login {
+        font-size: 0.9rem;
+        margin-top: 10px;
+        opacity: 0.7;
     }
     
     .stats-card {
@@ -112,7 +137,9 @@
         background-color: white;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        padding: 20px;
+        padding: 15px;
+        max-height: 400px;
+        overflow-y: auto;
         margin-bottom: 20px;
     }
     
@@ -224,7 +251,21 @@
     <div class="dashboard-container">
         <div class="dashboard-header">
             <h1><i class="fas fa-utensils me-2"></i>Restaurant Dashboard</h1>
-            <p class="text-muted">Welcome to your restaurant management system</p>
+            <p>Welcome back, <strong>@Model.UserFullName</strong>!</p>
+            
+            <div class="user-info">
+                <div>
+                    <strong>Roles:</strong>
+                    @foreach (var role in Model.UserRoles)
+                    {
+                        <span class="user-role-badge">@role</span>
+                    }
+                </div>
+                
+                <div class="last-login">
+                    <i class="fas fa-clock me-1"></i> Last login: @Model.LastLoginDate.ToString("MMM d, yyyy h:mm tt")
+                </div>
+            </div>
         </div>
         
 
@@ -292,7 +333,7 @@
         <div class="col-lg-8 mb-4">
             <div class="chart-container">
                 <h3>Sales Overview</h3>
-                <canvas id="salesChart" height="300"></canvas>
+                <canvas id="salesChart" height="250"></canvas>
             </div>
         </div>
 
