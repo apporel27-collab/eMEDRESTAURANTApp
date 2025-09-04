@@ -80,6 +80,7 @@ BEGIN
 END
 ELSE
     PRINT 'MenuItems table already exists';
+   
 
 -- Create MenuItemAllergens table
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MenuItemAllergens]') AND type in (N'U'))
@@ -116,6 +117,8 @@ BEGIN
 END
 ELSE
     PRINT 'MenuItemModifiers table already exists';
+
+  
 
 -- Create MenuItemIngredients table
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MenuItemIngredients]') AND type in (N'U'))

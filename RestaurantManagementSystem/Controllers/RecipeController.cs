@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient; // Choose Microsoft.Data.SqlClient explicitly
 using RestaurantManagementSystem.Models;
 using RestaurantManagementSystem.ViewModels;
 using Microsoft.AspNetCore.Mvc.Rendering;
