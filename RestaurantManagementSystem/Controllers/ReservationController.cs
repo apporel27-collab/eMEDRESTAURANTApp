@@ -59,16 +59,30 @@ namespace RestaurantManagementSystem.Controllers
         // GET: Reservation List
         public IActionResult List(DateTime? date = null)
         {
-            // If no date is provided, use today's date
-            date ??= DateTime.Today;
+            try
+            {
+                // If no date is provided, use today's date
+                date ??= DateTime.Today;
 
-            // Get reservations for the selected date
-            var reservations = GetReservationsByDate(date.Value);
-            
-            // Store the selected date in ViewBag for the view
-            ViewBag.SelectedDate = date.Value;
+                // Get reservations for the selected date
+                var reservations = GetReservationsByDate(date.Value);
+                
+                // Store the selected date in ViewBag for the view
+                ViewBag.SelectedDate = date.Value;
 
-            return View(reservations);
+                return View(reservations);
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                Console.WriteLine($"Error in Reservation/List: {ex.Message}");
+                
+                // Add error message to TempData
+                TempData["ErrorMessage"] = $"Error loading reservations: {ex.Message}";
+                
+                // Return an empty list to avoid null reference exceptions
+                return View(new List<Reservation>());
+            }
         }
 
         // GET: Create Reservation Form
@@ -300,8 +314,28 @@ namespace RestaurantManagementSystem.Controllers
         {
             var waitlist = GetActiveWaitlist();
             
-            // Get available tables for potentially seating waitlisted guests
-            ViewBag.AvailableTables = GetAllTables().Where(t => t.Status == TableStatus.Available).ToList();
+            // Check if an error occurred while loading waitlist data
+            if (TempData.ContainsKey("ErrorMessage"))
+            {
+                ViewBag.ErrorMessage = TempData["ErrorMessage"];
+                // Continue with empty waitlist if error occurred
+                if (waitlist.Count == 0)
+                {
+                    waitlist = new List<WaitlistEntry>();
+                }
+            }
+            
+            try
+            {
+                // Get available tables for potentially seating waitlisted guests
+                ViewBag.AvailableTables = GetAllTables().Where(t => t.Status == TableStatus.Available).ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading available tables: {ex.Message}");
+                ViewBag.AvailableTables = new List<Table>();
+                ViewBag.ErrorMessage = ViewBag.ErrorMessage ?? "Could not load available tables. Some functionality may be limited.";
+            }
             
             return View(waitlist);
         }
@@ -577,45 +611,155 @@ namespace RestaurantManagementSystem.Controllers
             var reservations = new List<Reservation>();
             using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
-                con.Open();
-                using (var cmd = new SqlCommand(
-                    @"SELECT r.Id, r.GuestName, r.PhoneNumber, r.EmailAddress, r.PartySize, 
-                    r.ReservationDate, r.ReservationTime, r.SpecialRequests, r.Notes, 
-                    r.TableId, r.Status, r.CreatedAt, r.UpdatedAt, r.ReminderSent, r.NoShow,
-                    t.TableNumber
-                    FROM Reservations r
-                    LEFT JOIN Tables t ON r.TableId = t.Id
-                    WHERE CONVERT(date, r.ReservationDate) = @Date
-                    ORDER BY r.ReservationTime", con))
+                try
                 {
-                    cmd.Parameters.AddWithValue("@Date", date.Date);
-                    using (var reader = cmd.ExecuteReader())
+                    con.Open();
+                    
+                    // First check if the table exists
+                    using (var checkCmd = new SqlCommand(
+                        @"IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Reservations')
+                          SELECT 1 ELSE SELECT 0", con))
                     {
-                        while (reader.Read())
+                        int tableExists = (int)checkCmd.ExecuteScalar();
+                        if (tableExists == 0)
                         {
-                            reservations.Add(new Reservation
+                            Console.WriteLine("Reservations table does not exist in the database");
+                            return reservations; // Return empty list
+                        }
+                    }
+                    
+                    // Check if required columns exist
+                    using (var checkColumnsCmd = new SqlCommand(
+                        @"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                          WHERE TABLE_NAME = 'Reservations' 
+                          AND COLUMN_NAME IN ('Id', 'GuestName', 'PhoneNumber', 'EmailAddress', 
+                               'PartySize', 'ReservationDate', 'ReservationTime', 'Status')", con))
+                    {
+                        int columnCount = (int)checkColumnsCmd.ExecuteScalar();
+                        if (columnCount < 8) // We need at least these 8 columns
+                        {
+                            Console.WriteLine("Reservations table is missing required columns");
+                            return reservations; // Return empty list
+                        }
+                    }
+                    
+                    // Revised query to get reservations with more resilient column access
+                    using (var cmd = new SqlCommand(
+                        @"SELECT r.*, t.TableNumber
+                        FROM Reservations r
+                        LEFT JOIN Tables t ON r.TableId = t.Id
+                        WHERE CONVERT(date, r.ReservationDate) = @Date
+                        ORDER BY r.ReservationTime", con))
+                    {
+                        cmd.Parameters.AddWithValue("@Date", date.Date);
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
                             {
-                                Id = reader.GetInt32(0),
-                                GuestName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                                PhoneNumber = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-                                EmailAddress = reader.IsDBNull(3) ? null : reader.GetString(3),
-                                PartySize = reader.GetInt32(4),
-                                ReservationDate = reader.GetDateTime(5),
-                                ReservationTime = reader.GetDateTime(6),
-                                SpecialRequests = reader.IsDBNull(7) ? null : reader.GetString(7),
-                                Notes = reader.IsDBNull(8) ? null : reader.GetString(8),
-                                TableId = reader.IsDBNull(9) ? null : (int?)reader.GetInt32(9),
-                                Status = (ReservationStatus)reader.GetInt32(10),
-                                CreatedAt = reader.GetDateTime(11),
-                                UpdatedAt = reader.GetDateTime(12),
-                                ReminderSent = reader.GetBoolean(13),
-                                NoShow = reader.GetBoolean(14)
-                            });
+                                try
+                                {
+                                    Reservation reservation = new Reservation
+                                    {
+                                        Id = GetIntSafe(reader, "Id"),
+                                        GuestName = GetStringSafe(reader, "GuestName"),
+                                        PhoneNumber = GetStringSafe(reader, "PhoneNumber"),
+                                        EmailAddress = GetNullableStringSafe(reader, "EmailAddress"),
+                                        PartySize = GetIntSafe(reader, "PartySize"),
+                                        ReservationDate = GetDateTimeSafe(reader, "ReservationDate"),
+                                        ReservationTime = GetDateTimeSafe(reader, "ReservationTime"),
+                                        SpecialRequests = GetNullableStringSafe(reader, "SpecialRequests"),
+                                        Notes = GetNullableStringSafe(reader, "Notes"),
+                                        Status = (ReservationStatus)GetIntSafe(reader, "Status")
+                                    };
+                                    
+                                    // Store the table number (from joined Tables table)
+                                    if (HasColumn(reader, "TableNumber"))
+                                    {
+                                        string tableNumber = GetNullableStringSafe(reader, "TableNumber");
+                                        reservation.TableNumber = tableNumber;
+                                    }
+
+                                    // Optional columns - only add if they exist
+                                    if (HasColumn(reader, "TableId"))
+                                        reservation.TableId = GetNullableIntSafe(reader, "TableId");
+                                        
+                                    if (HasColumn(reader, "CreatedAt"))
+                                        reservation.CreatedAt = GetDateTimeSafe(reader, "CreatedAt");
+                                        
+                                    if (HasColumn(reader, "UpdatedAt"))
+                                        reservation.UpdatedAt = GetDateTimeSafe(reader, "UpdatedAt");
+                                        
+                                    if (HasColumn(reader, "ReminderSent"))
+                                        reservation.ReminderSent = GetBooleanSafe(reader, "ReminderSent");
+                                        
+                                    if (HasColumn(reader, "NoShow"))
+                                        reservation.NoShow = GetBooleanSafe(reader, "NoShow");
+                                    
+                                    reservations.Add(reservation);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Error processing reservation row: {ex.Message}");
+                                    // Skip this row but continue processing others
+                                }
+                            }
                         }
                     }
                 }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error getting reservations by date: {ex.Message}");
+                    throw; // Rethrow to be caught in the List action
+                }
             }
             return reservations;
+        }
+        
+        // Safe helper methods for data access
+        private bool HasColumn(SqlDataReader reader, string columnName)
+        {
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+        
+        private int GetIntSafe(SqlDataReader reader, string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? 0 : reader.GetInt32(ordinal);
+        }
+        
+        private int? GetNullableIntSafe(SqlDataReader reader, string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : (int?)reader.GetInt32(ordinal);
+        }
+        
+        private string GetStringSafe(SqlDataReader reader, string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+        }
+        
+        private string? GetNullableStringSafe(SqlDataReader reader, string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+        }
+        
+        private DateTime GetDateTimeSafe(SqlDataReader reader, string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? DateTime.Now : reader.GetDateTime(ordinal);
+        }
+        
+        private bool GetBooleanSafe(SqlDataReader reader, string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? false : reader.GetBoolean(ordinal);
         }
 
         private Reservation GetReservationById(int id)
@@ -666,45 +810,122 @@ namespace RestaurantManagementSystem.Controllers
         private List<WaitlistEntry> GetActiveWaitlist()
         {
             var waitlist = new List<WaitlistEntry>();
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            try
             {
-                con.Open();
-                using (var cmd = new SqlCommand(
-                    @"SELECT w.Id, w.GuestName, w.PhoneNumber, w.PartySize, w.AddedAt, 
-                    w.QuotedWaitTime, w.NotifyWhenReady, w.Notes, w.Status, w.NotifiedAt, 
-                    w.SeatedAt, w.TableId,
-                    t.TableNumber
-                    FROM Waitlist w
-                    LEFT JOIN Tables t ON w.TableId = t.Id
-                    WHERE w.Status IN (0, 1) -- Only Waiting and Notified statuses
-                    ORDER BY w.AddedAt", con))
+                using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
                 {
-                    using (var reader = cmd.ExecuteReader())
+                    // Add timeout to connection open
+                    var connectionTimeout = 60; // seconds
+                    var connectionTask = Task.Run(() => con.Open());
+                    if (!connectionTask.Wait(TimeSpan.FromSeconds(connectionTimeout)))
                     {
-                        while (reader.Read())
+                        throw new TimeoutException($"Connection timeout after {connectionTimeout} seconds");
+                    }
+                    
+                    using (var cmd = new SqlCommand(
+                        @"SELECT w.Id, w.GuestName, w.PhoneNumber, w.PartySize, w.AddedAt, 
+                        w.QuotedWaitTime, w.NotifyWhenReady, w.Notes, w.Status, w.NotifiedAt, 
+                        w.SeatedAt, w.TableId,
+                        t.TableNumber
+                        FROM Waitlist w
+                        LEFT JOIN Tables t ON w.TableId = t.Id
+                        WHERE w.Status IN (0, 1) -- Only Waiting and Notified statuses
+                        ORDER BY w.AddedAt", con))
+                    {
+                        // Set command timeout to 30 seconds
+                        cmd.CommandTimeout = 30;
+                        
+                        using (var reader = cmd.ExecuteReader())
                         {
-                            waitlist.Add(new WaitlistEntry
+                            while (reader.Read())
                             {
-                                Id = reader.GetInt32(0),
-                                GuestName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                                PhoneNumber = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-                                PartySize = reader.GetInt32(3),
-                                AddedAt = reader.GetDateTime(4),
-                                QuotedWaitTime = reader.GetInt32(5),
-                                NotifyWhenReady = reader.GetBoolean(6),
-                                Notes = reader.IsDBNull(7) ? null : reader.GetString(7),
-                                Status = (WaitlistStatus)reader.GetInt32(8),
-                                NotifiedAt = reader.IsDBNull(9) ? null : (DateTime?)reader.GetDateTime(9),
-                                SeatedAt = reader.IsDBNull(10) ? null : (DateTime?)reader.GetDateTime(10),
-                                TableId = reader.IsDBNull(11) ? null : (int?)reader.GetInt32(11)
-                            });
+                                waitlist.Add(new WaitlistEntry
+                                {
+                                    Id = reader.GetInt32(0),
+                                    GuestName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                    PhoneNumber = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                                    PartySize = reader.GetInt32(3),
+                                    AddedAt = reader.GetDateTime(4),
+                                    QuotedWaitTime = reader.GetInt32(5),
+                                    NotifyWhenReady = reader.GetBoolean(6),
+                                    Notes = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                    Status = (WaitlistStatus)reader.GetInt32(8),
+                                    NotifiedAt = reader.IsDBNull(9) ? null : (DateTime?)reader.GetDateTime(9),
+                                    SeatedAt = reader.IsDBNull(10) ? null : (DateTime?)reader.GetDateTime(10),
+                                    TableId = reader.IsDBNull(11) ? null : (int?)reader.GetInt32(11)
+                                });
+                            }
                         }
                     }
                 }
             }
+            catch (SqlException ex)
+            {
+                // Log the SQL error
+                Console.WriteLine($"Database error in GetActiveWaitlist: {ex.Message}");
+                TempData["ErrorMessage"] = "Unable to load waitlist data. Please try again later.";
+            }
+            catch (TimeoutException ex)
+            {
+                // Handle timeout specifically
+                Console.WriteLine($"Connection timeout: {ex.Message}");
+                TempData["ErrorMessage"] = "Database connection timeout. Please try again later.";
+            }
+            catch (Exception ex)
+            {
+                // Log any other errors
+                Console.WriteLine($"Error in GetActiveWaitlist: {ex.Message}");
+                TempData["ErrorMessage"] = "An error occurred while loading the waitlist.";
+            }
+            
             return waitlist;
         }
 
+        /// <summary>
+        /// Helper method to execute database operations with proper timeout handling
+        /// </summary>
+        private T ExecuteWithTimeout<T>(Func<T> dbOperation, string operationName, T defaultValue = default)
+        {
+            try
+            {
+                // Execute the database operation with a timeout
+                var task = Task.Run(dbOperation);
+                if (!task.Wait(TimeSpan.FromSeconds(60)))
+                {
+                    throw new TimeoutException($"Operation timed out after 60 seconds: {operationName}");
+                }
+                return task.Result;
+            }
+            catch (AggregateException ex) when (ex.InnerExceptions.Count == 1)
+            {
+                // Unwrap the first inner exception
+                var innerEx = ex.InnerExceptions[0];
+                if (innerEx is SqlException sqlEx)
+                {
+                    Console.WriteLine($"SQL error in {operationName}: {sqlEx.Message}");
+                    TempData["ErrorMessage"] = $"Database error: {sqlEx.Message}";
+                }
+                else
+                {
+                    Console.WriteLine($"Error in {operationName}: {innerEx.Message}");
+                    TempData["ErrorMessage"] = $"Error: {innerEx.Message}";
+                }
+                return defaultValue;
+            }
+            catch (TimeoutException ex)
+            {
+                Console.WriteLine($"Timeout in {operationName}: {ex.Message}");
+                TempData["ErrorMessage"] = "The operation timed out. Please try again later.";
+                return defaultValue;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error in {operationName}: {ex.Message}");
+                TempData["ErrorMessage"] = "An unexpected error occurred.";
+                return defaultValue;
+            }
+        }
+        
         private WaitlistEntry GetWaitlistEntryById(int id)
         {
             WaitlistEntry entry = null;
@@ -750,36 +971,68 @@ namespace RestaurantManagementSystem.Controllers
         private List<Table> GetAllTables()
         {
             var tables = new List<Table>();
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            try
             {
-                con.Open();
-                using (var cmd = new SqlCommand(
-                    @"SELECT Id, TableNumber, Capacity, Section, IsAvailable, Status, 
-                    MinPartySize, LastOccupiedAt, IsActive 
-                    FROM Tables 
-                    WHERE IsActive = 1
-                    ORDER BY TableNumber", con))
+                using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
                 {
-                    using (var reader = cmd.ExecuteReader())
+                    // Add timeout to connection open
+                    var connectionTimeout = 60; // seconds
+                    var connectionTask = Task.Run(() => con.Open());
+                    if (!connectionTask.Wait(TimeSpan.FromSeconds(connectionTimeout)))
                     {
-                        while (reader.Read())
+                        throw new TimeoutException($"Connection timeout after {connectionTimeout} seconds");
+                    }
+                    
+                    using (var cmd = new SqlCommand(
+                        @"SELECT Id, TableNumber, Capacity, Section, IsAvailable, Status, 
+                        MinPartySize, LastOccupiedAt, IsActive 
+                        FROM Tables 
+                        WHERE IsActive = 1
+                        ORDER BY TableNumber", con))
+                    {
+                        // Set command timeout to 30 seconds
+                        cmd.CommandTimeout = 30;
+                        
+                        using (var reader = cmd.ExecuteReader())
                         {
-                            tables.Add(new Table
+                            while (reader.Read())
                             {
-                                Id = reader.GetInt32(0),
-                                TableNumber = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                                Capacity = reader.GetInt32(2),
-                                Section = reader.IsDBNull(3) ? null : reader.GetString(3),
-                                IsAvailable = reader.GetBoolean(4),
-                                Status = (TableStatus)reader.GetInt32(5),
-                                MinPartySize = reader.GetInt32(6),
-                                LastOccupiedAt = reader.IsDBNull(7) ? null : (DateTime?)reader.GetDateTime(7),
-                                IsActive = reader.GetBoolean(8)
-                            });
+                                tables.Add(new Table
+                                {
+                                    Id = reader.GetInt32(0),
+                                    TableNumber = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                    Capacity = reader.GetInt32(2),
+                                    Section = reader.IsDBNull(3) ? null : reader.GetString(3),
+                                    IsAvailable = reader.GetBoolean(4),
+                                    Status = (TableStatus)reader.GetInt32(5),
+                                    MinPartySize = reader.GetInt32(6),
+                                    LastOccupiedAt = reader.IsDBNull(7) ? null : (DateTime?)reader.GetDateTime(7),
+                                    IsActive = reader.GetBoolean(8)
+                                });
+                            }
                         }
                     }
                 }
             }
+            catch (SqlException ex)
+            {
+                // Log the SQL error
+                Console.WriteLine($"Database error in GetAllTables: {ex.Message}");
+                // We'll handle the error at the action level
+            }
+            catch (TimeoutException ex)
+            {
+                // Handle timeout specifically
+                Console.WriteLine($"Connection timeout in GetAllTables: {ex.Message}");
+                // We'll handle the error at the action level
+            }
+            catch (Exception ex)
+            {
+                // Log any other errors
+                Console.WriteLine($"Error in GetAllTables: {ex.Message}");
+                // We'll handle the error at the action level
+            }
+            
             return tables;
         }
 
