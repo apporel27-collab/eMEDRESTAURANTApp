@@ -116,33 +116,36 @@ namespace RestaurantManagementSystem.Controllers
                             
                             using (SqlDataReader reader = command.ExecuteReader())
                             {
+                                int orderId = 0;
+                                string orderNumber = "";
+                                string message = "Failed to create order.";
+                                
                                 if (reader.Read())
                                 {
-                                    int orderId = reader.GetInt32(0);
-                                    string orderNumber = reader.GetString(1);
-                                    string message = reader.GetString(2);
+                                    orderId = reader.GetInt32(0);
+                                    orderNumber = reader.GetString(1);
+                                    message = reader.GetString(2);
+                                }
+                                
+                                // Close the reader before executing another command on the same connection
+                                reader.Close();
+                                
+                                if (orderId > 0)
+                                {
+                                    // Create kitchen tickets for the new order if it has items
+                                    using (SqlCommand kitchenCommand = new SqlCommand("UpdateKitchenTicketsForOrder", connection))
+                                    {
+                                        kitchenCommand.CommandType = CommandType.StoredProcedure;
+                                        kitchenCommand.Parameters.AddWithValue("@OrderId", orderId);
+                                        kitchenCommand.ExecuteNonQuery();
+                                    }
                                     
-                                    if (orderId > 0)
-                                    {
-                                        // Create kitchen tickets for the new order if it has items
-                                        using (SqlCommand kitchenCommand = new SqlCommand("UpdateKitchenTicketsForOrder", connection))
-                                        {
-                                            kitchenCommand.CommandType = CommandType.StoredProcedure;
-                                            kitchenCommand.Parameters.AddWithValue("@OrderId", orderId);
-                                            kitchenCommand.ExecuteNonQuery();
-                                        }
-                                        
-                                        TempData["SuccessMessage"] = $"Order {orderNumber} created successfully.";
-                                        return RedirectToAction("Details", new { id = orderId });
-                                    }
-                                    else
-                                    {
-                                        ModelState.AddModelError("", message);
-                                    }
+                                    TempData["SuccessMessage"] = $"Order {orderNumber} created successfully.";
+                                    return RedirectToAction("Details", new { id = orderId });
                                 }
                                 else
                                 {
-                                    ModelState.AddModelError("", "Failed to create order.");
+                                    ModelState.AddModelError("", message);
                                 }
                             }
                         }
@@ -353,12 +356,89 @@ namespace RestaurantManagementSystem.Controllers
                     }
                     
                     // Get available modifiers for the menu item
-                    using (SqlCommand command = new SqlCommand(@"
-                        SELECT m.Id, m.Name, m.Price, m.IsDefault
-                        FROM Modifiers m
-                        INNER JOIN MenuItem_Modifiers mm ON m.Id = mm.ModifierId
-                        WHERE mm.MenuItemId = @MenuItemId
-                        ORDER BY m.Name", connection))
+                    // Check if either table version exists
+                    bool tableExists = false;
+                    string modifiersTableName = "";
+                    string modifiersQuery;
+                    
+                    try
+                    {
+                        using (SqlConnection checkCon = new SqlConnection(_connectionString))
+                        {
+                            checkCon.Open();
+                            
+                            // Try with underscore first
+                            using (SqlCommand cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID('MenuItem_Modifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", checkCon))
+                            {
+                                if (Convert.ToBoolean(cmd.ExecuteScalar()))
+                                {
+                                    tableExists = true;
+                                    modifiersTableName = "MenuItem_Modifiers";
+                                }
+                            }
+                            
+                            // If not found, try without underscore
+                            if (!tableExists)
+                            {
+                                using (SqlCommand cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID('MenuItemModifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", checkCon))
+                                {
+                                    if (Convert.ToBoolean(cmd.ExecuteScalar()))
+                                    {
+                                        tableExists = true;
+                                        modifiersTableName = "MenuItemModifiers";
+                                    }
+                                }
+                            }
+                        }
+                    
+                        if (tableExists)
+                        {
+                            // Check if the table has PriceAdjustment and IsDefault columns
+                            bool hasPriceAdjustment = ColumnExistsInTable(modifiersTableName, "PriceAdjustment");
+                            bool hasIsDefault = ColumnExistsInTable(modifiersTableName, "IsDefault");
+                            
+                            // Build the query based on the available columns
+                            if (hasPriceAdjustment && hasIsDefault)
+                            {
+                                modifiersQuery = $@"
+                                    SELECT m.Id, m.Name, mm.PriceAdjustment AS Price, mm.IsDefault
+                                    FROM Modifiers m
+                                    INNER JOIN {modifiersTableName} mm ON m.Id = mm.ModifierId
+                                    WHERE mm.MenuItemId = @MenuItemId
+                                    ORDER BY m.Name";
+                            }
+                            else
+                            {
+                                modifiersQuery = $@"
+                                    SELECT m.Id, m.Name, 0 AS Price, 0 AS IsDefault
+                                    FROM Modifiers m
+                                    INNER JOIN {modifiersTableName} mm ON m.Id = mm.ModifierId
+                                    WHERE mm.MenuItemId = @MenuItemId
+                                    ORDER BY m.Name";
+                            }
+                        }
+                        else
+                        {
+                            // If no table exists, just get modifiers without relationship
+                            modifiersQuery = @"
+                                SELECT m.Id, m.Name, 0 AS Price, 0 AS IsDefault
+                                FROM Modifiers m
+                                ORDER BY m.Name";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log the error if possible
+                        Console.WriteLine($"Error checking modifiers table: {ex.Message}");
+                        
+                        // Fallback to a simple query that doesn't require the relationship table
+                        modifiersQuery = @"
+                            SELECT m.Id, m.Name, 0 AS Price, 0 AS IsDefault
+                            FROM Modifiers m
+                            ORDER BY m.Name";
+                    }
+                        
+                    using (SqlCommand command = new SqlCommand(modifiersQuery, connection))
                     {
                         command.Parameters.AddWithValue("@MenuItemId", menuItemId.Value);
                         
@@ -372,7 +452,7 @@ namespace RestaurantManagementSystem.Controllers
                                     Name = reader.GetString(1),
                                     Price = reader.GetDecimal(2),
                                     IsDefault = reader.GetBoolean(3),
-                                    IsSelected = reader.GetBoolean(3), // Default selected if IsDefault is true
+                                    IsSelected = false, // Changed to false by default
                                     ModifierId = reader.GetInt32(0)
                                 };
                                 
@@ -387,12 +467,15 @@ namespace RestaurantManagementSystem.Controllers
                     }
                     
                     // Get allergens for the menu item
-                    using (SqlCommand command = new SqlCommand(@"
+                    string allergensTableName = GetMenuItemRelationshipTableName("Allergens");
+                    string allergensQuery = $@"
                         SELECT a.Name
                         FROM Allergens a
-                        INNER JOIN MenuItem_Allergens ma ON a.Id = ma.AllergenId
+                        INNER JOIN {allergensTableName} ma ON a.Id = ma.AllergenId
                         WHERE ma.MenuItemId = @MenuItemId
-                        ORDER BY a.Name", connection))
+                        ORDER BY a.Name";
+                        
+                    using (SqlCommand command = new SqlCommand(allergensQuery, connection))
                     {
                         command.Parameters.AddWithValue("@MenuItemId", menuItemId.Value);
                         
@@ -575,21 +658,274 @@ namespace RestaurantManagementSystem.Controllers
                         {
                             orderItemIds = string.Join(",", model.SelectedItems);
                         }
+
+                        // Check if KitchenTicketItems table exists with or without underscore
+                        bool useUnderscoreVersion = false;
+                        string kitchenTicketItemsTableName = "KitchenTicketItems";
                         
-                        using (SqlCommand command = new SqlCommand("usp_FireOrderItems", connection))
+                        if (TableExists("Kitchen_TicketItems"))
                         {
-                            command.CommandType = CommandType.StoredProcedure;
-                            
-                            command.Parameters.AddWithValue("@OrderId", model.OrderId);
-                            command.Parameters.AddWithValue("@OrderItemIds", orderItemIds ?? (object)DBNull.Value);
-                            
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            kitchenTicketItemsTableName = "Kitchen_TicketItems";
+                            useUnderscoreVersion = true;
+                        }
+                        
+                        // First, let's create the kitchen ticket
+                        // We'll use our own SQL instead of calling the stored procedure directly
+                        // to handle table name differences
+                        string ticketNumber = null;
+                        int kitchenTicketId = 0;
+                        
+                        try
+                        {
+                            // Start a transaction
+                            using (SqlTransaction transaction = connection.BeginTransaction())
                             {
-                                if (reader.Read())
+                                try
                                 {
-                                    int kitchenTicketId = reader.GetInt32(0);
-                                    string ticketNumber = reader.GetString(1);
-                                    string message = reader.GetString(2);
+                                    // Debug message to track execution
+                                    Console.WriteLine("Starting FireItems transaction...");
+                                    
+                                    // Generate unique ticket number
+                                    string ticketNumberSql = @"
+                                        SELECT 'KOT-' + CONVERT(NVARCHAR(8), GETDATE(), 112) + '-' + 
+                                        RIGHT('0000' + CAST((SELECT ISNULL(MAX(CAST(RIGHT(TicketNumber, 4) AS INT)), 0) + 1 
+                                                            FROM KitchenTickets 
+                                                            WHERE LEFT(TicketNumber, 12) = 'KOT-' + CONVERT(NVARCHAR(8), GETDATE(), 112)) AS NVARCHAR(4)), 4)
+                                    ";
+                                    
+                                    Console.WriteLine("Generating ticket number with SQL: " + ticketNumberSql);
+                                    
+                                    using (SqlCommand cmd = new SqlCommand(ticketNumberSql, connection, transaction))
+                                    {
+                                        ticketNumber = (string)cmd.ExecuteScalar();
+                                        Console.WriteLine($"Generated ticket number: {ticketNumber}");
+                                    }
+                                    
+                                    // First check the structure of KitchenTickets table
+                                    Console.WriteLine("Checking KitchenTickets table structure...");
+                                    
+                                    // Query to get the exact schema for the table
+                                    string schemaQuery = @"
+                                        SELECT c.name AS ColumnName 
+                                        FROM sys.columns c
+                                        JOIN sys.tables t ON c.object_id = t.object_id
+                                        WHERE t.name = 'KitchenTickets' AND t.type = 'U'";
+                                        
+                                    List<string> kitchenTicketColumns = new List<string>();
+                                    using (SqlCommand cmd = new SqlCommand(schemaQuery, connection, transaction))
+                                    {
+                                        using (SqlDataReader reader = cmd.ExecuteReader())
+                                        {
+                                            while (reader.Read())
+                                            {
+                                                string columnName = reader.GetString(0);
+                                                kitchenTicketColumns.Add(columnName);
+                                                Console.WriteLine($"Found column: {columnName}");
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Check if UpdatedAt column exists
+                                    bool hasKitchenTicketUpdatedAtColumn = kitchenTicketColumns.Contains("UpdatedAt");
+                                    Console.WriteLine($"Has UpdatedAt column: {hasKitchenTicketUpdatedAtColumn}");
+                                    
+                                    // We need to get the order number first
+                                    string orderNumber = null;
+                                    using (SqlCommand cmd = new SqlCommand(@"
+                                        SELECT OrderNumber FROM Orders WHERE Id = @OrderId
+                                    ", connection, transaction))
+                                    {
+                                        cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                        object result = cmd.ExecuteScalar();
+                                        if (result != null)
+                                        {
+                                            orderNumber = result.ToString();
+                                            Console.WriteLine($"Retrieved order number: {orderNumber}");
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine("Could not retrieve order number!");
+                                            throw new Exception("Order number is required but could not be retrieved");
+                                        }
+                                    }
+                                    
+                                    // Now include the OrderNumber in our insert
+                                    string insertKitchenTicketSql = @"
+                                        INSERT INTO [KitchenTickets] (
+                                            [TicketNumber],
+                                            [OrderId],
+                                            [OrderNumber],
+                                            [Status],
+                                            [CreatedAt]
+                                        ) VALUES (
+                                            @TicketNumber,
+                                            @OrderId,
+                                            @OrderNumber,
+                                            0,
+                                            GETDATE()
+                                        );
+                                        SELECT SCOPE_IDENTITY();";
+                                    
+                                    Console.WriteLine("Using SQL: " + insertKitchenTicketSql);
+                                    
+                                    // Create kitchen ticket
+                                    using (SqlCommand cmd = new SqlCommand(insertKitchenTicketSql, connection, transaction))
+                                    {
+                                        cmd.Parameters.AddWithValue("@TicketNumber", ticketNumber);
+                                        cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                        cmd.Parameters.AddWithValue("@OrderNumber", orderNumber);
+                                        kitchenTicketId = Convert.ToInt32(cmd.ExecuteScalar());
+                                        Console.WriteLine($"Created kitchen ticket with ID: {kitchenTicketId}");
+                                    }
+                                    
+                                    // Update order items and add them to kitchen ticket items
+                                    if (!model.FireAll && model.SelectedItems != null && model.SelectedItems.Any())
+                                    {
+                                        // Update selected order items
+                                        foreach (int itemId in model.SelectedItems)
+                                        {
+                                            // Check if OrderItems table has UpdatedAt column
+                                            bool hasItemUpdatedAtColumn = ColumnExistsInTable("OrderItems", "UpdatedAt");
+                                            
+                                            // Build SQL based on column existence
+                                            string updateItemSql = hasItemUpdatedAtColumn
+                                                ? @"UPDATE [OrderItems]
+                                                    SET [Status] = 1,
+                                                        [FireTime] = GETDATE(),
+                                                        [UpdatedAt] = GETDATE()
+                                                    WHERE [Id] = @ItemId AND [OrderId] = @OrderId AND [Status] = 0;"
+                                                : @"UPDATE [OrderItems]
+                                                    SET [Status] = 1,
+                                                        [FireTime] = GETDATE()
+                                                    WHERE [Id] = @ItemId AND [OrderId] = @OrderId AND [Status] = 0;";
+                                            
+                                            using (SqlCommand cmd = new SqlCommand(updateItemSql, connection, transaction))
+                                            {
+                                                cmd.Parameters.AddWithValue("@ItemId", itemId);
+                                                cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                                cmd.ExecuteNonQuery();
+                                            }
+                                            
+                                            // Get the menu item name
+                                            string menuItemName = null;
+                                            using (SqlCommand menuItemCmd = new SqlCommand(@"
+                                                SELECT mi.Name
+                                                FROM OrderItems oi
+                                                INNER JOIN MenuItems mi ON oi.MenuItemId = mi.Id
+                                                WHERE oi.Id = @ItemId
+                                            ", connection, transaction))
+                                            {
+                                                menuItemCmd.Parameters.AddWithValue("@ItemId", itemId);
+                                                object result = menuItemCmd.ExecuteScalar();
+                                                if (result != null)
+                                                {
+                                                    menuItemName = result.ToString();
+                                                    Console.WriteLine($"Menu item name for item {itemId}: {menuItemName}");
+                                                }
+                                                else
+                                                {
+                                                    // Use a default value if we can't find the name
+                                                    menuItemName = "Unknown Item";
+                                                    Console.WriteLine($"Could not find menu item name for item {itemId}");
+                                                }
+                                            }
+                                            
+                                            // Add to kitchen ticket items with the menu item name
+                                            using (SqlCommand cmd = new SqlCommand($@"
+                                                INSERT INTO [{kitchenTicketItemsTableName}] (
+                                                    [KitchenTicketId], 
+                                                    [OrderItemId], 
+                                                    [MenuItemName],
+                                                    [Status]
+                                                ) VALUES (
+                                                    @KitchenTicketId, 
+                                                    @OrderItemId, 
+                                                    @MenuItemName,
+                                                    0
+                                                );
+                                            ", connection, transaction))
+                                            {
+                                                cmd.Parameters.AddWithValue("@KitchenTicketId", kitchenTicketId);
+                                                cmd.Parameters.AddWithValue("@OrderItemId", itemId);
+                                                cmd.Parameters.AddWithValue("@MenuItemName", menuItemName);
+                                                cmd.ExecuteNonQuery();
+                                                Console.WriteLine($"Added item {itemId} to kitchen ticket {kitchenTicketId}");
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Check if OrderItems table has UpdatedAt column
+                                        bool hasItemUpdatedAtColumn = ColumnExistsInTable("OrderItems", "UpdatedAt");
+                                        
+                                        // Build SQL based on column existence
+                                        string updateAllItemsSql = hasItemUpdatedAtColumn
+                                            ? @"UPDATE oi
+                                                SET oi.[Status] = 1,
+                                                    oi.[FireTime] = GETDATE(),
+                                                    oi.[UpdatedAt] = GETDATE()
+                                                FROM [OrderItems] oi
+                                                WHERE oi.[OrderId] = @OrderId AND oi.[Status] = 0;"
+                                            : @"UPDATE oi
+                                                SET oi.[Status] = 1,
+                                                    oi.[FireTime] = GETDATE()
+                                                FROM [OrderItems] oi
+                                                WHERE oi.[OrderId] = @OrderId AND oi.[Status] = 0;";
+                                        
+                                        // Update all unfired order items
+                                        using (SqlCommand cmd = new SqlCommand(updateAllItemsSql, connection, transaction))
+                                        {
+                                            cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                            cmd.ExecuteNonQuery();
+                                        }
+                                        
+                                        // Add all newly fired items to kitchen ticket items including menu item names
+                                        using (SqlCommand cmd = new SqlCommand($@"
+                                            INSERT INTO [{kitchenTicketItemsTableName}] (
+                                                [KitchenTicketId], 
+                                                [OrderItemId], 
+                                                [MenuItemName],
+                                                [Status]
+                                            )
+                                            SELECT 
+                                                @KitchenTicketId, 
+                                                oi.[Id], 
+                                                mi.[Name],
+                                                0
+                                            FROM [OrderItems] oi
+                                            INNER JOIN [MenuItems] mi ON oi.[MenuItemId] = mi.[Id]
+                                            WHERE oi.[OrderId] = @OrderId AND oi.[Status] = 1;
+                                        ", connection, transaction))
+                                        {
+                                            cmd.Parameters.AddWithValue("@KitchenTicketId", kitchenTicketId);
+                                            cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                            int rowsAffected = cmd.ExecuteNonQuery();
+                                            Console.WriteLine($"Added {rowsAffected} items to kitchen ticket {kitchenTicketId}");
+                                        }
+                                    }
+                                    
+                                    // Check if Orders table has UpdatedAt column
+                                    bool hasUpdatedAtColumn = ColumnExistsInTable("Orders", "UpdatedAt");
+                                    
+                                    // Build the update SQL based on column existence
+                                    string updateOrderSql = hasUpdatedAtColumn 
+                                        ? @"UPDATE [Orders]
+                                            SET [Status] = CASE WHEN [Status] = 0 THEN 1 ELSE [Status] END,
+                                                [UpdatedAt] = GETDATE()
+                                            WHERE [Id] = @OrderId;"
+                                        : @"UPDATE [Orders]
+                                            SET [Status] = CASE WHEN [Status] = 0 THEN 1 ELSE [Status] END
+                                            WHERE [Id] = @OrderId;";
+                                    
+                                    // Update order status
+                                    using (SqlCommand cmd = new SqlCommand(updateOrderSql, connection, transaction))
+                                    {
+                                        cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                        cmd.ExecuteNonQuery();
+                                    }
+                                    
+                                    // Commit the transaction
+                                    transaction.Commit();
                                     
                                     if (kitchenTicketId > 0)
                                     {
@@ -597,14 +933,29 @@ namespace RestaurantManagementSystem.Controllers
                                     }
                                     else
                                     {
-                                        TempData["ErrorMessage"] = message;
+                                        TempData["ErrorMessage"] = "Failed to create kitchen ticket.";
                                     }
                                 }
-                                else
+                                catch (Exception ex)
                                 {
-                                    TempData["ErrorMessage"] = "Failed to fire items to kitchen.";
+                                    // Rollback the transaction on error
+                                    transaction.Rollback();
+                                    TempData["ErrorMessage"] = $"An error occurred: {ex.Message}";
+                                    Console.WriteLine($"Transaction error: {ex.Message}");
+                                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                                    
+                                    // If there's an inner exception, log it too
+                                    if (ex.InnerException != null)
+                                    {
+                                        Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                                    }
                                 }
                             }
+                        }
+                        catch (Exception ex)
+                        {
+                            TempData["ErrorMessage"] = $"Failed to fire items to kitchen: {ex.Message}";
+                            Console.WriteLine($"Database error: {ex.Message}");
                         }
                     }
                 }
@@ -887,17 +1238,187 @@ namespace RestaurantManagementSystem.Controllers
             return model;
         }
         
+        /// <summary>
+        /// Helper method to build SQL queries with either StationId or KitchenStationId
+        /// depending on the database schema
+        /// </summary>
+        private string GetSafeStationIdFieldName()
+        {
+            // Default to using KitchenStationId as that's the schema in the model
+            return "KitchenStationId";
+        }
+        
+        /// <summary>
+        /// Helper method to get the correct table name for menu item relationships
+        /// </summary>
+        private string GetMenuItemRelationshipTableName(string relationship)
+        {
+            // Check if the table exists with underscore first (as in SQL scripts)
+            bool tableWithUnderscoreExists = false;
+            bool tableWithoutUnderscoreExists = false;
+            
+            try
+            {
+                using (SqlConnection con = new SqlConnection(_connectionString))
+                {
+                    con.Open();
+                    
+                    // Check if table with underscore exists
+                    using (SqlCommand cmd = new SqlCommand($"SELECT CASE WHEN OBJECT_ID('MenuItem_{relationship}', 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
+                    {
+                        tableWithUnderscoreExists = Convert.ToBoolean(cmd.ExecuteScalar());
+                    }
+                    
+                    // Only check without underscore if underscore version doesn't exist
+                    if (!tableWithUnderscoreExists)
+                    {
+                        using (SqlCommand cmd = new SqlCommand($"SELECT CASE WHEN OBJECT_ID('MenuItem{relationship}', 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
+                        {
+                            tableWithoutUnderscoreExists = Convert.ToBoolean(cmd.ExecuteScalar());
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If any error occurs, assume neither table exists
+                tableWithUnderscoreExists = false;
+                tableWithoutUnderscoreExists = false;
+            }
+            
+            if (tableWithUnderscoreExists)
+                return $"MenuItem_{relationship}";
+            else if (tableWithoutUnderscoreExists)
+                return $"MenuItem{relationship}";
+            else
+                return $"MenuItem{relationship}"; // Default to version without underscore
+        }
+        
+        /// <summary>
+        /// Helper method to check if a column exists in a table
+        /// </summary>
+        private bool ColumnExistsInTable(string tableName, string columnName)
+        {
+            try
+            {
+                // Safety check - if table doesn't exist, column can't exist
+                if (string.IsNullOrEmpty(tableName))
+                {
+                    return false;
+                }
+
+                // Clean table name (remove any brackets and schema)
+                string cleanTableName = tableName.Replace("[", "").Replace("]", "");
+                if (cleanTableName.Contains("."))
+                {
+                    cleanTableName = cleanTableName.Split('.').Last();
+                }
+                
+                using (SqlConnection con = new SqlConnection(_connectionString))
+                {
+                    con.Open();
+                    
+                    // First verify the table exists
+                    string tableQuery = @"
+                        SELECT COUNT(1)
+                        FROM sys.tables
+                        WHERE name = @TableName";
+                        
+                    using (SqlCommand cmd = new SqlCommand(tableQuery, con))
+                    {
+                        cmd.Parameters.AddWithValue("@TableName", cleanTableName);
+                        int tableExists = Convert.ToInt32(cmd.ExecuteScalar());
+                        
+                        if (tableExists == 0)
+                        {
+                            return false; // Table doesn't exist
+                        }
+                    }
+                    
+                    // Now check if the column exists
+                    string columnQuery = @"
+                        SELECT COUNT(1)
+                        FROM sys.columns c
+                        JOIN sys.tables t ON c.object_id = t.object_id
+                        WHERE t.name = @TableName AND c.name = @ColumnName";
+                    
+                    using (SqlCommand cmd = new SqlCommand(columnQuery, con))
+                    {
+                        cmd.Parameters.AddWithValue("@TableName", cleanTableName);
+                        cmd.Parameters.AddWithValue("@ColumnName", columnName);
+                        
+                        int result = Convert.ToInt32(cmd.ExecuteScalar());
+                        return result > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the exception if possible
+                Console.WriteLine($"Error checking column existence: {ex.Message}");
+                // If any error occurs, assume the column doesn't exist
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// Helper method to check if a table exists in the database
+        /// </summary>
+        private bool TableExists(string tableName)
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(_connectionString))
+                {
+                    con.Open();
+                    
+                    using (SqlCommand cmd = new SqlCommand($"SELECT CASE WHEN OBJECT_ID(@TableName, 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
+                    {
+                        cmd.Parameters.AddWithValue("@TableName", tableName);
+                        return Convert.ToBoolean(cmd.ExecuteScalar());
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// Helper method to find the correct version of a table name
+        /// </summary>
+        private string GetCorrectTableName(string baseTableName, string alternativeTableName)
+        {
+            if (TableExists(baseTableName))
+            {
+                return baseTableName;
+            }
+            else if (TableExists(alternativeTableName))
+            {
+                return alternativeTableName;
+            }
+            
+            // Return the base name as fallback
+            return baseTableName;
+        }
+        
         private OrderViewModel GetOrderDetails(int id)
         {
             OrderViewModel order = null;
             
+            // Use separate connections for different data readers to avoid nested DataReader issues
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get order details
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT 
+                // First check if the UpdatedAt column exists in the Orders table
+                bool hasUpdatedAtColumn = ColumnExistsInTable("Orders", "UpdatedAt");
+                
+                // Build the SQL query based on column existence
+                string selectSql = hasUpdatedAtColumn 
+                    ? @"SELECT 
                         o.Id,
                         o.OrderNumber,
                         o.TableTurnoverId,
@@ -915,7 +1436,28 @@ namespace RestaurantManagementSystem.Controllers
                         o.SpecialInstructions,
                         o.CreatedAt,
                         o.UpdatedAt,
-                        o.CompletedAt,
+                        o.CompletedAt,"
+                    : @"SELECT 
+                        o.Id,
+                        o.OrderNumber,
+                        o.TableTurnoverId,
+                        o.OrderType,
+                        o.Status,
+                        o.UserId,
+                        CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
+                        o.CustomerName,
+                        o.CustomerPhone,
+                        o.Subtotal,
+                        o.TaxAmount,
+                        o.TipAmount,
+                        o.DiscountAmount,
+                        o.TotalAmount,
+                        o.SpecialInstructions,
+                        o.CreatedAt,
+                        o.CreatedAt AS UpdatedAt, -- Use CreatedAt as a fallback
+                        o.CompletedAt,";
+
+                using (SqlCommand command = new SqlCommand(selectSql + @"
                         CASE 
                             WHEN o.TableTurnoverId IS NOT NULL THEN t.TableName 
                             ELSE NULL 
@@ -939,10 +1481,9 @@ namespace RestaurantManagementSystem.Controllers
                             var orderType = reader.GetInt32(3);
                             string orderTypeDisplay = orderType switch
                             {
-                                0 => "Dine-In",
-                                1 => "Takeout",
+                                0 => "Dine In",
+                                1 => "Take Out",
                                 2 => "Delivery",
-                                3 => "Online",
                                 _ => "Unknown"
                             };
                             
@@ -976,12 +1517,13 @@ namespace RestaurantManagementSystem.Controllers
                                 TotalAmount = reader.GetDecimal(13),
                                 SpecialInstructions = reader.IsDBNull(14) ? null : reader.GetString(14),
                                 CreatedAt = reader.GetDateTime(15),
-                                UpdatedAt = reader.GetDateTime(16),
+                                UpdatedAt = reader.GetDateTime(16), // We've handled this in the SQL query
                                 CompletedAt = reader.IsDBNull(17) ? null : (DateTime?)reader.GetDateTime(17),
                                 TableName = reader.IsDBNull(18) ? null : reader.GetString(18),
                                 GuestName = reader.IsDBNull(19) ? null : reader.GetString(19),
                                 Items = new List<OrderItemViewModel>(),
-                                KitchenTickets = new List<KitchenTicketViewModel>()
+                                KitchenTickets = new List<KitchenTicketViewModel>(),
+                                AvailableCourses = new List<CourseType>()
                             };
                         }
                         else
@@ -1059,51 +1601,87 @@ namespace RestaurantManagementSystem.Controllers
                         }
                     }
                 }
+            }
                 
-                // Get order item modifiers
-                foreach (var item in order.Items)
+            // Get order item modifiers using separate connections for each item
+            foreach (var item in order.Items)
+            {
+                // Check which version of the table exists (with or without underscore)
+                string orderItemModifiersTable = GetCorrectTableName("OrderItemModifiers", "OrderItem_Modifiers");
+                
+                if (!string.IsNullOrEmpty(orderItemModifiersTable))
                 {
-                    using (SqlCommand command = new SqlCommand(@"
-                        SELECT 
-                            oim.Id,
-                            oim.ModifierId,
-                            m.Name AS ModifierName,
-                            oim.Price
-                        FROM OrderItemModifiers oim
-                        INNER JOIN Modifiers m ON oim.ModifierId = m.Id
-                        WHERE oim.OrderItemId = @OrderItemId", connection))
+                    // Use a separate connection for modifiers to avoid DataReader issues
+                    using (SqlConnection connection = new SqlConnection(_connectionString))
                     {
-                        command.Parameters.AddWithValue("@OrderItemId", item.Id);
+                        connection.Open();
                         
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        string modifiersQuery = $@"
+                            SELECT 
+                                oim.Id,
+                                oim.ModifierId,
+                                m.Name AS ModifierName,
+                                oim.Price
+                            FROM {orderItemModifiersTable} oim
+                            INNER JOIN Modifiers m ON oim.ModifierId = m.Id
+                            WHERE oim.OrderItemId = @OrderItemId";
+                            
+                        using (SqlCommand command = new SqlCommand(modifiersQuery, connection))
                         {
-                            while (reader.Read())
+                            command.Parameters.AddWithValue("@OrderItemId", item.Id);
+                            
+                            try
                             {
-                                item.Modifiers.Add(new OrderItemModifierViewModel
+                                // First check if the table exists
+                                bool tableExists = TableExists(orderItemModifiersTable);
+                                
+                                if (tableExists)
                                 {
-                                    Id = reader.GetInt32(0),
-                                    OrderItemId = item.Id,
-                                    ModifierId = reader.GetInt32(1),
-                                    ModifierName = reader.GetString(2),
-                                    Price = reader.GetDecimal(3)
-                                });
+                                    using (SqlDataReader reader = command.ExecuteReader())
+                                    {
+                                        while (reader.Read())
+                                        {
+                                            item.Modifiers.Add(new OrderItemModifierViewModel
+                                            {
+                                                Id = reader.GetInt32(0),
+                                                OrderItemId = item.Id,
+                                                ModifierId = reader.GetInt32(1),
+                                                ModifierName = reader.GetString(2),
+                                                Price = reader.GetDecimal(3)
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                // Log the exception
+                                Console.WriteLine($"Error getting modifiers for order item {item.Id}: {ex.Message}");
                             }
                         }
                     }
                 }
+            }
                 
-                // Get kitchen tickets
-                using (SqlCommand command = new SqlCommand(@"
+            // Get kitchen tickets using a separate connection
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                
+                string stationIdFieldName = GetSafeStationIdFieldName();
+                string kitchenTicketQuery = $@"
                     SELECT 
                         kt.Id,
                         kt.TicketNumber,
-                        kt.StationId,
+                        kt.{stationIdFieldName},
                         kt.Status,
                         kt.CreatedAt,
                         kt.CompletedAt
                     FROM KitchenTickets kt
                     WHERE kt.OrderId = @OrderId
-                    ORDER BY kt.CreatedAt DESC", connection))
+                    ORDER BY kt.CreatedAt DESC";
+                
+                using (SqlCommand command = new SqlCommand(kitchenTicketQuery, connection))
                 {
                     command.Parameters.AddWithValue("@OrderId", id);
                     
@@ -1140,25 +1718,60 @@ namespace RestaurantManagementSystem.Controllers
                         }
                     }
                 }
+            }
+            
+            // Use a new connection for kitchen ticket items to avoid DataReader issues
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
                 
                 // Get kitchen ticket items
                 foreach (var ticket in order.KitchenTickets)
                 {
-                    using (SqlCommand command = new SqlCommand(@"
-                        SELECT 
-                            kti.Id,
-                            kti.OrderItemId,
-                            mi.Name AS MenuItemName,
-                            oi.Quantity,
-                            oi.SpecialInstructions,
-                            kti.Status,
-                            kti.StartTime,
-                            kti.CompletionTime,
-                            kti.Notes
-                        FROM KitchenTicketItems kti
-                        INNER JOIN OrderItems oi ON kti.OrderItemId = oi.Id
-                        INNER JOIN MenuItems mi ON oi.MenuItemId = mi.Id
-                        WHERE kti.KitchenTicketId = @KitchenTicketId", connection))
+                    // Get the correct table name for kitchen ticket items
+                    string kitchenTicketItemsTable = GetCorrectTableName("KitchenTicketItems", "Kitchen_TicketItems");
+                    
+                    string queryString;
+                    if (kitchenTicketItemsTable == "KitchenTicketItems")
+                    {
+                        // Use direct field access because the schema might have changed
+                        queryString = $@"
+                            SELECT 
+                                kti.Id,
+                                kti.OrderItemId,
+                                mi.Name,
+                                oi.Quantity,
+                                oi.SpecialInstructions,
+                                kti.Status,
+                                kti.StartTime,
+                                kti.CompletionTime,
+                                kti.Notes
+                            FROM {kitchenTicketItemsTable} kti
+                            INNER JOIN OrderItems oi ON kti.OrderItemId = oi.Id
+                            INNER JOIN MenuItems mi ON oi.MenuItemId = mi.Id
+                            WHERE kti.KitchenTicketId = @KitchenTicketId";
+                    }
+                    else
+                    {
+                        // Get field names for the alternate version of the table
+                        queryString = $@"
+                            SELECT 
+                                kti.Id,
+                                kti.OrderItemId,
+                                mi.Name,
+                                oi.Quantity,
+                                oi.SpecialInstructions,
+                                kti.Status,
+                                kti.StartTime,
+                                kti.CompletionTime,
+                                kti.Notes
+                            FROM {kitchenTicketItemsTable} kti
+                            INNER JOIN OrderItems oi ON kti.OrderItemId = oi.Id
+                            INNER JOIN MenuItems mi ON oi.MenuItemId = mi.Id
+                            WHERE kti.KitchenTicketId = @KitchenTicketId";
+                    }
+                    
+                    using (SqlCommand command = new SqlCommand(queryString, connection))
                     {
                         command.Parameters.AddWithValue("@KitchenTicketId", ticket.Id);
                         
@@ -1193,20 +1806,45 @@ namespace RestaurantManagementSystem.Controllers
                                     Modifiers = new List<string>()
                                 };
                                 
-                                // Get modifiers for this ticket item
-                                using (SqlCommand modifiersCommand = new SqlCommand(@"
-                                    SELECT m.Name
-                                    FROM OrderItemModifiers oim
-                                    INNER JOIN Modifiers m ON oim.ModifierId = m.Id
-                                    WHERE oim.OrderItemId = @OrderItemId", connection))
+                                // Get modifiers for this ticket item using a separate connection
+                                string orderItemModifiersTable = GetCorrectTableName("OrderItemModifiers", "OrderItem_Modifiers");
+                                
+                                if (!string.IsNullOrEmpty(orderItemModifiersTable))
                                 {
-                                    modifiersCommand.Parameters.AddWithValue("@OrderItemId", ticketItem.OrderItemId);
+                                    // First check if the table exists
+                                    bool tableExists = TableExists(orderItemModifiersTable);
                                     
-                                    using (SqlDataReader modifiersReader = modifiersCommand.ExecuteReader())
+                                    if (tableExists)
                                     {
-                                        while (modifiersReader.Read())
+                                        using (SqlConnection modConnection = new SqlConnection(_connectionString))
                                         {
-                                            ticketItem.Modifiers.Add(modifiersReader.GetString(0));
+                                            modConnection.Open();
+                                            string modifiersQuery = $@"
+                                                SELECT m.Name
+                                                FROM {orderItemModifiersTable} oim
+                                                INNER JOIN Modifiers m ON oim.ModifierId = m.Id
+                                                WHERE oim.OrderItemId = @OrderItemId";
+                                                
+                                            using (SqlCommand modifiersCommand = new SqlCommand(modifiersQuery, modConnection))
+                                            {
+                                                modifiersCommand.Parameters.AddWithValue("@OrderItemId", ticketItem.OrderItemId);
+                                            
+                                                try
+                                                {
+                                                    using (SqlDataReader modifiersReader = modifiersCommand.ExecuteReader())
+                                                    {
+                                                        while (modifiersReader.Read())
+                                                        {
+                                                            ticketItem.Modifiers.Add(modifiersReader.GetString(0));
+                                                        }
+                                                    }
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    // Log but don't crash if there are any remaining issues
+                                                    Console.WriteLine($"Error getting modifiers for kitchen ticket item: {ex.Message}");
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1239,7 +1877,6 @@ namespace RestaurantManagementSystem.Controllers
             
             return order;
         }
-        
         private int GetCurrentUserId()
         {
             // In a real application, get this from authentication

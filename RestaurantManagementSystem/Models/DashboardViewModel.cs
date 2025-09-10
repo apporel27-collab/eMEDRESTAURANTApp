@@ -5,6 +5,15 @@ namespace RestaurantManagementSystem.Models
 {
     public class DashboardViewModel
     {
+        // User info
+        public string UserName { get; set; } = string.Empty;
+        public string UserFullName { get; set; } = string.Empty;
+        public string UserEmail { get; set; } = string.Empty;
+        public List<string> UserRoles { get; set; } = new List<string>();
+        public List<string> UserPermissions { get; set; } = new List<string>();
+        public DateTime LastLoginDate { get; set; }
+        
+        // Dashboard stats
         public decimal TodaySales { get; set; }
         public int TodayOrders { get; set; }
         public int ActiveTables { get; set; }

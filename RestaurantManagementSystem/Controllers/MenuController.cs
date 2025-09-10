@@ -5,14 +5,15 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using RestaurantManagementSystem.Data;
 using RestaurantManagementSystem.Models;
 using RestaurantManagementSystem.ViewModels;
+using RestaurantManagementSystem.Helpers;
 using System.IO;
 using Microsoft.AspNetCore.Hosting;
-using MenuItemIngredientViewModelView = RestaurantManagementSystem.ViewModels.MenuItemIngredientViewModel;
-using MenuItemIngredientViewModelModel = RestaurantManagementSystem.Models.MenuItemIngredientViewModel;
+using ViewModelsMenuItemIngredientViewModel = RestaurantManagementSystem.ViewModels.MenuItemIngredientViewModel;
+using ModelsMenuItemIngredientViewModel = RestaurantManagementSystem.Models.MenuItemIngredientViewModel;
 
 namespace RestaurantManagementSystem.Controllers
 {
@@ -25,6 +26,95 @@ namespace RestaurantManagementSystem.Controllers
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
             _webHostEnvironment = webHostEnvironment;
+        }
+        
+        private bool HasColumn(SqlDataReader reader, string columnName)
+        {
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+        
+        // Safe getters for database values
+        private int SafeGetInt(SqlDataReader reader, string columnName)
+        {
+            try
+            {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? 0 : reader.GetInt32(ordinal);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+        
+        private int? SafeGetNullableInt(SqlDataReader reader, string columnName)
+        {
+            try
+            {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? null : (int?)reader.GetInt32(ordinal);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        
+        private string SafeGetString(SqlDataReader reader, string columnName)
+        {
+            try
+            {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        
+        private decimal SafeGetDecimal(SqlDataReader reader, string columnName)
+        {
+            try
+            {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? 0 : reader.GetDecimal(ordinal);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+        
+        private decimal? SafeGetNullableDecimal(SqlDataReader reader, string columnName)
+        {
+            try
+            {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? null : (decimal?)reader.GetDecimal(ordinal);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        
+        private bool SafeGetBoolean(SqlDataReader reader, string columnName)
+        {
+            try
+            {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? false : reader.GetBoolean(ordinal);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         // GET: Menu
@@ -154,17 +244,18 @@ namespace RestaurantManagementSystem.Controllers
                 IsSpecial = menuItem.IsSpecial,
                 DiscountPercentage = menuItem.DiscountPercentage,
                 KitchenStationId = menuItem.KitchenStationId,
-                SelectedAllergens = menuItem.Allergens.Select(a => a.AllergenId).ToList(),
-                Ingredients = menuItem.Ingredients.Select(i => new RestaurantManagementSystem.ViewModels.MenuItemIngredientViewModel
+                SelectedAllergens = menuItem.Allergens?.Select(a => a.AllergenId).ToList() ?? new List<int>(),
+                Ingredients = menuItem.Ingredients?.Select(i => new ViewModelsMenuItemIngredientViewModel
                 {
                     IngredientId = i.IngredientId,
                     Quantity = i.Quantity,
                     Unit = i.Unit,
                     IsOptional = i.IsOptional,
                     Instructions = i.Instructions
-                }).ToList(),
-                SelectedModifiers = menuItem.Modifiers.Select(m => m.ModifierId).ToList(),
-                ModifierPrices = menuItem.Modifiers.ToDictionary(m => m.ModifierId, m => m.PriceAdjustment)
+                }).ToList() ?? new List<ViewModelsMenuItemIngredientViewModel>(),
+                SelectedModifiers = menuItem.Modifiers?.Select(m => m.ModifierId).ToList() ?? new List<int>(),
+                ModifierPrices = menuItem.Modifiers?.ToDictionary(m => m.ModifierId, m => m.PriceAdjustment) 
+                    ?? new Dictionary<int, decimal>()
             };
 
             ViewBag.Categories = GetCategorySelectList();
@@ -235,15 +326,7 @@ namespace RestaurantManagementSystem.Controllers
                     if (model.Ingredients != null && model.Ingredients.Any())
                     {
                         // Convert from ViewModels.MenuItemIngredientViewModel to Models.MenuItemIngredientViewModel
-                        var modelIngredients = model.Ingredients.Select(i => new Models.MenuItemIngredientViewModel
-                        {
-                            IngredientId = i.IngredientId,
-                            Quantity = i.Quantity,
-                            Unit = i.Unit,
-                            IsOptional = i.IsOptional,
-                            Instructions = i.Instructions
-                        }).ToList();
-                        
+                        var modelIngredients = ConvertIngredientsViewModelToModel(model.Ingredients);
                         AddMenuItemIngredients(id, modelIngredients);
                     }
 
@@ -334,14 +417,17 @@ namespace RestaurantManagementSystem.Controllers
                 CookingInstructions = recipe?.CookingInstructions ?? "",
                 PlatingInstructions = recipe?.PlatingInstructions ?? "",
                 Yield = recipe?.Yield ?? 1,
+                YieldPercentage = recipe?.YieldPercentage ?? 100,
                 PreparationTimeMinutes = recipe?.PreparationTimeMinutes ?? menuItem.PreparationTimeMinutes,
                 CookingTimeMinutes = recipe?.CookingTimeMinutes ?? 0,
                 Notes = recipe?.Notes ?? "",
                 IsArchived = recipe?.IsArchived ?? false,
                 Version = recipe?.Version ?? 1,
-                Steps = recipe?.Steps.OrderBy(s => s.StepNumber).Select(s => new RecipeStepViewModel
+                CreatedById = recipe?.CreatedById ?? 0,
+                Steps = recipe?.Steps?.OrderBy(s => s.StepNumber).Select(s => new RecipeStepViewModel
                 {
                     Id = s.Id,
+                    RecipeId = recipe.Id,
                     StepNumber = s.StepNumber,
                     Description = s.Description,
                     TimeRequiredMinutes = s.TimeRequiredMinutes,
@@ -408,11 +494,9 @@ namespace RestaurantManagementSystem.Controllers
                                 step.ImagePath = "/images/recipes/" + uniqueFileName;
                             }
                         }
-
-                        // Remove existing steps
+                        
+                        // Save steps
                         RemoveRecipeSteps(recipeId);
-
-                        // Add updated steps
                         AddRecipeSteps(recipeId, model.Steps);
                     }
 
@@ -431,7 +515,7 @@ namespace RestaurantManagementSystem.Controllers
             
             return View(model);
         }
-
+        
         // Helper methods for database operations
         private List<MenuItem> GetAllMenuItems()
         {
@@ -441,40 +525,108 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand("sp_GetAllMenuItems", connection))
-                {
-                    command.CommandType = System.Data.CommandType.StoredProcedure;
+                // Instead of using the stored procedure which may not have all columns,
+                // let's directly query the tables to ensure we get all columns
+                using (SqlCommand command = new SqlCommand(@"
+                    -- First, let's check if ItemType column exists
+                    DECLARE @ItemTypeExists INT = 0;
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    IF EXISTS (
+                        SELECT 1
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = 'MenuItems' 
+                        AND COLUMN_NAME = 'ItemType'
+                    )
+                    BEGIN
+                        SET @ItemTypeExists = 1;
+                    END
+                    
+                    -- Now build the dynamic query
+                    DECLARE @SqlQuery NVARCHAR(MAX);
+                    SET @SqlQuery = 'SELECT 
+                        m.[Id], 
+                        ISNULL(m.[PLUCode], '''') AS PLUCode,
+                        m.[Name], 
+                        m.[Description], 
+                        m.[Price], 
+                        m.[CategoryId], 
+                        c.[Name] AS CategoryName,
+                        m.[ImagePath], 
+                        m.[IsAvailable], 
+                        ISNULL(m.[PrepTime], 0) AS PreparationTimeMinutes,
+                        m.[CalorieCount],
+                        ISNULL(m.[IsFeatured], 0) AS IsFeatured,
+                        ISNULL(m.[IsSpecial], 0) AS IsSpecial,
+                        m.[DiscountPercentage],
+                        m.[KitchenStationId],
+                        m.[TargetGP]';
+                        
+                    -- Include ItemType if it exists
+                    IF @ItemTypeExists = 1
+                    BEGIN
+                        SET @SqlQuery = @SqlQuery + ', m.[ItemType]';
+                    END
+                    
+                    SET @SqlQuery = @SqlQuery + '
+                    FROM [dbo].[MenuItems] m
+                    INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
+                    ORDER BY m.[Name]';
+                    
+                    EXEC sp_executesql @SqlQuery;", connection))
+                {
+                    try
                     {
-                        while (reader.Read())
+                        using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            menuItems.Add(new MenuItem
+                            while (reader.Read())
                             {
-                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                                PLUCode = reader.GetString(reader.GetOrdinal("PLUCode")),
-                                Name = reader.GetString(reader.GetOrdinal("Name")),
-                                Description = reader.GetString(reader.GetOrdinal("Description")),
-                                Price = reader.GetDecimal(reader.GetOrdinal("Price")),
-                                CategoryId = reader.GetInt32(reader.GetOrdinal("CategoryId")),
-                                Category = new Category { Name = reader.GetString(reader.GetOrdinal("CategoryName")) },
-                                ImagePath = reader.IsDBNull(reader.GetOrdinal("ImagePath")) ? null : reader.GetString(reader.GetOrdinal("ImagePath")),
-                                IsAvailable = reader.GetBoolean(reader.GetOrdinal("IsAvailable")),
-                                PreparationTimeMinutes = reader.GetInt32(reader.GetOrdinal("PreparationTimeMinutes")),
-                                CalorieCount = reader.IsDBNull(reader.GetOrdinal("CalorieCount")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("CalorieCount")),
-                                IsFeatured = reader.GetBoolean(reader.GetOrdinal("IsFeatured")),
-                                IsSpecial = reader.GetBoolean(reader.GetOrdinal("IsSpecial")),
-                                DiscountPercentage = reader.IsDBNull(reader.GetOrdinal("DiscountPercentage")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("DiscountPercentage")),
-                                TargetGP = reader.IsDBNull(reader.GetOrdinal("TargetGP")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("TargetGP"))
-                            });
+                                try
+                                {
+                                    var menuItem = new MenuItem
+                                    {
+                                        Id = SafeGetInt(reader, "Id"),
+                                        PLUCode = SafeGetString(reader, "PLUCode") ?? string.Empty,
+                                        Name = SafeGetString(reader, "Name") ?? string.Empty,
+                                        Description = SafeGetString(reader, "Description") ?? string.Empty,
+                                        Price = SafeGetDecimal(reader, "Price"),
+                                        CategoryId = SafeGetInt(reader, "CategoryId"),
+                                        Category = new Category { Name = SafeGetString(reader, "CategoryName") ?? "Uncategorized" },
+                                        ImagePath = SafeGetString(reader, "ImagePath"),
+                                        IsAvailable = SafeGetBoolean(reader, "IsAvailable"),
+                                        PreparationTimeMinutes = SafeGetInt(reader, "PreparationTimeMinutes"),
+                                        CalorieCount = SafeGetNullableInt(reader, "CalorieCount"),
+                                        IsFeatured = SafeGetBoolean(reader, "IsFeatured"),
+                                        IsSpecial = SafeGetBoolean(reader, "IsSpecial"),
+                                        DiscountPercentage = SafeGetNullableDecimal(reader, "DiscountPercentage"),
+                                        KitchenStationId = SafeGetNullableInt(reader, "KitchenStationId"),
+                                        TargetGP = SafeGetNullableDecimal(reader, "TargetGP"),
+                                        ItemType = HasColumn(reader, "ItemType") ? SafeGetString(reader, "ItemType") : null,
+                                        Allergens = new List<MenuItemAllergen>(),
+                                        Ingredients = new List<MenuItemIngredient>(),
+                                        Modifiers = new List<MenuItemModifier>()
+                                    };
+                                    
+                                    menuItems.Add(menuItem);
+                                }
+                                catch (Exception ex)
+                                {
+                                    // Log the error but continue processing other records
+                                    Console.WriteLine($"Error processing menu item: {ex.Message}");
+                                }
+                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log the error
+                        Console.WriteLine($"Error retrieving menu items: {ex.Message}");
                     }
                 }
             }
             
             return menuItems;
         }
-
+        
         private MenuItem GetMenuItemById(int id)
         {
             MenuItem menuItem = null;
@@ -483,10 +635,28 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                // Get menu item details using stored procedure
-                using (SqlCommand command = new SqlCommand("sp_GetMenuItemById", connection))
+                using (SqlCommand command = new SqlCommand(@"
+                    SELECT 
+                        m.[Id], 
+                        m.[PLUCode], 
+                        m.[Name], 
+                        m.[Description], 
+                        m.[Price], 
+                        m.[CategoryId], 
+                        c.[Name] AS CategoryName,
+                        m.[ImagePath], 
+                        m.[IsAvailable], 
+                        m.[PrepTime] AS PreparationTimeMinutes,
+                        m.[CalorieCount],
+                        m.[IsFeatured],
+                        m.[IsSpecial],
+                        m.[DiscountPercentage],
+                        m.[KitchenStationId],
+                        m.[TargetGP]
+                    FROM [dbo].[MenuItems] m
+                    INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
+                    WHERE m.[Id] = @Id", connection))
                 {
-                    command.CommandType = System.Data.CommandType.StoredProcedure;
                     command.Parameters.AddWithValue("@Id", id);
                     
                     using (SqlDataReader reader = command.ExecuteReader())
@@ -495,21 +665,22 @@ namespace RestaurantManagementSystem.Controllers
                         {
                             menuItem = new MenuItem
                             {
-                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                                PLUCode = reader.GetString(reader.GetOrdinal("PLUCode")),
-                                Name = reader.GetString(reader.GetOrdinal("Name")),
-                                Description = reader.GetString(reader.GetOrdinal("Description")),
-                                Price = reader.GetDecimal(reader.GetOrdinal("Price")),
-                                CategoryId = reader.GetInt32(reader.GetOrdinal("CategoryId")),
-                                Category = new Category { Name = reader.GetString(reader.GetOrdinal("CategoryName")) },
-                                ImagePath = reader.IsDBNull(reader.GetOrdinal("ImagePath")) ? null : reader.GetString(reader.GetOrdinal("ImagePath")),
-                                IsAvailable = reader.GetBoolean(reader.GetOrdinal("IsAvailable")),
-                                PreparationTimeMinutes = reader.GetInt32(reader.GetOrdinal("PreparationTimeMinutes")),
-                                CalorieCount = reader.IsDBNull(reader.GetOrdinal("CalorieCount")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("CalorieCount")),
-                                IsFeatured = reader.GetBoolean(reader.GetOrdinal("IsFeatured")),
-                                IsSpecial = reader.GetBoolean(reader.GetOrdinal("IsSpecial")),
-                                DiscountPercentage = reader.IsDBNull(reader.GetOrdinal("DiscountPercentage")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("DiscountPercentage")),
-                                TargetGP = reader.IsDBNull(reader.GetOrdinal("TargetGP")) ? null : (decimal?)reader.GetDecimal(reader.GetOrdinal("TargetGP")),
+                                Id = SafeGetInt(reader, "Id"),
+                                PLUCode = SafeGetString(reader, "PLUCode") ?? string.Empty,
+                                Name = SafeGetString(reader, "Name") ?? string.Empty,
+                                Description = SafeGetString(reader, "Description") ?? string.Empty,
+                                Price = SafeGetDecimal(reader, "Price"),
+                                CategoryId = SafeGetInt(reader, "CategoryId"),
+                                Category = new Category { Name = SafeGetString(reader, "CategoryName") ?? "Uncategorized" },
+                                ImagePath = SafeGetString(reader, "ImagePath"),
+                                IsAvailable = SafeGetBoolean(reader, "IsAvailable"),
+                                PreparationTimeMinutes = SafeGetInt(reader, "PreparationTimeMinutes"),
+                                CalorieCount = SafeGetNullableInt(reader, "CalorieCount"),
+                                IsFeatured = SafeGetBoolean(reader, "IsFeatured"),
+                                IsSpecial = SafeGetBoolean(reader, "IsSpecial"),
+                                DiscountPercentage = SafeGetNullableDecimal(reader, "DiscountPercentage"),
+                                KitchenStationId = SafeGetNullableInt(reader, "KitchenStationId"),
+                                TargetGP = SafeGetNullableDecimal(reader, "TargetGP"),
                                 Allergens = new List<MenuItemAllergen>(),
                                 Ingredients = new List<MenuItemIngredient>(),
                                 Modifiers = new List<MenuItemModifier>()
@@ -521,83 +692,95 @@ namespace RestaurantManagementSystem.Controllers
                 if (menuItem != null)
                 {
                     // Get allergens
-                    using (SqlCommand command = new SqlCommand(@"
-                        SELECT mia.Id, mia.AllergenId, a.Name, mia.SeverityLevel
-                        FROM MenuItemAllergens mia
-                        JOIN Allergens a ON mia.AllergenId = a.Id
-                        WHERE mia.MenuItemId = @MenuItemId", connection))
-                    {
-                        command.Parameters.AddWithValue("@MenuItemId", id);
-                        
-                        using (SqlDataReader reader = command.ExecuteReader())
+                    try {
+                        using (SqlCommand command = new SqlCommand(@"
+                            SELECT mia.Id, mia.AllergenId, a.Name, mia.SeverityLevel
+                            FROM MenuItemAllergens mia
+                            JOIN Allergens a ON mia.AllergenId = a.Id
+                            WHERE mia.MenuItemId = @MenuItemId", connection))
                         {
-                            while (reader.Read())
+                            command.Parameters.AddWithValue("@MenuItemId", id);
+                            
+                            using (SqlDataReader reader = command.ExecuteReader())
                             {
-                                menuItem.Allergens.Add(new MenuItemAllergen
+                                while (reader.Read())
                                 {
-                                    Id = reader.GetInt32(0),
-                                    MenuItemId = id,
-                                    AllergenId = reader.GetInt32(1),
-                                    Allergen = new Allergen { Name = reader.GetString(2) },
-                                    SeverityLevel = reader.GetInt32(3)
-                                });
+                                    menuItem.Allergens.Add(new MenuItemAllergen
+                                    {
+                                        Id = SafeGetInt(reader, "Id"),
+                                        MenuItemId = id,
+                                        AllergenId = SafeGetInt(reader, "AllergenId"),
+                                        Allergen = new Allergen { Name = SafeGetString(reader, "Name") },
+                                        SeverityLevel = SafeGetInt(reader, "SeverityLevel")
+                                    });
+                                }
                             }
                         }
+                    } catch (Exception ex) {
+                        Console.WriteLine($"Error getting allergens: {ex.Message}");
                     }
                     
                     // Get ingredients
-                    using (SqlCommand command = new SqlCommand(@"
-                        SELECT mii.Id, mii.IngredientId, i.Name, mii.Quantity, mii.Unit, mii.IsOptional, mii.Instructions
-                        FROM MenuItemIngredients mii
-                        JOIN Ingredients i ON mii.IngredientId = i.Id
-                        WHERE mii.MenuItemId = @MenuItemId", connection))
-                    {
-                        command.Parameters.AddWithValue("@MenuItemId", id);
-                        
-                        using (SqlDataReader reader = command.ExecuteReader())
+                    try {
+                        using (SqlCommand command = new SqlCommand(@"
+                            SELECT mii.Id, mii.IngredientId, i.IngredientsName as Name, mii.Quantity, mii.Unit, mii.IsOptional, mii.Instructions
+                            FROM MenuItemIngredients mii
+                            JOIN Ingredients i ON mii.IngredientId = i.Id
+                            WHERE mii.MenuItemId = @MenuItemId", connection))
                         {
-                            while (reader.Read())
+                            command.Parameters.AddWithValue("@MenuItemId", id);
+                            
+                            using (SqlDataReader reader = command.ExecuteReader())
                             {
-                                menuItem.Ingredients.Add(new MenuItemIngredient
+                                while (reader.Read())
                                 {
-                                    Id = reader.GetInt32(0),
-                                    MenuItemId = id,
-                                    IngredientId = reader.GetInt32(1),
-                                    Ingredient = new Ingredients { IngredientsName = reader.GetString(2) },
-                                    Quantity = reader.GetDecimal(3),
-                                    Unit = reader.GetString(4),
-                                    IsOptional = reader.GetBoolean(5),
-                                    Instructions = reader.IsDBNull(6) ? null : reader.GetString(6)
-                                });
+                                    menuItem.Ingredients.Add(new MenuItemIngredient
+                                    {
+                                        Id = SafeGetInt(reader, "Id"),
+                                        MenuItemId = id,
+                                        IngredientId = SafeGetInt(reader, "IngredientId"),
+                                        Ingredient = new Ingredients { IngredientsName = SafeGetString(reader, "Name") },
+                                        Quantity = SafeGetDecimal(reader, "Quantity"),
+                                        Unit = SafeGetString(reader, "Unit") ?? "",
+                                        IsOptional = SafeGetBoolean(reader, "IsOptional"),
+                                        Instructions = SafeGetString(reader, "Instructions")
+                                    });
+                                }
                             }
                         }
+                    } catch (Exception ex) {
+                        Console.WriteLine($"Error getting ingredients: {ex.Message}");
                     }
                     
                     // Get modifiers
-                    using (SqlCommand command = new SqlCommand(@"
-                        SELECT mim.Id, mim.ModifierId, m.Name, mim.PriceAdjustment, mim.IsDefault, mim.MaxAllowed
-                        FROM MenuItemModifiers mim
-                        JOIN Modifiers m ON mim.ModifierId = m.Id
-                        WHERE mim.MenuItemId = @MenuItemId", connection))
-                    {
-                        command.Parameters.AddWithValue("@MenuItemId", id);
-                        
-                        using (SqlDataReader reader = command.ExecuteReader())
+                    try {
+                        using (SqlCommand command = new SqlCommand(@"
+                            SELECT mim.Id, mim.ModifierId, m.Name, mim.PriceAdjustment, mim.IsDefault, mim.MaxAllowed
+                            FROM MenuItemModifiers mim
+                            JOIN Modifiers m ON mim.ModifierId = m.Id
+                            WHERE mim.MenuItemId = @MenuItemId", connection))
                         {
-                            while (reader.Read())
+                            command.Parameters.AddWithValue("@MenuItemId", id);
+                            
+                            using (SqlDataReader reader = command.ExecuteReader())
                             {
-                                menuItem.Modifiers.Add(new MenuItemModifier
+                                while (reader.Read())
                                 {
-                                    Id = reader.GetInt32(0),
-                                    MenuItemId = id,
-                                    ModifierId = reader.GetInt32(1),
-                                    Modifier = new Modifier { Name = reader.GetString(2) },
-                                    PriceAdjustment = reader.GetDecimal(3),
-                                    IsDefault = reader.GetBoolean(4),
-                                    MaxAllowed = reader.IsDBNull(5) ? null : (int?)reader.GetInt32(5)
-                                });
+                                    menuItem.Modifiers.Add(new MenuItemModifier
+                                    {
+                                        Id = SafeGetInt(reader, "Id"),
+                                        MenuItemId = id,
+                                        ModifierId = SafeGetInt(reader, "ModifierId"),
+                                        Modifier = new Modifier { Name = SafeGetString(reader, "Name") },
+                                        PriceAdjustment = SafeGetDecimal(reader, "PriceAdjustment"),
+                                        IsDefault = SafeGetBoolean(reader, "IsDefault"),
+                                        MaxAllowed = SafeGetNullableInt(reader, "MaxAllowed")
+                                    });
+                                }
                             }
                         }
+                    } catch (Exception ex) {
+                        Console.WriteLine($"Error getting modifiers: {ex.Message}");
                     }
                 }
             }
@@ -607,7 +790,7 @@ namespace RestaurantManagementSystem.Controllers
 
         private int CreateMenuItem(MenuItemViewModel model)
         {
-            int menuItemId;
+            int menuItemId = 0;
             
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
@@ -615,7 +798,7 @@ namespace RestaurantManagementSystem.Controllers
                 
                 using (SqlCommand command = new SqlCommand(@"
                     INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
-                                          IsAvailable, PreparationTimeMinutes, CalorieCount, 
+                                          IsAvailable, PrepTime, CalorieCount, 
                                           IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId)
                     VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @ImagePath,
                             @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
@@ -654,7 +837,8 @@ namespace RestaurantManagementSystem.Controllers
                     else
                         command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
                     
-                    menuItemId = Convert.ToInt32(command.ExecuteScalar());
+                    var result = command.ExecuteScalar();
+                    menuItemId = Convert.ToInt32(result);
                 }
             }
             
@@ -670,14 +854,22 @@ namespace RestaurantManagementSystem.Controllers
                 using (SqlCommand command = new SqlCommand(@"
                     UPDATE MenuItems
                     SET Name = @Name,
+                        PLUCode = @PLUCode,
                         Description = @Description,
                         Price = @Price,
                         CategoryId = @CategoryId,
                         ImagePath = @ImagePath,
-                        IsAvailable = @IsAvailable
+                        IsAvailable = @IsAvailable,
+                        PrepTime = @PreparationTimeMinutes,
+                        CalorieCount = @CalorieCount,
+                        IsFeatured = @IsFeatured,
+                        IsSpecial = @IsSpecial,
+                        DiscountPercentage = @DiscountPercentage,
+                        KitchenStationId = @KitchenStationId
                     WHERE Id = @Id", connection))
                 {
                     command.Parameters.AddWithValue("@Id", model.Id);
+                    command.Parameters.AddWithValue("@PLUCode", model.PLUCode ?? string.Empty);
                     command.Parameters.AddWithValue("@Name", model.Name);
                     command.Parameters.AddWithValue("@Description", model.Description);
                     command.Parameters.AddWithValue("@Price", model.Price);
@@ -689,6 +881,25 @@ namespace RestaurantManagementSystem.Controllers
                         command.Parameters.AddWithValue("@ImagePath", DBNull.Value);
                     
                     command.Parameters.AddWithValue("@IsAvailable", model.IsAvailable);
+                    command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
+                    
+                    if (model.CalorieCount.HasValue)
+                        command.Parameters.AddWithValue("@CalorieCount", model.CalorieCount);
+                    else
+                        command.Parameters.AddWithValue("@CalorieCount", DBNull.Value);
+                        
+                    command.Parameters.AddWithValue("@IsFeatured", model.IsFeatured);
+                    command.Parameters.AddWithValue("@IsSpecial", model.IsSpecial);
+                    
+                    if (model.DiscountPercentage.HasValue)
+                        command.Parameters.AddWithValue("@DiscountPercentage", model.DiscountPercentage);
+                    else
+                        command.Parameters.AddWithValue("@DiscountPercentage", DBNull.Value);
+                        
+                    if (model.KitchenStationId.HasValue)
+                        command.Parameters.AddWithValue("@KitchenStationId", model.KitchenStationId);
+                    else
+                        command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
                     
                     command.ExecuteNonQuery();
                 }
@@ -701,11 +912,45 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
-                    DELETE FROM MenuItems WHERE Id = @Id", connection))
+                using (var transaction = connection.BeginTransaction())
                 {
-                    command.Parameters.AddWithValue("@Id", id);
-                    command.ExecuteNonQuery();
+                    try
+                    {
+                        // Delete allergens
+                        using (SqlCommand command = new SqlCommand("DELETE FROM MenuItemAllergens WHERE MenuItemId = @MenuItemId", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@MenuItemId", id);
+                            command.ExecuteNonQuery();
+                        }
+
+                        // Delete ingredients
+                        using (SqlCommand command = new SqlCommand("DELETE FROM MenuItemIngredients WHERE MenuItemId = @MenuItemId", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@MenuItemId", id);
+                            command.ExecuteNonQuery();
+                        }
+
+                        // Delete modifiers
+                        using (SqlCommand command = new SqlCommand("DELETE FROM MenuItemModifiers WHERE MenuItemId = @MenuItemId", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@MenuItemId", id);
+                            command.ExecuteNonQuery();
+                        }
+
+                        // Delete menu item
+                        using (SqlCommand command = new SqlCommand("DELETE FROM MenuItems WHERE Id = @Id", connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@Id", id);
+                            command.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
                 }
             }
         }
@@ -807,20 +1052,23 @@ namespace RestaurantManagementSystem.Controllers
                 
                 foreach (var modifierId in modifierIds)
                 {
-                    decimal priceAdjustment = 0;
-                    if (modifierPrices != null && modifierPrices.ContainsKey(modifierId))
-                    {
-                        priceAdjustment = modifierPrices[modifierId];
-                    }
-                    
                     using (SqlCommand command = new SqlCommand(@"
-                        INSERT INTO MenuItemModifiers (MenuItemId, ModifierId, PriceAdjustment, IsDefault)
-                        VALUES (@MenuItemId, @ModifierId, @PriceAdjustment, @IsDefault)", connection))
+                        INSERT INTO MenuItemModifiers (MenuItemId, ModifierId, PriceAdjustment, IsDefault, MaxAllowed)
+                        VALUES (@MenuItemId, @ModifierId, @PriceAdjustment, @IsDefault, @MaxAllowed)", connection))
                     {
                         command.Parameters.AddWithValue("@MenuItemId", menuItemId);
                         command.Parameters.AddWithValue("@ModifierId", modifierId);
+                        
+                        decimal priceAdjustment = 0;
+                        if (modifierPrices != null && modifierPrices.ContainsKey(modifierId))
+                        {
+                            priceAdjustment = modifierPrices[modifierId];
+                        }
                         command.Parameters.AddWithValue("@PriceAdjustment", priceAdjustment);
+                        
                         command.Parameters.AddWithValue("@IsDefault", false); // Default value
+                        command.Parameters.AddWithValue("@MaxAllowed", DBNull.Value);
+                        
                         command.ExecuteNonQuery();
                     }
                 }
@@ -850,13 +1098,72 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                // Get recipe details
+                try
+                {
+                    // First try with stored procedure
+                    using (SqlCommand command = new SqlCommand("sp_GetRecipeByMenuItemId", connection))
+                    {
+                        command.CommandType = System.Data.CommandType.StoredProcedure;
+                        command.Parameters.AddWithValue("@MenuItemId", menuItemId);
+                        
+                        try
+                        {
+                            using (SqlDataReader reader = command.ExecuteReader())
+                            {
+                                if (reader.Read())
+                                {
+                                    recipe = new Recipe
+                                    {
+                                        Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                        MenuItemId = menuItemId,
+                                        Title = reader.GetString(reader.GetOrdinal("Title")),
+                                        PreparationInstructions = reader.GetString(reader.GetOrdinal("PreparationInstructions")),
+                                        CookingInstructions = reader.GetString(reader.GetOrdinal("CookingInstructions")),
+                                        PlatingInstructions = reader.IsDBNull(reader.GetOrdinal("PlatingInstructions")) ? null : reader.GetString(reader.GetOrdinal("PlatingInstructions")),
+                                        Yield = reader.GetInt32(reader.GetOrdinal("Yield")),
+                                        YieldPercentage = reader.GetDecimal(reader.GetOrdinal("YieldPercentage")),
+                                        PreparationTimeMinutes = reader.GetInt32(reader.GetOrdinal("PreparationTimeMinutes")),
+                                        CookingTimeMinutes = reader.GetInt32(reader.GetOrdinal("CookingTimeMinutes")),
+                                        Notes = reader.IsDBNull(reader.GetOrdinal("Notes")) ? null : reader.GetString(reader.GetOrdinal("Notes")),
+                                        IsArchived = reader.GetBoolean(reader.GetOrdinal("IsArchived")),
+                                        Version = reader.GetInt32(reader.GetOrdinal("Version")),
+                                        CreatedById = reader.IsDBNull(reader.GetOrdinal("CreatedById")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("CreatedById")),
+                                        Steps = new List<RecipeStep>()
+                                    };
+                                    return recipe;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Fallback to direct SQL query
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fallback to direct SQL query
+                }
+                
+                // Direct SQL query as fallback
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT r.Id, r.Title, r.PreparationInstructions, r.CookingInstructions, 
-                           r.PlatingInstructions, r.Yield, r.PreparationTimeMinutes, r.CookingTimeMinutes,
-                           r.LastUpdated, r.CreatedById, r.Notes, r.IsArchived, r.Version
-                    FROM Recipes r
-                    WHERE r.MenuItemId = @MenuItemId", connection))
+                    SELECT 
+                        r.[Id], 
+                        r.[Title], 
+                        r.[MenuItemId], 
+                        r.[PreparationInstructions],
+                        r.[CookingInstructions],
+                        r.[PlatingInstructions],
+                        r.[Yield],
+                        r.[YieldPercentage],
+                        r.[PreparationTimeMinutes],
+                        r.[CookingTimeMinutes],
+                        r.[Notes],
+                        r.[IsArchived],
+                        r.[Version],
+                        r.[CreatedById]
+                    FROM [dbo].[Recipes] r
+                    WHERE r.[MenuItemId] = @MenuItemId", connection))
                 {
                     command.Parameters.AddWithValue("@MenuItemId", menuItemId);
                     
@@ -866,20 +1173,20 @@ namespace RestaurantManagementSystem.Controllers
                         {
                             recipe = new Recipe
                             {
-                                Id = reader.GetInt32(0),
+                                Id = SafeGetInt(reader, "Id"),
+                                Title = SafeGetString(reader, "Title"),
                                 MenuItemId = menuItemId,
-                                Title = reader.GetString(1),
-                                PreparationInstructions = reader.GetString(2),
-                                CookingInstructions = reader.GetString(3),
-                                PlatingInstructions = reader.IsDBNull(4) ? null : reader.GetString(4),
-                                Yield = reader.GetInt32(5),
-                                PreparationTimeMinutes = reader.GetInt32(6),
-                                CookingTimeMinutes = reader.GetInt32(7),
-                                LastUpdated = reader.GetDateTime(8),
-                                CreatedById = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
-                                Notes = reader.IsDBNull(10) ? null : reader.GetString(10),
-                                IsArchived = reader.GetBoolean(11),
-                                Version = reader.GetInt32(12),
+                                PreparationInstructions = SafeGetString(reader, "PreparationInstructions"),
+                                CookingInstructions = SafeGetString(reader, "CookingInstructions"),
+                                PlatingInstructions = SafeGetString(reader, "PlatingInstructions"),
+                                Yield = SafeGetInt(reader, "Yield"),
+                                YieldPercentage = HasColumn(reader, "YieldPercentage") ? SafeGetDecimal(reader, "YieldPercentage") : 100,
+                                PreparationTimeMinutes = SafeGetInt(reader, "PreparationTimeMinutes"),
+                                CookingTimeMinutes = SafeGetInt(reader, "CookingTimeMinutes"),
+                                Notes = SafeGetString(reader, "Notes"),
+                                IsArchived = SafeGetBoolean(reader, "IsArchived"),
+                                Version = SafeGetInt(reader, "Version"),
+                                CreatedById = HasColumn(reader, "CreatedById") ? SafeGetNullableInt(reader, "CreatedById") : null,
                                 Steps = new List<RecipeStep>()
                             };
                         }
@@ -890,11 +1197,19 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     // Get recipe steps
                     using (SqlCommand command = new SqlCommand(@"
-                        SELECT rs.Id, rs.StepNumber, rs.Description, rs.TimeRequiredMinutes, 
-                               rs.Temperature, rs.SpecialEquipment, rs.Tips, rs.ImagePath
-                        FROM RecipeSteps rs
-                        WHERE rs.RecipeId = @RecipeId
-                        ORDER BY rs.StepNumber", connection))
+                        SELECT 
+                            rs.[Id],
+                            rs.[RecipeId],
+                            rs.[StepNumber],
+                            rs.[Description],
+                            rs.[TimeRequiredMinutes],
+                            rs.[Temperature],
+                            rs.[SpecialEquipment],
+                            rs.[Tips],
+                            rs.[ImagePath]
+                        FROM [dbo].[RecipeSteps] rs
+                        WHERE rs.[RecipeId] = @RecipeId
+                        ORDER BY rs.[StepNumber]", connection))
                     {
                         command.Parameters.AddWithValue("@RecipeId", recipe.Id);
                         
@@ -904,15 +1219,15 @@ namespace RestaurantManagementSystem.Controllers
                             {
                                 recipe.Steps.Add(new RecipeStep
                                 {
-                                    Id = reader.GetInt32(0),
+                                    Id = SafeGetInt(reader, "Id"),
                                     RecipeId = recipe.Id,
-                                    StepNumber = reader.GetInt32(1),
-                                    Description = reader.GetString(2),
-                                    TimeRequiredMinutes = reader.IsDBNull(3) ? null : (int?)reader.GetInt32(3),
-                                    Temperature = reader.IsDBNull(4) ? null : reader.GetString(4),
-                                    SpecialEquipment = reader.IsDBNull(5) ? null : reader.GetString(5),
-                                    Tips = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                    ImagePath = reader.IsDBNull(7) ? null : reader.GetString(7)
+                                    StepNumber = SafeGetInt(reader, "StepNumber"),
+                                    Description = SafeGetString(reader, "Description"),
+                                    TimeRequiredMinutes = SafeGetNullableInt(reader, "TimeRequiredMinutes"),
+                                    Temperature = SafeGetString(reader, "Temperature"),
+                                    SpecialEquipment = SafeGetString(reader, "SpecialEquipment"),
+                                    Tips = SafeGetString(reader, "Tips"),
+                                    ImagePath = SafeGetString(reader, "ImagePath")
                                 });
                             }
                         }
@@ -925,25 +1240,25 @@ namespace RestaurantManagementSystem.Controllers
 
         private int CreateRecipe(RecipeViewModel model)
         {
-            int recipeId;
+            int recipeId = 0;
             
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    INSERT INTO Recipes (MenuItemId, Title, PreparationInstructions, CookingInstructions,
-                                        PlatingInstructions, Yield, PreparationTimeMinutes, CookingTimeMinutes,
-                                        LastUpdated, CreatedById, Notes, IsArchived, Version)
-                    VALUES (@MenuItemId, @Title, @PreparationInstructions, @CookingInstructions,
-                            @PlatingInstructions, @Yield, @PreparationTimeMinutes, @CookingTimeMinutes,
-                            GETDATE(), @CreatedById, @Notes, @IsArchived, @Version);
+                    INSERT INTO Recipes (Title, MenuItemId, PreparationInstructions, CookingInstructions,
+                                         PlatingInstructions, Yield, YieldPercentage, PreparationTimeMinutes, CookingTimeMinutes,
+                                         Notes, IsArchived, Version, CreatedById, LastUpdated)
+                    VALUES (@Title, @MenuItemId, @PreparationInstructions, @CookingInstructions,
+                            @PlatingInstructions, @Yield, @YieldPercentage, @PreparationTimeMinutes, @CookingTimeMinutes,
+                            @Notes, @IsArchived, @Version, @CreatedById, @LastUpdated);
                     SELECT SCOPE_IDENTITY();", connection))
                 {
-                    command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
                     command.Parameters.AddWithValue("@Title", model.Title);
-                    command.Parameters.AddWithValue("@PreparationInstructions", model.PreparationInstructions);
-                    command.Parameters.AddWithValue("@CookingInstructions", model.CookingInstructions);
+                    command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
+                    command.Parameters.AddWithValue("@PreparationInstructions", model.PreparationInstructions ?? "");
+                    command.Parameters.AddWithValue("@CookingInstructions", model.CookingInstructions ?? "");
                     
                     if (!string.IsNullOrEmpty(model.PlatingInstructions))
                         command.Parameters.AddWithValue("@PlatingInstructions", model.PlatingInstructions);
@@ -951,11 +1266,9 @@ namespace RestaurantManagementSystem.Controllers
                         command.Parameters.AddWithValue("@PlatingInstructions", DBNull.Value);
                     
                     command.Parameters.AddWithValue("@Yield", model.Yield);
+                    command.Parameters.AddWithValue("@YieldPercentage", model.YieldPercentage);
                     command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
                     command.Parameters.AddWithValue("@CookingTimeMinutes", model.CookingTimeMinutes);
-                    
-                    // CreatedById is now an int instead of int?
-                    command.Parameters.AddWithValue("@CreatedById", model.CreatedById);
                     
                     if (!string.IsNullOrEmpty(model.Notes))
                         command.Parameters.AddWithValue("@Notes", model.Notes);
@@ -965,7 +1278,15 @@ namespace RestaurantManagementSystem.Controllers
                     command.Parameters.AddWithValue("@IsArchived", model.IsArchived);
                     command.Parameters.AddWithValue("@Version", model.Version);
                     
-                    recipeId = Convert.ToInt32(command.ExecuteScalar());
+                    if (model.CreatedById > 0)
+                        command.Parameters.AddWithValue("@CreatedById", model.CreatedById);
+                    else
+                        command.Parameters.AddWithValue("@CreatedById", DBNull.Value);
+                    
+                    command.Parameters.AddWithValue("@LastUpdated", DateTime.Now);
+                    
+                    var result = command.ExecuteScalar();
+                    recipeId = Convert.ToInt32(result);
                 }
             }
             
@@ -985,18 +1306,19 @@ namespace RestaurantManagementSystem.Controllers
                         CookingInstructions = @CookingInstructions,
                         PlatingInstructions = @PlatingInstructions,
                         Yield = @Yield,
+                        YieldPercentage = @YieldPercentage,
                         PreparationTimeMinutes = @PreparationTimeMinutes,
                         CookingTimeMinutes = @CookingTimeMinutes,
-                        LastUpdated = GETDATE(),
                         Notes = @Notes,
                         IsArchived = @IsArchived,
-                        Version = @Version
+                        Version = @Version,
+                        LastUpdated = @LastUpdated
                     WHERE Id = @Id", connection))
                 {
                     command.Parameters.AddWithValue("@Id", model.Id);
                     command.Parameters.AddWithValue("@Title", model.Title);
-                    command.Parameters.AddWithValue("@PreparationInstructions", model.PreparationInstructions);
-                    command.Parameters.AddWithValue("@CookingInstructions", model.CookingInstructions);
+                    command.Parameters.AddWithValue("@PreparationInstructions", model.PreparationInstructions ?? "");
+                    command.Parameters.AddWithValue("@CookingInstructions", model.CookingInstructions ?? "");
                     
                     if (!string.IsNullOrEmpty(model.PlatingInstructions))
                         command.Parameters.AddWithValue("@PlatingInstructions", model.PlatingInstructions);
@@ -1004,6 +1326,7 @@ namespace RestaurantManagementSystem.Controllers
                         command.Parameters.AddWithValue("@PlatingInstructions", DBNull.Value);
                     
                     command.Parameters.AddWithValue("@Yield", model.Yield);
+                    command.Parameters.AddWithValue("@YieldPercentage", model.YieldPercentage);
                     command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
                     command.Parameters.AddWithValue("@CookingTimeMinutes", model.CookingTimeMinutes);
                     
@@ -1014,6 +1337,7 @@ namespace RestaurantManagementSystem.Controllers
                     
                     command.Parameters.AddWithValue("@IsArchived", model.IsArchived);
                     command.Parameters.AddWithValue("@Version", model.Version);
+                    command.Parameters.AddWithValue("@LastUpdated", DateTime.Now);
                     
                     command.ExecuteNonQuery();
                 }
@@ -1035,14 +1359,14 @@ namespace RestaurantManagementSystem.Controllers
                         INSERT INTO RecipeSteps (RecipeId, StepNumber, Description, TimeRequiredMinutes,
                                                Temperature, SpecialEquipment, Tips, ImagePath)
                         VALUES (@RecipeId, @StepNumber, @Description, @TimeRequiredMinutes,
-                                @Temperature, @SpecialEquipment, @Tips, @ImagePath)", connection))
+                               @Temperature, @SpecialEquipment, @Tips, @ImagePath)", connection))
                     {
                         command.Parameters.AddWithValue("@RecipeId", recipeId);
                         command.Parameters.AddWithValue("@StepNumber", step.StepNumber);
-                        command.Parameters.AddWithValue("@Description", step.Description);
+                        command.Parameters.AddWithValue("@Description", step.Description ?? "");
                         
                         if (step.TimeRequiredMinutes.HasValue)
-                            command.Parameters.AddWithValue("@TimeRequiredMinutes", step.TimeRequiredMinutes.Value);
+                            command.Parameters.AddWithValue("@TimeRequiredMinutes", step.TimeRequiredMinutes);
                         else
                             command.Parameters.AddWithValue("@TimeRequiredMinutes", DBNull.Value);
                         
@@ -1086,8 +1410,6 @@ namespace RestaurantManagementSystem.Controllers
                 }
             }
         }
-
-        // Helper methods for dropdown lists
         private List<SelectListItem> GetCategorySelectList()
         {
             var categories = new List<SelectListItem>();
@@ -1097,7 +1419,7 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, Name 
+                    SELECT Id, Name
                     FROM Categories
                     ORDER BY Name", connection))
                 {
@@ -1127,7 +1449,7 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, Name, Description, IconPath
+                    SELECT Id, Name, Description
                     FROM Allergens
                     ORDER BY Name", connection))
                 {
@@ -1139,8 +1461,7 @@ namespace RestaurantManagementSystem.Controllers
                             {
                                 Id = reader.GetInt32(0),
                                 Name = reader.GetString(1),
-                                Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-                                IconPath = reader.IsDBNull(3) ? null : reader.GetString(3)
+                                Description = !reader.IsDBNull(2) ? reader.GetString(2) : null
                             });
                         }
                     }
@@ -1159,7 +1480,7 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, IngredientsName
+                    SELECT Id, IngredientsName, DisplayName
                     FROM Ingredients
                     ORDER BY IngredientsName", connection))
                 {
@@ -1170,7 +1491,9 @@ namespace RestaurantManagementSystem.Controllers
                             ingredients.Add(new SelectListItem
                             {
                                 Value = reader.GetInt32(0).ToString(),
-                                Text = reader.GetString(1)
+                                Text = !reader.IsDBNull(2) && !string.IsNullOrEmpty(reader.GetString(2)) 
+                                    ? reader.GetString(2) 
+                                    : reader.GetString(1)
                             });
                         }
                     }
@@ -1184,31 +1507,35 @@ namespace RestaurantManagementSystem.Controllers
         {
             var modifiers = new List<Modifier>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                connection.Open();
-                
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, Name, Price, IsDefault
-                    FROM Modifiers
-                    ORDER BY Name", connection))
+                using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    connection.Open();
+                    
+                    using (SqlCommand command = new SqlCommand(@"
+                        SELECT Id, Name, Description
+                        FROM Modifiers
+                        ORDER BY Name", connection))
                     {
-                        while (reader.Read())
+                        using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            modifiers.Add(new Modifier
+                            while (reader.Read())
                             {
-                                Id = reader.GetInt32(0),
-                                Name = reader.GetString(1),
-                                // Setting default values for the properties not in the database
-                                Description = "Standard modifier",
-                                ModifierType = "Addition",
-                                IsActive = true
-                            });
+                                modifiers.Add(new Modifier
+                                {
+                                    Id = SafeGetInt(reader, "Id"),
+                                    Name = SafeGetString(reader, "Name"),
+                                    Description = SafeGetString(reader, "Description")
+                                });
+                            }
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting modifiers: {ex.Message}");
             }
             
             return modifiers;
@@ -1216,65 +1543,58 @@ namespace RestaurantManagementSystem.Controllers
 
         private List<SelectListItem> GetKitchenStationSelectList()
         {
-            var kitchenStations = new List<SelectListItem>();
+            var stations = new List<SelectListItem>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                connection.Open();
-                
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT Id, Name
-                    FROM KitchenStations
-                    ORDER BY Name", connection))
+                using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    connection.Open();
+                    
+                    using (SqlCommand command = new SqlCommand(@"
+                        SELECT Id, Name
+                        FROM KitchenStations
+                        ORDER BY Name", connection))
                     {
-                        while (reader.Read())
+                        using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            kitchenStations.Add(new SelectListItem
+                            while (reader.Read())
                             {
-                                Value = reader.GetInt32(0).ToString(),
-                                Text = reader.GetString(1)
-                            });
+                                stations.Add(new SelectListItem
+                                {
+                                    Value = SafeGetInt(reader, "Id").ToString(),
+                                    Text = SafeGetString(reader, "Name")
+                                });
+                            }
                         }
                     }
                 }
             }
-            
-            return kitchenStations;
-        }
-
-        // Convert ViewModels to Models for ingredient list
-        private List<Models.MenuItemIngredientViewModel> ConvertIngredientsViewModelToModel(List<ViewModels.MenuItemIngredientViewModel> viewModelIngredients)
-        {
-            var modelIngredients = new List<Models.MenuItemIngredientViewModel>();
-            
-            foreach (var ingredient in viewModelIngredients)
+            catch (Exception ex)
             {
-                modelIngredients.Add(new Models.MenuItemIngredientViewModel
+                Console.WriteLine($"Error getting kitchen stations: {ex.Message}");
+                // Add an empty selection in case of error
+                stations.Add(new SelectListItem
                 {
-                    IngredientId = ingredient.IngredientId,
-                    Quantity = ingredient.Quantity,
-                    Unit = ingredient.Unit,
-                    IsOptional = ingredient.IsOptional,
-                    Instructions = ingredient.Instructions
+                    Value = "",
+                    Text = "-- Select Station --"
                 });
             }
             
-            return modelIngredients;
+            return stations;
         }
 
-        // Convert Models to ViewModels for ingredient list
-        private ViewModels.MenuItemIngredientViewModel ConvertToViewModelMenuItemIngredient(Models.MenuItemIngredientViewModel modelIngredient)
+        private List<ModelsMenuItemIngredientViewModel> ConvertIngredientsViewModelToModel(
+            List<ViewModelsMenuItemIngredientViewModel> viewModelIngredients)
         {
-            return new ViewModels.MenuItemIngredientViewModel
+            return viewModelIngredients.Select(i => new ModelsMenuItemIngredientViewModel
             {
-                IngredientId = modelIngredient.IngredientId,
-                Quantity = modelIngredient.Quantity,
-                Unit = modelIngredient.Unit,
-                IsOptional = modelIngredient.IsOptional,
-                Instructions = modelIngredient.Instructions
-            };
+                IngredientId = i.IngredientId,
+                Quantity = i.Quantity,
+                Unit = i.Unit,
+                IsOptional = i.IsOptional,
+                Instructions = i.Instructions
+            }).ToList();
         }
     }
 }

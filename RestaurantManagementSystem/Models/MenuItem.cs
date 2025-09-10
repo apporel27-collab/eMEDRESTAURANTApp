@@ -61,6 +61,9 @@ namespace RestaurantManagementSystem.Models
         [Range(0, 90, ErrorMessage = "Target GP % must be between 0% and 90%")]
         public decimal? TargetGP { get; set; }
         
+        [Display(Name = "Item Type")]
+        public string ItemType { get; set; }
+        
         // Navigation properties
         public virtual ICollection<MenuItemAllergen> Allergens { get; set; } = new List<MenuItemAllergen>();
         public virtual ICollection<MenuItemIngredient> Ingredients { get; set; } = new List<MenuItemIngredient>();

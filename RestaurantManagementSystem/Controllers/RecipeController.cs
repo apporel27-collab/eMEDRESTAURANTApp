@@ -30,6 +30,13 @@ namespace RestaurantManagementSystem.Controllers
             var recipes = GetAllRecipes();
             return View(recipes);
         }
+        
+        // GET: Recipe/Dashboard
+        public IActionResult Dashboard()
+        {
+            var recipes = GetAllRecipes();
+            return View(recipes);
+        }
 
         // GET: Recipe/Details/5
         public IActionResult Details(int id)
@@ -571,48 +578,100 @@ namespace RestaurantManagementSystem.Controllers
             return ingredients;
         }
         
+        // Helper method to execute SQL script files
+        private void ExecuteScriptFile(string fileName)
+        {
+            try
+            {
+                string scriptPath = Path.Combine(_webHostEnvironment.ContentRootPath, "SQL", fileName);
+                if (System.IO.File.Exists(scriptPath))
+                {
+                    string script = System.IO.File.ReadAllText(scriptPath);
+                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    {
+                        connection.Open();
+                        
+                        // Split the script by GO statements if needed
+                        foreach (string batch in script.Split(new[] { "GO" }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            if (!string.IsNullOrWhiteSpace(batch))
+                            {
+                                using (SqlCommand command = new SqlCommand(batch, connection))
+                                {
+                                    try
+                                    {
+                                        command.ExecuteNonQuery();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"Error executing script {fileName}: {ex.Message}");
+                                        // Continue with next batch even if this one fails
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Script file not found: {scriptPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in ExecuteScriptFile: {ex.Message}");
+            }
+        }
+
         private List<Recipe> GetAllRecipes()
         {
             List<Recipe> recipes = new List<Recipe>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                connection.Open();
+                // First, ensure stored procedures are available
+                ExecuteScriptFile("create_sp_GetAllRecipes.sql");
+                ExecuteScriptFile("update_sp_GetAllRecipes.sql");
                 
-                using (SqlCommand command = new SqlCommand("sp_GetAllRecipes", connection))
+                using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
-                    command.CommandType = System.Data.CommandType.StoredProcedure;
+                    connection.Open();
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (SqlCommand command = new SqlCommand("sp_GetAllRecipes", connection))
                     {
-                        while (reader.Read())
+                        command.CommandType = System.Data.CommandType.StoredProcedure;
+                        
+                        using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            Recipe recipe = new Recipe
+                            while (reader.Read())
                             {
-                                Id = reader.GetInt32(0),
-                                MenuItemId = reader.GetInt32(1),
-                                Title = reader.GetString(3),
-                                PreparationInstructions = reader.IsDBNull(4) ? null : reader.GetString(4),
-                                CookingInstructions = reader.IsDBNull(5) ? null : reader.GetString(5),
-                                PlatingInstructions = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                Yield = reader.GetInt32(7),
-                                YieldPercentage = reader.GetDecimal(8),
-                                PreparationTimeMinutes = reader.GetInt32(9),
-                                CookingTimeMinutes = reader.GetInt32(10),
-                                LastUpdated = reader.GetDateTime(11),
-                                Notes = reader.IsDBNull(12) ? null : reader.GetString(12),
-                                IsArchived = reader.GetBoolean(13),
-                                Version = reader.GetInt32(14),
-                                MenuItem = new MenuItem { 
-                                    Id = reader.GetInt32(1),
-                                    Name = reader.GetString(2) 
-                                }
-                            };
-                            
-                            recipes.Add(recipe);
+                                recipes.Add(new Recipe
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                    MenuItemId = reader.GetInt32(reader.GetOrdinal("MenuItemId")),
+                                    Title = reader.GetString(reader.GetOrdinal("Title")),
+                                    PreparationInstructions = reader.IsDBNull(reader.GetOrdinal("PreparationInstructions")) ? null : reader.GetString(reader.GetOrdinal("PreparationInstructions")),
+                                    CookingInstructions = reader.IsDBNull(reader.GetOrdinal("CookingInstructions")) ? null : reader.GetString(reader.GetOrdinal("CookingInstructions")),
+                                    PlatingInstructions = reader.IsDBNull(reader.GetOrdinal("PlatingInstructions")) ? null : reader.GetString(reader.GetOrdinal("PlatingInstructions")),
+                                    Yield = reader.GetInt32(reader.GetOrdinal("Yield")),
+                                    YieldPercentage = reader.GetDecimal(reader.GetOrdinal("YieldPercentage")),
+                                    PreparationTimeMinutes = reader.GetInt32(reader.GetOrdinal("PreparationTimeMinutes")),
+                                    CookingTimeMinutes = reader.GetInt32(reader.GetOrdinal("CookingTimeMinutes")),
+                                    LastUpdated = reader.GetDateTime(reader.GetOrdinal("LastUpdated")),
+                                    Notes = reader.IsDBNull(reader.GetOrdinal("Notes")) ? null : reader.GetString(reader.GetOrdinal("Notes")),
+                                    IsArchived = reader.GetBoolean(reader.GetOrdinal("IsArchived")),
+                                    Version = reader.GetInt32(reader.GetOrdinal("Version")),
+                                    MenuItemName = reader.GetString(reader.GetOrdinal("MenuItemName"))
+                                });
+                            }
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error retrieving recipes: {ex.Message}");
+                // Log the error or display it
             }
             
             return recipes;

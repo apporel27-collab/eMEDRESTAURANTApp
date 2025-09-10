@@ -1,9 +1,13 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantManagementSystem.Models;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+using Microsoft.Data.SqlClient;
 
 namespace RestaurantManagementSystem.Controllers
 {
+    [Authorize]
     public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
@@ -15,9 +19,27 @@ namespace RestaurantManagementSystem.Controllers
 
         public IActionResult Index()
         {
-            // Create a simple dashboard view model with sample data
+            // Get current user information
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userName = User.FindFirstValue(ClaimTypes.Name);
+            var userFirstName = User.FindFirstValue(ClaimTypes.GivenName) ?? "User";
+            var userLastName = User.FindFirstValue(ClaimTypes.Surname) ?? "";
+            var userFullName = $"{userFirstName} {userLastName}".Trim();
+            var userEmail = User.FindFirstValue(ClaimTypes.Email);
+            var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+            
+            // Get user's permissions
+            var userPermissions = User.FindAll("Permission").Select(c => c.Value).ToList();
+            
+            // Create a dashboard view model with welcome message and sample data
             var model = new DashboardViewModel
             {
+                UserName = userName,
+                UserFullName = userFullName,
+                UserEmail = userEmail,
+                UserRoles = userRoles,
+                UserPermissions = userPermissions,
+                LastLoginDate = DateTime.Now, // In a real app, get this from the database
                 TodaySales = 1250.75m,
                 TodayOrders = 45,
                 ActiveTables = 12,

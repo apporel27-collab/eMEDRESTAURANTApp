@@ -58,6 +58,9 @@ namespace RestaurantManagementSystem.Models
         [Display(Name = "Is Archived")]
         public bool IsArchived { get; set; } = false;
         
+        [Display(Name = "Menu Item Name")]
+        public string MenuItemName { get; set; }
+        
         [Display(Name = "Version")]
         public int Version { get; set; } = 1;
         

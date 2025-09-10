@@ -66,6 +66,9 @@ namespace RestaurantManagementSystem.Models
         public string? Notes { get; set; }
 
         public int? TableId { get; set; }
+        
+        [Display(Name = "Table Number")]
+        public string? TableNumber { get; set; }
 
         [Display(Name = "Status")]
         public ReservationStatus Status { get; set; } = ReservationStatus.Confirmed;

@@ -22,22 +22,30 @@
                         <input type="hidden" asp-for="ImagePath" />
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                         
-                        <ul class="nav nav-tabs" id="menuItemTabs" role="tablist">
-                            <li class="nav-item">
-                                <a class="nav-link active" id="general-tab" data-toggle="tab" href="#general" role="tab" aria-controls="general" aria-selected="true">General</a>
+                        <ul class="nav nav-tabs nav-fill mb-3" id="menuItemTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-controls="general" aria-selected="true">
+                                    <i class="fas fa-info-circle me-1"></i> General
+                                </button>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" id="allergens-tab" data-toggle="tab" href="#allergens" role="tab" aria-controls="allergens" aria-selected="false">Allergens</a>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="allergens-tab" data-bs-toggle="tab" data-bs-target="#allergens" type="button" role="tab" aria-controls="allergens" aria-selected="false">
+                                    <i class="fas fa-exclamation-triangle me-1"></i> Allergens
+                                </button>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" id="ingredients-tab" data-toggle="tab" href="#ingredients" role="tab" aria-controls="ingredients" aria-selected="false">Ingredients</a>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="ingredients-tab" data-bs-toggle="tab" data-bs-target="#ingredients" type="button" role="tab" aria-controls="ingredients" aria-selected="false">
+                                    <i class="fas fa-carrot me-1"></i> Ingredients
+                                </button>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" id="modifiers-tab" data-toggle="tab" href="#modifiers" role="tab" aria-controls="modifiers" aria-selected="false">Modifiers</a>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="modifiers-tab" data-bs-toggle="tab" data-bs-target="#modifiers" type="button" role="tab" aria-controls="modifiers" aria-selected="false">
+                                    <i class="fas fa-sliders-h me-1"></i> Modifiers
+                                </button>
                             </li>
                         </ul>
                         
-                        <div class="tab-content pt-4" id="menuItemTabsContent">
+                        <div class="tab-content pt-3" id="menuItemTabsContent">
                             <!-- General Tab -->
                             <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
                                 <div class="row">
@@ -199,7 +207,7 @@
                                                                             {
                                                                                 @foreach (var item in ViewBag.Ingredients)
                                                                                 {
-                                                                                    <option value="@item.Value" @(Model.Ingredients[i].IngredientId == int.Parse(item.Value) ? "selected" : "")>@item.Text</option>
+                                                                                    <option value="@item.Value" selected="@(Model.Ingredients[i].IngredientId == int.Parse(item.Value))">@item.Text</option>
                                                                                 }
                                                                             }
                                                                         </select>
@@ -388,6 +396,16 @@
         $(document).ready(function() {
             let ingredientIndex = @(Model.Ingredients?.Count ?? 0);
             
+            // Initialize Bootstrap tooltips
+            $('[data-bs-toggle="tooltip"]').tooltip();
+            
+            // Handle tab navigation from URL hash
+            if (window.location.hash) {
+                const hash = window.location.hash;
+                const tabId = hash.replace('#', '') + '-tab';
+                $('#' + tabId).tab('show');
+            }
+            
             // Add ingredient
             $("#addIngredientButton").click(function() {
                 const template = $("#ingredientTemplate").html();
@@ -405,6 +423,36 @@
             if ($("#ingredientsContainer").children().length === 0) {
                 $("#addIngredientButton").click();
             }
-        });
+            
+            // Add event handler for modifier checkboxes
+            $(document).on("change", ".modifier-checkbox", function() {
+                const modifierId = $(this).val();
+                togglePriceField(modifierId);
+            });
+            
+            // Form validation before submission
+            $('form').on('submit', function(e) {
+                if (!this.checkValidity()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Find the first invalid field and activate its tab
+                    const invalidFields = $(this).find(':invalid');
+                    if (invalidFields.length > 0) {
+                        const tabPane = $(invalidFields[0]).closest('.tab-pane');
+                        const tabId = tabPane.attr('id') + '-tab';
+                        document.getElementById(tabId).click();
+                        
+                        // Scroll to and focus the first invalid field
+                        $('html, body').animate({
+                            scrollTop: $(invalidFields[0]).offset().top - 100
+                        }, 500);
+                        $(invalidFields[0]).focus();
+                        
+                        // Show validation message
+                        $(this).addClass('was-validated');
+                    }
+                }
+            });
     </script>
 }

@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace RestaurantManagementSystem.Models
 {
     // Menu Item Modifier model for UC-006
-    public class MenuItemModifier
+    public class MenuItemModifierOption
     {
         public int Id { get; set; }
         

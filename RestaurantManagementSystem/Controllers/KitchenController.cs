@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -117,7 +117,25 @@ namespace RestaurantManagementSystem.Controllers
                                 MinutesSinceCreated = (int)reader["MinutesSinceCreated"]
                             };
                             
-                            viewModel.OrderNotes = reader["OrderNotes"].ToString();
+                            // Safely access OrderNotes column, if it exists
+                            try 
+                            {
+                                // Safely handle OrderNotes column which may not exist in all database schemas
+                            try
+                            {
+                                viewModel.OrderNotes = reader["OrderNotes"].ToString();
+                            }
+                            catch (IndexOutOfRangeException)
+                            {
+                                // OrderNotes column not found - set to empty string
+                                viewModel.OrderNotes = string.Empty;
+                            }
+                            }
+                            catch (IndexOutOfRangeException)
+                            {
+                                // OrderNotes column does not exist in this schema
+                                viewModel.OrderNotes = string.Empty;
+                            }
                         }
                         
                         reader.NextResult();

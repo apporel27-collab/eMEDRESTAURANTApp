@@ -131,7 +131,7 @@ namespace RestaurantManagementSystem.Models
         public string TicketNumber { get; set; }
         public int OrderId { get; set; }
         public string OrderNumber { get; set; }
-        public int? StationId { get; set; }
+        public int? StationId { get; set; } // Maps to KitchenStationId in the database
         public string StationName { get; set; }
         public int Status { get; set; }
         public string StatusDisplay { get; set; }

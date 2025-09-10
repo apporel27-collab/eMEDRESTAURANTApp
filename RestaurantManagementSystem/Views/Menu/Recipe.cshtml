@@ -1,4 +1,4 @@
-@model RestaurantManagementSystem.ViewModels.RecipeViewModel
+@model RestaurantManagementSystem.Models.RecipeViewModel
 
 @{
     ViewData["Title"] = "Recipe Management";
@@ -9,16 +9,19 @@
     <div class="row">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-header">
-                    <h4>@(Model.Id > 0 ? "Edit" : "Create") Recipe for @Model.MenuItemName</h4>
-                    <div class="float-right">
-                        <a asp-action="Details" asp-route-id="@menuItemId" class="btn btn-secondary">
-                            <i class="fa fa-arrow-left"></i> Back to Menu Item
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">@(Model.Id > 0 ? "Edit" : "Create") Recipe for @Model.MenuItemName</h4>
+                    <div>
+                        <button type="submit" form="recipeForm" class="btn btn-success mr-2">
+                            <i class="fa fa-save"></i> Save Recipe
+                        </button>
+                        <a asp-action="Details" asp-route-id="@menuItemId" class="btn btn-light">
+                            <i class="fa fa-arrow-left"></i> Back
                         </a>
                     </div>
                 </div>
                 <div class="card-body">
-                    <form asp-action="Recipe" method="post" enctype="multipart/form-data">
+                    <form id="recipeForm" asp-action="Recipe" method="post" enctype="multipart/form-data">
                         <input type="hidden" asp-for="Id" />
                         <input type="hidden" asp-for="MenuItemId" />
                         <input type="hidden" asp-for="MenuItemName" />
@@ -28,69 +31,83 @@
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <div class="form-group">
-                                    <label asp-for="Title" class="control-label"></label>
-                                    <input asp-for="Title" class="form-control" />
-                                    <span asp-validation-for="Title" class="text-danger"></span>
+                                    <label asp-for="Title" class="control-label small font-weight-bold"></label>
+                                    <input asp-for="Title" class="form-control form-control-sm" />
+                                    <span asp-validation-for="Title" class="text-danger small"></span>
                                 </div>
-                                
+                            </div>
+                            <div class="col-md-2">
                                 <div class="form-group">
-                                    <label asp-for="Yield" class="control-label"></label>
-                                    <input asp-for="Yield" class="form-control" type="number" min="1" />
-                                    <span asp-validation-for="Yield" class="text-danger"></span>
+                                    <label asp-for="Yield" class="control-label small font-weight-bold"></label>
+                                    <input asp-for="Yield" class="form-control form-control-sm" type="number" min="1" />
+                                    <span asp-validation-for="Yield" class="text-danger small"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-1">
+                                <div class="form-group">
+                                    <label asp-for="YieldPercentage" class="control-label small font-weight-bold"></label>
+                                    <input asp-for="YieldPercentage" class="form-control form-control-sm" type="number" min="1" max="100" />
+                                    <span asp-validation-for="YieldPercentage" class="text-danger small"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label asp-for="PreparationTimeMinutes" class="control-label small font-weight-bold"></label>
+                                    <input asp-for="PreparationTimeMinutes" class="form-control form-control-sm" type="number" min="1" />
+                                    <span asp-validation-for="PreparationTimeMinutes" class="text-danger small"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label asp-for="CookingTimeMinutes" class="control-label small font-weight-bold"></label>
+                                    <input asp-for="CookingTimeMinutes" class="form-control form-control-sm" type="number" min="0" />
+                                    <span asp-validation-for="CookingTimeMinutes" class="text-danger small"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label asp-for="PreparationInstructions" class="control-label small font-weight-bold"></label>
+                                    <textarea asp-for="PreparationInstructions" class="form-control form-control-sm" rows="4"></textarea>
+                                    <span asp-validation-for="PreparationInstructions" class="text-danger small"></span>
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="form-group">
-                                    <label asp-for="PreparationTimeMinutes" class="control-label"></label>
-                                    <input asp-for="PreparationTimeMinutes" class="form-control" type="number" min="1" />
-                                    <span asp-validation-for="PreparationTimeMinutes" class="text-danger"></span>
+                                    <label asp-for="CookingInstructions" class="control-label small font-weight-bold"></label>
+                                    <textarea asp-for="CookingInstructions" class="form-control form-control-sm" rows="4"></textarea>
+                                    <span asp-validation-for="CookingInstructions" class="text-danger small"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label asp-for="PlatingInstructions" class="control-label small font-weight-bold"></label>
+                                    <textarea asp-for="PlatingInstructions" class="form-control form-control-sm" rows="2"></textarea>
+                                    <span asp-validation-for="PlatingInstructions" class="text-danger small"></span>
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label asp-for="CookingTimeMinutes" class="control-label"></label>
-                                    <input asp-for="CookingTimeMinutes" class="form-control" type="number" min="0" />
-                                    <span asp-validation-for="CookingTimeMinutes" class="text-danger"></span>
+                                    <label asp-for="Notes" class="control-label small font-weight-bold"></label>
+                                    <textarea asp-for="Notes" class="form-control form-control-sm" rows="2"></textarea>
+                                    <span asp-validation-for="Notes" class="text-danger small"></span>
+                                </div>
+                                
+                                <div class="form-check mb-2">
+                                    <input asp-for="IsArchived" class="form-check-input" />
+                                    <label asp-for="IsArchived" class="form-check-label small"></label>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label asp-for="PreparationInstructions" class="control-label"></label>
-                            <textarea asp-for="PreparationInstructions" class="form-control" rows="5"></textarea>
-                            <span asp-validation-for="PreparationInstructions" class="text-danger"></span>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label asp-for="CookingInstructions" class="control-label"></label>
-                            <textarea asp-for="CookingInstructions" class="form-control" rows="5"></textarea>
-                            <span asp-validation-for="CookingInstructions" class="text-danger"></span>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label asp-for="PlatingInstructions" class="control-label"></label>
-                            <textarea asp-for="PlatingInstructions" class="form-control" rows="3"></textarea>
-                            <span asp-validation-for="PlatingInstructions" class="text-danger"></span>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label asp-for="Notes" class="control-label"></label>
-                            <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
-                            <span asp-validation-for="Notes" class="text-danger"></span>
-                        </div>
-                        
-                        <div class="form-check mb-4">
-                            <input asp-for="IsArchived" class="form-check-input" />
-                            <label asp-for="IsArchived" class="form-check-label"></label>
-                        </div>
-                        
-                        <h4>Recipe Steps</h4>
-                        <p class="text-muted">Break down the recipe into sequential steps</p>
-                        
-                        <div class="mb-3">
-                            <button type="button" id="addStepButton" class="btn btn-success">
+                        <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+                            <h5 class="mb-0">Recipe Steps</h5>
+                            <button type="button" id="addStepButton" class="btn btn-sm btn-success">
                                 <i class="fa fa-plus"></i> Add Step
                             </button>
                         </div>
@@ -98,67 +115,69 @@
                         <div id="stepsContainer">
                             @for (var i = 0; i < Model.Steps.Count; i++)
                             {
-                                <div class="card mb-3 step-card">
-                                    <div class="card-header d-flex justify-content-between align-items-center">
-                                        <h5>Step <span class="step-number">@Model.Steps[i].StepNumber</span></h5>
+                                <div class="card mb-2 step-card">
+                                    <div class="card-header py-2 d-flex justify-content-between align-items-center bg-light">
+                                        <h6 class="mb-0">Step <span class="step-number">@Model.Steps[i].StepNumber</span></h6>
                                         <button type="button" class="btn btn-sm btn-danger remove-step">
-                                            <i class="fa fa-times"></i> Remove
+                                            <i class="fa fa-times"></i>
                                         </button>
                                     </div>
-                                    <div class="card-body">
+                                    <div class="card-body py-2">
                                         <input type="hidden" name="Steps[@i].Id" value="@Model.Steps[i].Id" />
                                         <input type="hidden" name="Steps[@i].ImagePath" value="@Model.Steps[i].ImagePath" />
 
                                         <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label>Step Number</label>
-                                                    <input type="number" name="Steps[@i].StepNumber" value="@Model.Steps[i].StepNumber" class="form-control step-number-input" min="1" required />
-                                                </div>
-
-                                                <div class="form-group">
-                                                    <label>Description</label>
-                                                    <textarea name="Steps[@i].Description" class="form-control" rows="3" required>@Model.Steps[i].Description</textarea>
-                                                </div>
-
-                                                <div class="row">
-                                                    <div class="col-md-6">
-                                                        <div class="form-group">
-                                                            <label>Time Required (minutes)</label>
-                                                            <input type="number" name="Steps[@i].TimeRequiredMinutes" value="@Model.Steps[i].TimeRequiredMinutes" class="form-control" min="0" />
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <div class="form-group">
-                                                            <label>Temperature</label>
-                                                            <input type="text" name="Steps[@i].Temperature" value="@Model.Steps[i].Temperature" class="form-control" placeholder="e.g. 350°F, Medium-High" />
-                                                        </div>
-                                                    </div>
+                                            <div class="col-md-2">
+                                                <div class="form-group mb-2">
+                                                    <label class="small font-weight-bold mb-1">Step Number</label>
+                                                    <input type="number" name="Steps[@i].StepNumber" value="@Model.Steps[i].StepNumber" class="form-control form-control-sm step-number-input" min="1" required />
                                                 </div>
                                             </div>
-
                                             <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label>Special Equipment</label>
-                                                    <input type="text" name="Steps[@i].SpecialEquipment" value="@Model.Steps[i].SpecialEquipment" class="form-control" />
+                                                <div class="form-group mb-2">
+                                                    <label class="small font-weight-bold mb-1">Description</label>
+                                                    <textarea name="Steps[@i].Description" class="form-control form-control-sm" rows="2" required>@Model.Steps[i].Description</textarea>
                                                 </div>
-
-                                                <div class="form-group">
-                                                    <label>Tips</label>
-                                                    <textarea name="Steps[@i].Tips" class="form-control" rows="2">@Model.Steps[i].Tips</textarea>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <div class="form-group mb-2">
+                                                    <label class="small font-weight-bold mb-1">Time (min)</label>
+                                                    <input type="number" name="Steps[@i].TimeRequiredMinutes" value="@Model.Steps[i].TimeRequiredMinutes" class="form-control form-control-sm" min="0" />
                                                 </div>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <div class="form-group mb-2">
+                                                    <label class="small font-weight-bold mb-1">Temperature</label>
+                                                    <input type="text" name="Steps[@i].Temperature" value="@Model.Steps[i].Temperature" class="form-control form-control-sm" placeholder="e.g. 350°F" />
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                                <div class="form-group">
-                                                    <label>Image</label>
-                                                    @if (!string.IsNullOrEmpty(Model.Steps[i].ImagePath))
-                                                    {
-                                                        <div class="mb-2">
-                                                            <img src="@Model.Steps[i].ImagePath" class="img-thumbnail" style="max-height: 100px;" />
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <div class="form-group mb-2">
+                                                    <label class="small font-weight-bold mb-1">Equipment</label>
+                                                    <input type="text" name="Steps[@i].SpecialEquipment" value="@Model.Steps[i].SpecialEquipment" class="form-control form-control-sm" />
+                                                </div>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <div class="form-group mb-2">
+                                                    <label class="small font-weight-bold mb-1">Tips</label>
+                                                    <textarea name="Steps[@i].Tips" class="form-control form-control-sm" rows="1">@Model.Steps[i].Tips</textarea>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group mb-2">
+                                                    <label class="small font-weight-bold mb-1">Image</label>
+                                                    <div class="d-flex align-items-center">
+                                                        @if (!string.IsNullOrEmpty(Model.Steps[i].ImagePath))
+                                                        {
+                                                            <img src="@Model.Steps[i].ImagePath" class="img-thumbnail mr-2" style="max-height: 40px; max-width: 40px;" />
+                                                        }
+                                                        <div class="custom-file">
+                                                            <input type="file" name="Steps[@i].ImageFile" class="custom-file-input" accept="image/*" onchange="displayFileName(this)" />
+                                                            <label class="custom-file-label small">Choose file</label>
                                                         </div>
-                                                    }
-                                                    <div class="custom-file">
-                                                        <input type="file" name="Steps[@i].ImageFile" class="custom-file-input" accept="image/*" onchange="displayFileName(this)" />
-                                                        <label class="custom-file-label">Choose file</label>
                                                     </div>
                                                 </div>
                                             </div>
@@ -168,13 +187,10 @@
                             }
                         </div>
                         
-                        <div class="form-group mt-4 text-right">
-                            <button type="submit" class="btn btn-primary">
+                        <div class="d-flex justify-content-center mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg px-5">
                                 <i class="fa fa-save"></i> Save Recipe
                             </button>
-                            <a asp-action="Details" asp-route-id="@menuItemId" class="btn btn-secondary">
-                                <i class="fa fa-times"></i> Cancel
-                            </a>
                         </div>
                     </form>
                 </div>
@@ -185,61 +201,63 @@
 
 <!-- Template for new step -->
 <template id="stepTemplate">
-    <div class="card mb-3 step-card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5>Step <span class="step-number">{number}</span></h5>
+    <div class="card mb-2 step-card">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center bg-light">
+            <h6 class="mb-0">Step <span class="step-number">{number}</span></h6>
             <button type="button" class="btn btn-sm btn-danger remove-step">
-                <i class="fa fa-times"></i> Remove
+                <i class="fa fa-times"></i>
             </button>
         </div>
-        <div class="card-body">
+        <div class="card-body py-2">
             <input type="hidden" name="Steps[{index}].Id" value="0" />
             <input type="hidden" name="Steps[{index}].ImagePath" value="" />
 
             <div class="row">
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label>Step Number</label>
-                        <input type="number" name="Steps[{index}].StepNumber" value="{number}" class="form-control step-number-input" min="1" required />
-                    </div>
-
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea name="Steps[{index}].Description" class="form-control" rows="3" required></textarea>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Time Required (minutes)</label>
-                                <input type="number" name="Steps[{index}].TimeRequiredMinutes" class="form-control" min="0" />
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Temperature</label>
-                                <input type="text" name="Steps[{index}].Temperature" class="form-control" placeholder="e.g. 350°F, Medium-High" />
-                            </div>
-                        </div>
+                <div class="col-md-2">
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold mb-1">Step Number</label>
+                        <input type="number" name="Steps[{index}].StepNumber" value="{number}" class="form-control form-control-sm step-number-input" min="1" required />
                     </div>
                 </div>
-
                 <div class="col-md-6">
-                    <div class="form-group">
-                        <label>Special Equipment</label>
-                        <input type="text" name="Steps[{index}].SpecialEquipment" class="form-control" />
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold mb-1">Description</label>
+                        <textarea name="Steps[{index}].Description" class="form-control form-control-sm" rows="2" required></textarea>
                     </div>
-
-                    <div class="form-group">
-                        <label>Tips</label>
-                        <textarea name="Steps[{index}].Tips" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold mb-1">Time (min)</label>
+                        <input type="number" name="Steps[{index}].TimeRequiredMinutes" class="form-control form-control-sm" min="0" />
                     </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold mb-1">Temperature</label>
+                        <input type="text" name="Steps[{index}].Temperature" class="form-control form-control-sm" placeholder="e.g. 350°F" />
+                    </div>
+                </div>
+            </div>
 
-                    <div class="form-group">
-                        <label>Image</label>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold mb-1">Equipment</label>
+                        <input type="text" name="Steps[{index}].SpecialEquipment" class="form-control form-control-sm" />
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold mb-1">Tips</label>
+                        <textarea name="Steps[{index}].Tips" class="form-control form-control-sm" rows="1"></textarea>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold mb-1">Image</label>
                         <div class="custom-file">
                             <input type="file" name="Steps[{index}].ImageFile" class="custom-file-input" accept="image/*" onchange="displayFileName(this)" />
-                            <label class="custom-file-label">Choose file</label>
+                            <label class="custom-file-label small">Choose file</label>
                         </div>
                     </div>
                 </div>

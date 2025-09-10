@@ -6,7 +6,7 @@ namespace RestaurantManagementSystem.Models
 {
     // Model for UC-003: Capture Dine-In Order
     
-    public class MenuItem
+    public class OrderMenuItem
     {
         public int Id { get; set; }
         
@@ -34,11 +34,11 @@ namespace RestaurantManagementSystem.Models
         public DateTime UpdatedAt { get; set; }
         
         // Navigation properties
-        public List<Modifier> AvailableModifiers { get; set; } = new List<Modifier>();
-        public List<Allergen> ContainedAllergens { get; set; } = new List<Allergen>();
+        public List<OrderModifier> AvailableModifiers { get; set; } = new List<OrderModifier>();
+        public List<OrderAllergen> ContainedAllergens { get; set; } = new List<OrderAllergen>();
     }
     
-    public class Modifier
+    public class OrderModifier
     {
         public int Id { get; set; }
         
@@ -56,7 +56,7 @@ namespace RestaurantManagementSystem.Models
         public DateTime UpdatedAt { get; set; }
     }
     
-    public class Allergen
+    public class OrderAllergen
     {
         public int Id { get; set; }
         

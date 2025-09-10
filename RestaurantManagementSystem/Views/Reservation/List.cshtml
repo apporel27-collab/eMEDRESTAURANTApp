@@ -1,6 +1,10 @@
 @model IEnumerable<RestaurantManagementSystem.Models.Reservation>
 @{
-    ViewData["Title"] = $"Reservations for {ViewBag.SelectedDate:MMM dd, yyyy}";
+    // Safely format the date, providing a default if ViewBag.SelectedDate is null
+    string dateTitle = ViewBag.SelectedDate != null ? 
+        $"Reservations for {((DateTime)ViewBag.SelectedDate).ToString("MMM dd, yyyy")}" : 
+        "Reservations";
+    ViewData["Title"] = dateTitle;
 }
 
 <div class="container">
@@ -156,12 +160,34 @@
 @section Scripts {
     <script>
         $(document).ready(function () {
-            $('#reservationsTable').DataTable({
-                "paging": false,
-                "ordering": true,
-                "info": false,
-                "searching": true
-            });
+            // Only initialize DataTables if the table has data rows (excluding the "No reservations" row)
+            if ($('#reservationsTable tbody tr').length > 0 && 
+                $('#reservationsTable tbody tr td[colspan="8"]').length === 0) {
+                
+                $('#reservationsTable').DataTable({
+                    "paging": false,
+                    "ordering": true,
+                    "info": false,
+                    "searching": true,
+                    "columnDefs": [
+                        // Disable sorting and searching on the Actions column (last column)
+                        { "orderable": false, "searchable": false, "targets": 7 }
+                    ],
+                    "columns": [
+                        { "data": "0" }, // Time
+                        { "data": "1" }, // Guest
+                        { "data": "2" }, // Phone
+                        { "data": "3" }, // Party Size
+                        { "data": "4" }, // Table
+                        { "data": "5" }, // Status
+                        { "data": "6" }, // Special Requests
+                        { "data": null, "defaultContent": "" } // Actions column - don't try to extract data
+                    ],
+                    "language": {
+                        "emptyTable": "No reservations found for this date"
+                    }
+                });
+            }
         });
     </script>
 }

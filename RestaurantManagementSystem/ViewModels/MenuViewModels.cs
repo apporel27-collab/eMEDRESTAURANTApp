@@ -95,7 +95,8 @@ namespace RestaurantManagementSystem.ViewModels
         public string Instructions { get; set; }
     }
     
-    public class RecipeViewModel
+    // Renamed to avoid conflicts with RecipeViewModel in RecipeViewModels.cs
+    public class MenuRecipeViewModel
     {
         public int Id { get; set; }
         
@@ -143,10 +144,10 @@ namespace RestaurantManagementSystem.ViewModels
         [Range(1, int.MaxValue, ErrorMessage = "Version must be at least 1")]
         public int Version { get; set; }
         
-        public List<RecipeStepViewModel> Steps { get; set; } = new List<RecipeStepViewModel>();
+        public List<MenuRecipeStepViewModel> Steps { get; set; } = new List<MenuRecipeStepViewModel>();
     }
     
-    public class RecipeStepViewModel
+    public class MenuRecipeStepViewModel
     {
         public int Id { get; set; }
         

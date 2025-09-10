@@ -2,143 +2,173 @@
     ViewData["Title"] = "Reservation Management Dashboard";
 }
 
-<div class="container-fluid">
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <h2>Reservation Management Dashboard</h2>
-        </div>
-        <div class="col-md-6 text-md-end">
-            <a asp-action="Create" class="b                            @if (ViewBag.TomorrowsReservations.Count == 0)
-                            {
-                                <tr>
-                                    <td colspan="8" class="text-center">No reservations for tomorrow</td>
-                                </tr>
-                            }-primary">New Reservation</a>
-            <a asp-action="AddToWaitlist" class="btn btn-secondary">Add to Waitlist</a>
-            <a asp-action="Tables" class="btn btn-info">Manage Tables</a>
+<div class="container-fluid p-1">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <h5 class="mb-0">Reservation Dashboard</h5>
+        <div class="btn-toolbar">
+            <div class="btn-group btn-group-sm me-1">
+                <a asp-action="Create" class="btn btn-sm btn-primary py-0 px-1">
+                    <i class="bi bi-plus-circle"></i> New
+                </a>
+                <a asp-action="AddToWaitlist" class="btn btn-sm btn-warning py-0 px-1">
+                    <i class="bi bi-list-ul"></i> Waitlist
+                </a>
+            </div>
+            <a asp-action="Tables" class="btn btn-sm btn-info py-0 px-1">
+                <i class="bi bi-grid"></i> Tables
+            </a>
         </div>
     </div>
 
     @if (TempData["ResultMessage"] != null)
     {
-        <div class="alert alert-info">@TempData["ResultMessage"]</div>
+        <div class="alert alert-info py-1 px-2 mb-1 small">@TempData["ResultMessage"]</div>
     }
     
     @if (TempData["ErrorMessage"] != null)
     {
-        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        <div class="alert alert-danger py-1 px-2 mb-1 small">@TempData["ErrorMessage"]</div>
     }
 
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Total Tables</h5>
-                    <p class="card-text display-4">@ViewBag.TotalTables</p>
+    <!-- Statistics Cards - Professional & Compact -->
+    <div class="row g-2 mb-2">
+        <div class="col-3 col-md-3">
+            <div class="card shadow-sm border-0" style="height: 80px; background: linear-gradient(to right, #3a7bd5, #2b86c5);">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column h-100 justify-content-between">
+                        <div class="text-white small fw-light">Total Tables</div>
+                        <div class="d-flex align-items-end justify-content-between">
+                            <h4 class="text-white mb-0 fw-bold">@ViewBag.TotalTables</h4>
+                            <i class="bi bi-grid text-white-50 h5 mb-0"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Available Tables</h5>
-                    <p class="card-text display-4">@ViewBag.AvailableTables</p>
+        <div class="col-3 col-md-3">
+            <div class="card shadow-sm border-0" style="height: 80px; background: linear-gradient(to right, #2ecc71, #27ae60);">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column h-100 justify-content-between">
+                        <div class="text-white small fw-light">Available</div>
+                        <div class="d-flex align-items-end justify-content-between">
+                            <h4 class="text-white mb-0 fw-bold">@ViewBag.AvailableTables</h4>
+                            <i class="bi bi-check-circle text-white-50 h5 mb-0"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-danger text-white mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Occupied Tables</h5>
-                    <p class="card-text display-4">@ViewBag.OccupiedTables</p>
+        <div class="col-3 col-md-3">
+            <div class="card shadow-sm border-0" style="height: 80px; background: linear-gradient(to right, #e74c3c, #c0392b);">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column h-100 justify-content-between">
+                        <div class="text-white small fw-light">Occupied</div>
+                        <div class="d-flex align-items-end justify-content-between">
+                            <h4 class="text-white mb-0 fw-bold">@ViewBag.OccupiedTables</h4>
+                            <i class="bi bi-people text-white-50 h5 mb-0"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-dark mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Waitlist Count</h5>
-                    <p class="card-text display-4">@ViewBag.WaitlistCount</p>
+        <div class="col-3 col-md-3">
+            <div class="card shadow-sm border-0" style="height: 80px; background: linear-gradient(to right, #f39c12, #e67e22);">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column h-100 justify-content-between">
+                        <div class="text-white small fw-light">Waitlist</div>
+                        <div class="d-flex align-items-end justify-content-between">
+                            <h4 class="text-white mb-0 fw-bold">@ViewBag.WaitlistCount</h4>
+                            <i class="bi bi-hourglass-split text-white-50 h5 mb-0"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
+    <div class="row g-2">
         <!-- Today's Reservations -->
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-primary text-white d-flex justify-content-between">
-                    <h5 class="mb-0">Today's Reservations</h5>
-                    <span class="badge bg-light text-dark">@ViewBag.TodaysReservationCount</span>
+        <div class="col-md-6 mb-2">
+            <div class="card shadow-sm border-0" style="height: 330px;">
+                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2 px-3">
+                    <h6 class="mb-0 fw-bold text-primary">
+                        <i class="bi bi-calendar-check me-1"></i> Today's Reservations
+                    </h6>
+                    <span class="badge bg-primary rounded-pill">@ViewBag.TodaysReservationCount</span>
                 </div>
-                <div class="card-body overflow-auto" style="max-height: 400px;">
-                    <table class="table table-striped table-sm">
-                        <thead>
+                <div class="card-body p-0 overflow-auto" style="max-height: 275px;">
+                    <table class="table table-striped table-sm mb-0">
+                        <thead class="table-light">
                             <tr>
-                                <th>Time</th>
-                                <th>Guest</th>
-                                <th>Party</th>
-                                <th>Table</th>
-                                <th>Status</th>
-                                <th></th>
+                                <th class="px-2 py-1">Time</th>
+                                <th class="px-2 py-1">Guest</th>
+                                <th class="px-2 py-1">Size</th>
+                                <th class="px-2 py-1">Table</th>
+                                <th class="px-2 py-1">Status</th>
+                                <th class="px-2 py-1"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var res in ViewBag.TodaysReservations)
                             {
                                 <tr class="@(res.Status == ReservationStatus.Seated ? "table-success" : (res.Status == ReservationStatus.Cancelled || res.Status == ReservationStatus.NoShow ? "table-danger" : ""))">
-                                    <td>@res.ReservationTime.ToString("h:mm tt")</td>
-                                    <td>@res.GuestName</td>
-                                    <td>@res.PartySize</td>
-                                    <td>@(res.TableId.HasValue ? $"Table {res.TableNumber}" : "-")</td>
-                                    <td>@res.Status</td>
-                                    <td>
+                                    <td class="px-2 py-1">@res.ReservationTime.ToString("h:mm tt")</td>
+                                    <td class="px-2 py-1">@res.GuestName</td>
+                                    <td class="px-2 py-1">@res.PartySize</td>
+                                    <td class="px-2 py-1">@((!string.IsNullOrEmpty(res.TableNumber)) ? $"Table {res.TableNumber}" : "-")</td>
+                                    <td class="px-2 py-1">
+                                        <span class="badge @(res.Status == ReservationStatus.Confirmed ? "bg-primary" : 
+                                                           res.Status == ReservationStatus.Seated ? "bg-success" : 
+                                                           res.Status == ReservationStatus.Completed ? "bg-info" : 
+                                                           "bg-secondary")">
+                                            @res.Status
+                                        </span>
+                                    </td>
+                                    <td class="px-2 py-1">
                                         <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                                Actions
+                                            <button class="btn btn-sm btn-outline-secondary btn-sm py-0 px-1 dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="bi bi-three-dots-vertical"></i>
                                             </button>
-                                            <ul class="dropdown-menu">
-                                                <li><a class="dropdown-item" asp-action="Edit" asp-route-id="@res.Id">Edit</a></li>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item small py-1" asp-action="Edit" asp-route-id="@res.Id"><i class="bi bi-pencil"></i> Edit</a></li>
                                                 @if (res.Status == ReservationStatus.Confirmed)
                                                 {
                                                     <li>
-                                                        <form asp-action="ChangeStatus" method="post">
+                                                        <form asp-action="ChangeStatus" method="post" class="m-0">
                                                             <input type="hidden" name="id" value="@res.Id" />
                                                             <input type="hidden" name="status" value="@((int)ReservationStatus.Seated)" />
-                                                            <button type="submit" class="dropdown-item">Seat Guest</button>
+                                                            <button type="submit" class="dropdown-item small py-1"><i class="bi bi-check-circle"></i> Seat Guest</button>
                                                         </form>
                                                     </li>
                                                 }
                                                 @if (res.Status == ReservationStatus.Seated)
                                                 {
                                                     <li>
-                                                        <form asp-action="ChangeStatus" method="post">
+                                                        <form asp-action="ChangeStatus" method="post" class="m-0">
                                                             <input type="hidden" name="id" value="@res.Id" />
                                                             <input type="hidden" name="status" value="@((int)ReservationStatus.Completed)" />
-                                                            <button type="submit" class="dropdown-item">Complete</button>
+                                                            <button type="submit" class="dropdown-item small py-1"><i class="bi bi-flag"></i> Complete</button>
                                                         </form>
                                                     </li>
                                                 }
                                                 @if (res.Status == ReservationStatus.Confirmed)
                                                 {
                                                     <li>
-                                                        <form asp-action="ChangeStatus" method="post">
+                                                        <form asp-action="ChangeStatus" method="post" class="m-0">
                                                             <input type="hidden" name="id" value="@res.Id" />
                                                             <input type="hidden" name="status" value="@((int)ReservationStatus.NoShow)" />
-                                                            <button type="submit" class="dropdown-item">Mark No-Show</button>
+                                                            <button type="submit" class="dropdown-item small py-1"><i class="bi bi-x-circle"></i> No-Show</button>
                                                         </form>
                                                     </li>
                                                     <li>
-                                                        <form asp-action="ChangeStatus" method="post">
+                                                        <form asp-action="ChangeStatus" method="post" class="m-0">
                                                             <input type="hidden" name="id" value="@res.Id" />
                                                             <input type="hidden" name="status" value="@((int)ReservationStatus.Cancelled)" />
-                                                            <button type="submit" class="dropdown-item">Cancel</button>
+                                                            <button type="submit" class="dropdown-item small py-1"><i class="bi bi-x"></i> Cancel</button>
                                                         </form>
                                                     </li>
                                                 }
-                                                <li><a class="dropdown-item text-danger" asp-action="DeleteConfirm" asp-route-id="@res.Id">Delete</a></li>
+                                                <li><a class="dropdown-item small py-1 text-danger" asp-action="DeleteConfirm" asp-route-id="@res.Id"><i class="bi bi-trash"></i> Delete</a></li>
                                             </ul>
                                         </div>
                                     </td>
@@ -147,43 +177,47 @@
                             @if (ViewBag.TodaysReservations.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="6" class="text-center">No reservations today</td>
+                                    <td colspan="6" class="text-center py-1">No reservations today</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 </div>
-                <div class="card-footer">
-                    <a asp-action="List" class="btn btn-sm btn-primary">View All</a>
+                <div class="card-footer bg-white border-top p-2 d-flex justify-content-end">
+                    <a asp-action="List" class="btn btn-sm btn-outline-primary px-3 py-1">
+                        <i class="bi bi-arrow-right"></i> View All
+                    </a>
                 </div>
             </div>
         </div>
 
         <!-- Waitlist -->
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-warning text-dark d-flex justify-content-between">
-                    <h5 class="mb-0">Current Waitlist</h5>
-                    <span class="badge bg-dark text-light">@ViewBag.Waitlist.Count</span>
+        <div class="col-md-6 mb-2">
+            <div class="card shadow-sm border-0" style="height: 330px;">
+                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2 px-3">
+                    <h6 class="mb-0 fw-bold text-warning">
+                        <i class="bi bi-list-ul me-1"></i> Current Waitlist
+                    </h6>
+                    <span class="badge bg-warning rounded-pill text-dark">@ViewBag.Waitlist.Count</span>
                 </div>
-                <div class="card-body overflow-auto" style="max-height: 400px;">
-                    <table class="table table-striped table-sm">
-                        <thead>
+                <div class="card-body p-0 overflow-auto" style="max-height: 275px;">
+                    <table class="table table-striped table-sm mb-0">
+                        <thead class="table-light">
                             <tr>
-                                <th>Added</th>
-                                <th>Guest</th>
-                                <th>Party</th>
-                                <th>Wait Time</th>
-                                <th>Status</th>
-                                <th></th>
+                                <th class="px-2 py-1">Added</th>
+                                <th class="px-2 py-1">Guest</th>
+                                <th class="px-2 py-1">Size</th>
+                                <th class="px-2 py-1">Wait</th>
+                                <th class="px-2 py-1">Status</th>
+                                <th class="px-2 py-1"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var entry in ViewBag.Waitlist)
                             {
                                 <tr class="@(entry.IsWaitTimeExceeded ? "table-danger" : (entry.Status == WaitlistStatus.Notified ? "table-warning" : ""))">
-                                    <td>@entry.AddedAt.ToString("h:mm tt")</td>
-                                    <td>@entry.GuestName</td>
+                                    <td class="px-2 py-1">@entry.AddedAt.ToString("h:mm tt")</td>
+                                    <td class="px-2 py-1">@entry.GuestName</td>
                                     <td>@entry.PartySize</td>
                                     <td>@entry.ElapsedWaitTime / @entry.QuotedWaitTime min</td>
                                     <td>@entry.Status</td>
@@ -206,24 +240,24 @@
                                                 @if (entry.Status == WaitlistStatus.Notified || entry.Status == WaitlistStatus.Waiting)
                                                 {
                                                     <li>
-                                                        <form asp-action="UpdateWaitlistStatus" method="post">
+                                                        <form asp-action="UpdateWaitlistStatus" method="post" class="m-0">
                                                             <input type="hidden" name="id" value="@entry.Id" />
                                                             <input type="hidden" name="status" value="@((int)WaitlistStatus.Seated)" />
-                                                            <button type="submit" class="dropdown-item">Mark Seated</button>
+                                                            <button type="submit" class="dropdown-item py-1">Seat</button>
                                                         </form>
                                                     </li>
                                                 }
                                                 <li>
-                                                    <form asp-action="UpdateWaitlistStatus" method="post">
+                                                    <form asp-action="UpdateWaitlistStatus" method="post" class="m-0">
                                                         <input type="hidden" name="id" value="@entry.Id" />
                                                         <input type="hidden" name="status" value="@((int)WaitlistStatus.Left)" />
-                                                        <button type="submit" class="dropdown-item">Mark Left</button>
+                                                        <button type="submit" class="dropdown-item py-1">Left</button>
                                                     </form>
                                                 </li>
                                                 <li>
-                                                    <form asp-action="RemoveFromWaitlist" method="post">
+                                                    <form asp-action="RemoveFromWaitlist" method="post" class="m-0">
                                                         <input type="hidden" name="id" value="@entry.Id" />
-                                                        <button type="submit" class="dropdown-item text-danger">Remove</button>
+                                                        <button type="submit" class="dropdown-item py-1 text-danger">Remove</button>
                                                     </form>
                                                 </li>
                                             </ul>
@@ -234,42 +268,49 @@
                             @if (ViewBag.Waitlist.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="6" class="text-center">Waitlist is empty</td>
+                                    <td colspan="6" class="text-center py-1">Waitlist is empty</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 </div>
-                <div class="card-footer">
-                    <a asp-action="Waitlist" class="btn btn-sm btn-primary">Manage Waitlist</a>
+                <div class="card-footer bg-white border-top p-2 d-flex justify-content-end">
+                    <a asp-action="Waitlist" class="btn btn-sm btn-outline-warning px-3 py-1">
+                        <i class="bi bi-arrow-right"></i> Manage
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Table Layout -->
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">Table Layout</h5>
+            <div class="card shadow-sm border-0" style="height: 240px;">
+                <div class="card-header bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-info">
+                        <i class="bi bi-grid me-1"></i> Table Layout
+                    </h6>
+                    <span class="badge bg-info rounded-pill">@ViewBag.Tables.Count tables</span>
                 </div>
-                <div class="card-body">
-                    <div class="row">
+                <div class="card-body p-2 overflow-auto">
+                    <div class="row g-2">
                         @foreach (var table in ViewBag.Tables)
                         {
-                            <div class="col-md-2 col-sm-4 col-6 mb-3">
-                                <div class="card @GetTableStatusClass(table.Status)">
-                                    <div class="card-body text-center py-3">
-                                        <h5 class="card-title mb-0">Table @table.TableNumber</h5>
-                                        <p class="card-text mb-0">Seats: @table.Capacity</p>
-                                        <p class="card-text mb-1">@table.StatusDescription</p>
-                                        @if (table.Status == TableStatus.Occupied && table.LastOccupiedAt.HasValue)
-                                        {
-                                            <small class="text-muted">
-                                                Seated at @table.LastOccupiedAt.Value.ToString("h:mm tt")
-                                            </small>
-                                        }
+                            <div class="col-md-2 col-sm-3 col-4">
+                                <div class="card border-0 shadow-sm" style="height: 70px; border-left: 4px solid @GetTableColor(table.Status) !important;">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <span class="badge @GetTableBadgeClass(table.Status) rounded-pill">@table.StatusDescription</span>
+                                            <h5 class="card-title mb-0 fw-bold">T-@table.TableNumber</h5>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-end mt-1">
+                                            <small class="text-muted">@table.Capacity seats</small>
+                                            @if (table.Status == TableStatus.Occupied && table.LastOccupiedAt.HasValue)
+                                            {
+                                                <small class="text-muted">@table.LastOccupiedAt.Value.ToString("h:mm tt")</small>
+                                            }
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -281,45 +322,52 @@
     </div>
     
     <!-- Tomorrow's Reservations -->
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-secondary text-white d-flex justify-content-between">
-                    <h5 class="mb-0">Tomorrow's Reservations</h5>
-                    <span class="badge bg-light text-dark">@ViewBag.TomorrowsReservations.Count</span>
+            <div class="card shadow-sm border-0" style="height: 200px;">
+                <div class="card-header bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-secondary">
+                        <i class="bi bi-calendar-plus me-1"></i> Tomorrow's Reservations
+                    </h6>
+                    <span class="badge bg-secondary rounded-pill">@ViewBag.TomorrowsReservations.Count</span>
                 </div>
-                <div class="card-body overflow-auto" style="max-height: 300px;">
-                    <table class="table table-striped table-sm">
-                        <thead>
+                <div class="card-body p-0 overflow-auto" style="max-height: 145px;">
+                    <table class="table table-striped table-sm mb-0">
+                        <thead class="table-light">
                             <tr>
-                                <th>Time</th>
-                                <th>Guest</th>
-                                <th>Party Size</th>
-                                <th>Phone</th>
-                                <th>Table</th>
-                                <th>Notes</th>
+                                <th class="px-2 py-1">Time</th>
+                                <th class="px-2 py-1">Guest</th>
+                                <th class="px-2 py-1">Size</th>
+                                <th class="px-2 py-1">Phone</th>
+                                <th class="px-2 py-1">Table</th>
+                                <th class="px-2 py-1">Notes</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var res in ViewBag.TomorrowsReservations)
                             {
                                 <tr>
-                                    <td>@res.ReservationTime.ToString("h:mm tt")</td>
-                                    <td>@res.GuestName</td>
-                                    <td>@res.PartySize</td>
-                                    <td>@res.PhoneNumber</td>
-                                    <td>@(res.TableId.HasValue ? $"Table {res.TableNumber}" : "-")</td>
-                                    <td>@(string.IsNullOrEmpty(res.SpecialRequests) ? "-" : res.SpecialRequests)</td>
+                                    <td class="px-2 py-1">@res.ReservationTime.ToString("h:mm tt")</td>
+                                    <td class="px-2 py-1">@res.GuestName</td>
+                                    <td class="px-2 py-1">@res.PartySize</td>
+                                    <td class="px-2 py-1">@res.PhoneNumber</td>
+                                    <td class="px-2 py-1">@((!string.IsNullOrEmpty(res.TableNumber)) ? $"T-{res.TableNumber}" : "-")</td>
+                                    <td class="px-2 py-1 small">@(string.IsNullOrEmpty(res.SpecialRequests) ? "-" : res.SpecialRequests)</td>
                                 </tr>
                             }
                             @if (ViewBag.TomorrowsReservations.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="6" class="text-center">No reservations for tomorrow</td>
+                                    <td colspan="6" class="text-center py-1">No reservations for tomorrow</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
+                </div>
+                <div class="card-footer bg-white border-top p-2 d-flex justify-content-end">
+                    <a asp-action="List" asp-route-date="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")" class="btn btn-sm btn-outline-secondary px-3 py-1">
+                        <i class="bi bi-arrow-right"></i> View All
+                    </a>
                 </div>
             </div>
         </div>
@@ -332,11 +380,46 @@
         return status switch
         {
             TableStatus.Available => "bg-success text-white",
-            TableStatus.Reserved => "bg-info text-dark",
+            TableStatus.Reserved => "bg-info text-white",
             TableStatus.Occupied => "bg-danger text-white",
             TableStatus.Dirty => "bg-warning text-dark",
             TableStatus.Maintenance => "bg-secondary text-white",
+            _ => "bg-light text-dark"
+        };
+    }
+    
+    string GetTableColor(TableStatus status)
+    {
+        return status switch
+        {
+            TableStatus.Available => "#28a745",
+            TableStatus.Reserved => "#17a2b8",
+            TableStatus.Occupied => "#dc3545",
+            TableStatus.Dirty => "#ffc107",
+            TableStatus.Maintenance => "#6c757d",
+            _ => "#f8f9fa"
+        };
+    }
+    
+    string GetTableBadgeClass(TableStatus status)
+    {
+        return status switch
+        {
+            TableStatus.Available => "bg-success",
+            TableStatus.Reserved => "bg-info",
+            TableStatus.Occupied => "bg-danger",
+            TableStatus.Dirty => "bg-warning",
+            TableStatus.Maintenance => "bg-secondary",
             _ => "bg-light"
         };
     }
+}
+
+@section Scripts {
+    <script>
+        // Auto-refresh the dashboard every 2 minutes
+        setTimeout(function() {
+            location.reload();
+        }, 120000);
+    </script>
 }
