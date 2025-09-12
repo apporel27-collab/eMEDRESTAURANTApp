@@ -1,0 +1,115 @@
+@model RestaurantManagementSystem.ViewModels.PriceSuggestionViewModel
+
+@{
+    ViewData["Title"] = "Calculate Suggested Price";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2>Price Calculation for @Model.MenuItemName</h2>
+            <hr />
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Cost and Price Information</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Total Cost</dt>
+                                <dd class="col-sm-8">@Model.TotalCost.ToString("C")</dd>
+                                
+                                <dt class="col-sm-4">Target GP %</dt>
+                                <dd class="col-sm-8">@Model.TargetGPPercentage%</dd>
+                                
+                                <dt class="col-sm-4">Suggested Price</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge bg-success fs-6">@Model.SuggestedPrice.ToString("C")</span>
+                                </dd>
+                                
+                                <dt class="col-sm-4">Current Price</dt>
+                                <dd class="col-sm-8">@Model.CurrentPrice.ToString("C")</dd>
+                                
+                                @if (Model.CurrentPrice > 0 && Model.TotalCost > 0)
+                                {
+                                    var currentGP = (Model.CurrentPrice - Model.TotalCost) / Model.CurrentPrice * 100;
+                                    <dt class="col-sm-4">Current GP %</dt>
+                                    <dd class="col-sm-8">@currentGP.ToString("F2")%</dd>
+                                }
+                            </dl>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <form asp-action="CalculateSuggestedPrice" method="get" class="mb-4">
+                                <input type="hidden" name="id" value="@Model.MenuItemId" />
+                                
+                                <div class="input-group">
+                                    <span class="input-group-text">Target GP %</span>
+                                    <input type="number" name="targetGP" class="form-control" value="@Model.TargetGPPercentage" min="1" max="90" />
+                                    <button type="submit" class="btn btn-primary">Recalculate</button>
+                                </div>
+                            </form>
+                            
+                            @if (Model.TotalCost <= 0)
+                            {
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    No ingredient costs found. Please add ingredients with costs to calculate an accurate suggested price.
+                                </div>
+                            }
+                            
+                            @if (Model.SuggestedPrice > 0)
+                            {
+                                <form asp-action="UpdatePrice" method="post">
+                                    <input type="hidden" asp-for="MenuItemId" />
+                                    <input type="hidden" asp-for="TotalCost" />
+                                    <input type="hidden" asp-for="TargetGPPercentage" />
+                                    <input type="hidden" asp-for="SuggestedPrice" />
+                                    <input type="hidden" asp-for="CurrentPrice" />
+                                    
+                                    <div class="card border-primary">
+                                        <div class="card-header bg-primary text-white">
+                                            <h5>Update Price</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="form-group mb-3">
+                                                <label asp-for="NewPrice" class="control-label">New Price</label>
+                                                <input asp-for="NewPrice" class="form-control" value="@Model.SuggestedPrice" />
+                                                <span asp-validation-for="NewPrice" class="text-danger"></span>
+                                                <small class="form-text text-muted">You can accept the suggested price or set your own</small>
+                                            </div>
+                                            
+                                            <div class="alert alert-info">
+                                                <i class="fas fa-info-circle"></i>
+                                                Note: Price changes may require approval before taking effect.
+                                            </div>
+                                            
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="fas fa-save"></i> Update Price
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <a asp-controller="Recipe" asp-action="Details" asp-route-id="@Model.MenuItemId" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Recipe
+                </a>
+                <a asp-controller="Menu" asp-action="Details" asp-route-id="@Model.MenuItemId" class="btn btn-secondary">
+                    <i class="fas fa-utensils"></i> Back to Menu Item
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

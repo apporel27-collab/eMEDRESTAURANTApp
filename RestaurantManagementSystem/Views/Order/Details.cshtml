@@ -82,6 +82,13 @@
                                                 @if (item.Status == 0) 
                                                 { @* New *@
                                                     <input type="checkbox" class="fireItem" value="@item.Id" form="fireItemsForm" name="SelectedItems" />
+                                                    <form asp-action="CancelOrderItem" method="post" class="d-inline-block ms-1" onsubmit="return confirm('Are you sure you want to cancel this item?');">
+                                                        <input type="hidden" name="orderId" value="@Model.Id" />
+                                                        <input type="hidden" name="orderItemId" value="@item.Id" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancel Item">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </form>
                                                 }
                                                 else
                                                 {

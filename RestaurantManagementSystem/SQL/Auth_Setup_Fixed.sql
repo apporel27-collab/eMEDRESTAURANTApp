@@ -1,0 +1,864 @@
+-- Auth_Setup.sql
+-- Creates the authentication and authorization database structure
+
+-- Users Table
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Users')
+BEGIN
+    CREATE TABLE Users (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        Username NVARCHAR(50) NOT NULL UNIQUE,
+        Email NVARCHAR(100) NOT NULL UNIQUE,
+        PasswordHash NVARCHAR(MAX) NOT NULL,
+        Salt NVARCHAR(MAX) NOT NULL,
+        FirstName NVARCHAR(50) NOT NULL,
+        LastName NVARCHAR(50) NOT NULL,
+        PhoneNumber NVARCHAR(20) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        IsLockedOut BIT NOT NULL DEFAULT 0,
+        FailedLoginAttempts INT NOT NULL DEFAULT 0,
+        LastLoginDate DATETIME NULL,
+        CreatedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        LastModifiedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        MustChangePassword BIT NOT NULL DEFAULT 0,
+        PasswordLastChanged DATETIME NULL,
+        RequiresMFA BIT NOT NULL DEFAULT 0
+    );
+END
+GO
+
+-- Roles Table
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Roles')
+BEGIN
+    CREATE TABLE Roles (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        Name NVARCHAR(50) NOT NULL UNIQUE,
+        Description NVARCHAR(200) NULL,
+        IsSystemRole BIT NOT NULL DEFAULT 0,
+        CreatedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        LastModifiedDate DATETIME NOT NULL DEFAULT GETDATE()
+    );
+END
+GO
+
+-- Permissions Table
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Permissions')
+BEGIN
+    CREATE TABLE Permissions (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        Name NVARCHAR(100) NOT NULL UNIQUE,
+        Description NVARCHAR(200) NULL,
+        Category NVARCHAR(50) NOT NULL,
+        IsSystemPermission BIT NOT NULL DEFAULT 0
+    );
+END
+GO
+
+-- Role Permissions (Many-to-Many relationship)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RolePermissions')
+BEGIN
+    CREATE TABLE RolePermissions (
+        RoleId INT NOT NULL,
+        PermissionId INT NOT NULL,
+        CONSTRAINT PK_RolePermissions PRIMARY KEY (RoleId, PermissionId),
+        CONSTRAINT FK_RolePermissions_Roles FOREIGN KEY (RoleId) REFERENCES Roles(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_RolePermissions_Permissions FOREIGN KEY (PermissionId) REFERENCES Permissions(Id) ON DELETE CASCADE
+    );
+END
+GO
+
+-- User Roles (Many-to-Many relationship)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserRoles')
+BEGIN
+    CREATE TABLE UserRoles (
+        UserId INT NOT NULL,
+        RoleId INT NOT NULL,
+        AssignedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        AssignedBy INT NULL,
+        CONSTRAINT PK_UserRoles PRIMARY KEY (UserId, RoleId),
+        CONSTRAINT FK_UserRoles_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_UserRoles_Roles FOREIGN KEY (RoleId) REFERENCES Roles(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_UserRoles_AssignedBy FOREIGN KEY (AssignedBy) REFERENCES Users(Id)
+    );
+END
+GO
+
+-- Outlets Table (For outlet scopes)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Outlets')
+BEGIN
+    CREATE TABLE Outlets (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        Name NVARCHAR(100) NOT NULL UNIQUE,
+        Location NVARCHAR(200) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        LastModifiedDate DATETIME NOT NULL DEFAULT GETDATE()
+    );
+END
+GO
+
+-- User Outlet Scopes
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserOutletScopes')
+BEGIN
+    CREATE TABLE UserOutletScopes (
+        UserId INT NOT NULL,
+        OutletId INT NOT NULL,
+        AssignedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        AssignedBy INT NULL,
+        CONSTRAINT PK_UserOutletScopes PRIMARY KEY (UserId, OutletId),
+        CONSTRAINT FK_UserOutletScopes_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_UserOutletScopes_Outlets FOREIGN KEY (OutletId) REFERENCES Outlets(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_UserOutletScopes_AssignedBy FOREIGN KEY (AssignedBy) REFERENCES Users(Id)
+    );
+END
+GO
+
+-- MFA Factors
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'MFAFactors')
+BEGIN
+    CREATE TABLE MFAFactors (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        UserId INT NOT NULL,
+        FactorType NVARCHAR(20) NOT NULL, -- 'Email', 'Phone', 'App'
+        FactorValue NVARCHAR(100) NOT NULL, -- Email, Phone number, or App ID
+        IsVerified BIT NOT NULL DEFAULT 0,
+        IsDefault BIT NOT NULL DEFAULT 0,
+        CreatedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        LastUsedDate DATETIME NULL,
+        CONSTRAINT FK_MFAFactors_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+    );
+END
+GO
+
+-- Audit Log
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'AuditLog')
+BEGIN
+    CREATE TABLE AuditLog (
+        Id BIGINT PRIMARY KEY IDENTITY(1,1),
+        UserId INT NULL,
+        Action NVARCHAR(100) NOT NULL,
+        Details NVARCHAR(MAX) NULL,
+        IpAddress NVARCHAR(50) NULL,
+        UserAgent NVARCHAR(500) NULL,
+        EntityName NVARCHAR(100) NULL,
+        EntityId NVARCHAR(50) NULL,
+        Timestamp DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_AuditLog_Users FOREIGN KEY (UserId) REFERENCES Users(Id)
+    );
+END
+GO
+
+-- Sessions
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserSessions')
+BEGIN
+    CREATE TABLE UserSessions (
+        Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+        UserId INT NOT NULL,
+        Token NVARCHAR(MAX) NOT NULL,
+        CreatedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        ExpiryDate DATETIME NOT NULL,
+        LastActivityDate DATETIME NOT NULL,
+        IpAddress NVARCHAR(50) NULL,
+        DeviceId NVARCHAR(100) NULL,
+        UserAgent NVARCHAR(500) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CONSTRAINT FK_UserSessions_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+    );
+END
+GO
+
+-- Devices
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Devices')
+BEGIN
+    CREATE TABLE Devices (
+        Id NVARCHAR(100) PRIMARY KEY,
+        Name NVARCHAR(100) NOT NULL,
+        DeviceType NVARCHAR(50) NOT NULL, -- 'POS', 'KDS', 'Manager', 'Mobile'
+        OutletId INT NULL,
+        StationName NVARCHAR(50) NULL,
+        RegisteredDate DATETIME NOT NULL DEFAULT GETDATE(),
+        LastActiveDate DATETIME NULL,
+        Status NVARCHAR(20) NOT NULL DEFAULT 'Active', -- 'Active', 'Inactive', 'Maintenance', 'Blocked'
+        Notes NVARCHAR(500) NULL,
+        CONSTRAINT FK_Devices_Outlets FOREIGN KEY (OutletId) REFERENCES Outlets(Id)
+    );
+END
+GO
+
+-- Device Terminal Bindings
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TerminalBindings')
+BEGIN
+    CREATE TABLE TerminalBindings (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        DeviceId NVARCHAR(100) NOT NULL,
+        TerminalName NVARCHAR(50) NOT NULL,
+        AllowedRoles NVARCHAR(MAX) NULL, -- Comma-separated list of role IDs or JSON array
+        SessionTimeout INT NOT NULL DEFAULT 30, -- Minutes
+        CreatedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        LastModifiedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_TerminalBindings_Devices FOREIGN KEY (DeviceId) REFERENCES Devices(Id) ON DELETE CASCADE
+    );
+END
+GO
+
+-- Access Reviews
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'AccessReviews')
+BEGIN
+    CREATE TABLE AccessReviews (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        Name NVARCHAR(100) NOT NULL,
+        StartDate DATETIME NOT NULL,
+        EndDate DATETIME NOT NULL,
+        Status NVARCHAR(20) NOT NULL DEFAULT 'Pending', -- 'Pending', 'InProgress', 'Completed'
+        ReviewType NVARCHAR(50) NOT NULL, -- 'Regular', 'AdHoc'
+        Scope NVARCHAR(50) NOT NULL, -- 'All', 'Outlet', 'Role'
+        ScopeId INT NULL, -- Outlet ID or Role ID if applicable
+        CreatedBy INT NOT NULL,
+        CreatedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_AccessReviews_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES Users(Id)
+    );
+END
+GO
+
+-- Access Review Tasks
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'AccessReviewTasks')
+BEGIN
+    CREATE TABLE AccessReviewTasks (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        ReviewId INT NOT NULL,
+        UserId INT NOT NULL,
+        ReviewerId INT NOT NULL,
+        Status NVARCHAR(20) NOT NULL DEFAULT 'Pending', -- 'Pending', 'Approved', 'Removed', 'Modified'
+        CompletedDate DATETIME NULL,
+        Comments NVARCHAR(500) NULL,
+        CONSTRAINT FK_AccessReviewTasks_Reviews FOREIGN KEY (ReviewId) REFERENCES AccessReviews(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_AccessReviewTasks_Users FOREIGN KEY (UserId) REFERENCES Users(Id),
+        CONSTRAINT FK_AccessReviewTasks_Reviewers FOREIGN KEY (ReviewerId) REFERENCES Users(Id)
+    );
+END
+GO
+
+-- Override Requests
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'OverrideRequests')
+BEGIN
+    CREATE TABLE OverrideRequests (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        RequestType NVARCHAR(50) NOT NULL, -- 'Void', 'Refund', 'Discount', 'PriceOverride', 'DayReopen'
+        RequesterId INT NOT NULL,
+        ApproverId INT NULL,
+        Status NVARCHAR(20) NOT NULL DEFAULT 'Pending', -- 'Pending', 'Approved', 'Rejected'
+        Amount DECIMAL(18, 2) NULL,
+        OrderId INT NULL,
+        Justification NVARCHAR(500) NOT NULL,
+        ApproverJustification NVARCHAR(500) NULL,
+        CreatedDate DATETIME NOT NULL DEFAULT GETDATE(),
+        RespondedDate DATETIME NULL,
+        CONSTRAINT FK_OverrideRequests_Requesters FOREIGN KEY (RequesterId) REFERENCES Users(Id),
+        CONSTRAINT FK_OverrideRequests_Approvers FOREIGN KEY (ApproverId) REFERENCES Users(Id)
+    );
+END
+GO
+
+-- Insert default roles if they don't exist
+IF NOT EXISTS (SELECT * FROM Roles WHERE Name = 'Administrator')
+BEGIN
+    INSERT INTO Roles (Name, Description, IsSystemRole) VALUES
+    ('Administrator', 'Full system access', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Roles WHERE Name = 'Manager')
+BEGIN
+    INSERT INTO Roles (Name, Description, IsSystemRole) VALUES
+    ('Manager', 'Restaurant management', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Roles WHERE Name = 'Staff')
+BEGIN
+    INSERT INTO Roles (Name, Description, IsSystemRole) VALUES
+    ('Staff', 'Regular staff member', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Roles WHERE Name = 'Kitchen')
+BEGIN
+    INSERT INTO Roles (Name, Description, IsSystemRole) VALUES
+    ('Kitchen', 'Kitchen staff', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Roles WHERE Name = 'Cashier')
+BEGIN
+    INSERT INTO Roles (Name, Description, IsSystemRole) VALUES
+    ('Cashier', 'Cashier/POS operator', 1);
+END
+GO
+
+-- Insert default permissions
+-- User Management Permissions
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'users.view')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('users.view', 'View users', 'UserManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'users.create')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('users.create', 'Create users', 'UserManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'users.edit')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('users.edit', 'Edit users', 'UserManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'users.delete')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('users.delete', 'Delete users', 'UserManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'roles.assign')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('roles.assign', 'Assign roles', 'UserManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'outlets.assign')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('outlets.assign', 'Assign outlet scopes', 'UserManagement', 1);
+END
+GO
+
+-- Menu Management Permissions
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'menu.view')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('menu.view', 'View menu items', 'MenuManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'menu.create')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('menu.create', 'Create menu items', 'MenuManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'menu.edit')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('menu.edit', 'Edit menu items', 'MenuManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'menu.delete')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('menu.delete', 'Delete menu items', 'MenuManagement', 1);
+END
+GO
+
+-- Order Management Permissions
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'orders.view')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('orders.view', 'View orders', 'OrderManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'orders.create')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('orders.create', 'Create orders', 'OrderManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'orders.edit')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('orders.edit', 'Edit orders', 'OrderManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'orders.cancel')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('orders.cancel', 'Cancel orders', 'OrderManagement', 1);
+END
+GO
+
+-- Payment Permissions
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'payments.process')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('payments.process', 'Process payments', 'PaymentManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'payments.refund')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('payments.refund', 'Process refunds', 'PaymentManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'payments.void')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('payments.void', 'Void payments', 'PaymentManagement', 1);
+END
+GO
+
+-- Kitchen Permissions
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'kitchen.view')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('kitchen.view', 'View kitchen orders', 'KitchenManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'kitchen.update')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('kitchen.update', 'Update order status', 'KitchenManagement', 1);
+END
+GO
+
+-- Table Service Permissions
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'tables.view')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('tables.view', 'View tables', 'TableManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'tables.assign')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('tables.assign', 'Assign tables', 'TableManagement', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'tables.modify')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('tables.modify', 'Modify table status', 'TableManagement', 1);
+END
+GO
+
+-- Reporting Permissions
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'reports.view')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('reports.view', 'View reports', 'Reporting', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'reports.create')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('reports.create', 'Create reports', 'Reporting', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'reports.export')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('reports.export', 'Export reports', 'Reporting', 1);
+END
+GO
+
+-- Settings Permissions
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'settings.view')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('settings.view', 'View settings', 'SystemSettings', 1);
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM Permissions WHERE Name = 'settings.modify')
+BEGIN
+    INSERT INTO Permissions (Name, Description, Category, IsSystemPermission) VALUES
+    ('settings.modify', 'Modify settings', 'SystemSettings', 1);
+END
+GO
+
+-- Assign permissions to roles
+-- Administrator (all permissions)
+-- First clear existing permissions for this role to avoid duplicates
+DELETE FROM RolePermissions WHERE RoleId = 1;
+GO
+
+INSERT INTO RolePermissions (RoleId, PermissionId)
+SELECT 1, Id FROM Permissions;
+GO
+
+-- Manager permissions
+-- First clear existing permissions for this role to avoid duplicates
+DELETE FROM RolePermissions WHERE RoleId = 2;
+GO
+
+INSERT INTO RolePermissions (RoleId, PermissionId)
+SELECT 2, Id FROM Permissions 
+WHERE Name IN (
+    'users.view', 'roles.assign', 'outlets.assign',
+    'menu.view', 'menu.create', 'menu.edit',
+    'orders.view', 'orders.create', 'orders.edit', 'orders.cancel',
+    'payments.process', 'payments.refund', 'payments.void',
+    'kitchen.view', 
+    'tables.view', 'tables.assign', 'tables.modify',
+    'reports.view', 'reports.create', 'reports.export'
+);
+GO
+
+-- Staff permissions
+-- First clear existing permissions for this role to avoid duplicates
+DELETE FROM RolePermissions WHERE RoleId = 3;
+GO
+
+INSERT INTO RolePermissions (RoleId, PermissionId)
+SELECT 3, Id FROM Permissions 
+WHERE Name IN (
+    'menu.view',
+    'orders.view', 'orders.create', 'orders.edit',
+    'payments.process',
+    'tables.view', 'tables.modify'
+);
+GO
+
+-- Kitchen permissions
+-- First clear existing permissions for this role to avoid duplicates
+DELETE FROM RolePermissions WHERE RoleId = 4;
+GO
+
+INSERT INTO RolePermissions (RoleId, PermissionId)
+SELECT 4, Id FROM Permissions 
+WHERE Name IN (
+    'kitchen.view', 'kitchen.update',
+    'menu.view'
+);
+GO
+
+-- Cashier permissions
+-- First clear existing permissions for this role to avoid duplicates
+DELETE FROM RolePermissions WHERE RoleId = 5;
+GO
+
+INSERT INTO RolePermissions (RoleId, PermissionId)
+SELECT 5, Id FROM Permissions 
+WHERE Name IN (
+    'menu.view',
+    'orders.view', 'orders.create',
+    'payments.process',
+    'tables.view'
+);
+GO
+
+-- Create a default admin user
+-- Password is 'Admin@123' (this is a hashed password with salt)
+IF NOT EXISTS (SELECT * FROM Users WHERE Username = 'admin')
+BEGIN
+    INSERT INTO Users (Username, Email, PasswordHash, Salt, FirstName, LastName, RequiresMFA)
+    VALUES ('admin', 'admin@restaurant.com', 
+            '1000:5b42403363486974614c33736d4f7373:ff7e21ebb8123c9d9e4aa13e93ce5a20868cb0dc530ef1e7bb1c3da51a608e172e52de7d39e26ce9ca40596fbb30826b14c01089ddad46bd97240703ac56e45e', -- Hashed password for 'Admin@123'
+            '5b42403363486974614c33736d4f7373', -- Salt
+            'System', 'Administrator', 1);
+
+    -- Assign admin role to admin user
+    INSERT INTO UserRoles (UserId, RoleId)
+    VALUES (1, 1);
+END
+GO
+
+-- Create a default outlet
+IF NOT EXISTS (SELECT * FROM Outlets WHERE Name = 'Main Restaurant')
+BEGIN
+    INSERT INTO Outlets (Name, Location)
+    VALUES ('Main Restaurant', '123 Main Street');
+
+    -- Assign admin to the default outlet
+    IF EXISTS (SELECT * FROM Users WHERE Username = 'admin')
+    BEGIN
+        INSERT INTO UserOutletScopes (UserId, OutletId)
+        SELECT u.Id, o.Id
+        FROM Users u, Outlets o
+        WHERE u.Username = 'admin' AND o.Name = 'Main Restaurant'
+        AND NOT EXISTS (
+            SELECT 1 FROM UserOutletScopes uos
+            WHERE uos.UserId = u.Id AND uos.OutletId = o.Id
+        );
+    END
+END
+GO
+
+-- Stored procedure to authenticate a user
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_AuthenticateUser]') AND type in (N'P', N'PC'))
+    DROP PROCEDURE [dbo].[sp_AuthenticateUser]
+GO
+
+CREATE PROCEDURE sp_AuthenticateUser
+    @Username NVARCHAR(50),
+    @PasswordHash NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @UserId INT;
+    DECLARE @IsLockedOut BIT;
+    DECLARE @FailedAttempts INT;
+    
+    -- Get user info
+    SELECT @UserId = Id, @IsLockedOut = IsLockedOut, @FailedAttempts = FailedLoginAttempts
+    FROM Users
+    WHERE Username = @Username AND IsActive = 1;
+    
+    -- Check if user exists and is not locked out
+    IF @UserId IS NULL
+    BEGIN
+        SELECT 0 AS Success, 'Invalid username or password' AS Message, NULL AS UserId;
+        RETURN;
+    END
+    
+    IF @IsLockedOut = 1
+    BEGIN
+        SELECT 0 AS Success, 'Account is locked. Please contact administrator.' AS Message, NULL AS UserId;
+        RETURN;
+    END
+    
+    -- Check password
+    DECLARE @StoredHash NVARCHAR(MAX);
+    SELECT @StoredHash = PasswordHash FROM Users WHERE Id = @UserId;
+    
+    IF @StoredHash = @PasswordHash
+    BEGIN
+        -- Successful login
+        UPDATE Users
+        SET LastLoginDate = GETDATE(),
+            FailedLoginAttempts = 0
+        WHERE Id = @UserId;
+        
+        -- Return user details
+        SELECT 1 AS Success, 'Login successful' AS Message, Id AS UserId, Username, Email, FirstName, LastName, RequiresMFA
+        FROM Users
+        WHERE Id = @UserId;
+    END
+    ELSE
+    BEGIN
+        -- Failed login attempt
+        SET @FailedAttempts = @FailedAttempts + 1;
+        
+        -- Lock account after 5 failed attempts
+        IF @FailedAttempts >= 5
+        BEGIN
+            UPDATE Users
+            SET FailedLoginAttempts = @FailedAttempts,
+                IsLockedOut = 1
+            WHERE Id = @UserId;
+            
+            SELECT 0 AS Success, 'Account locked after multiple failed attempts' AS Message, NULL AS UserId;
+        END
+        ELSE
+        BEGIN
+            UPDATE Users
+            SET FailedLoginAttempts = @FailedAttempts
+            WHERE Id = @UserId;
+            
+            SELECT 0 AS Success, 'Invalid username or password' AS Message, NULL AS UserId;
+        END
+    END
+END;
+GO
+
+-- Stored procedure to get user roles and permissions
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetUserRolesAndPermissions]') AND type in (N'P', N'PC'))
+    DROP PROCEDURE [dbo].[sp_GetUserRolesAndPermissions]
+GO
+
+CREATE PROCEDURE sp_GetUserRolesAndPermissions
+    @UserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Get user roles
+    SELECT r.Id, r.Name, r.Description
+    FROM Roles r
+    INNER JOIN UserRoles ur ON r.Id = ur.RoleId
+    WHERE ur.UserId = @UserId;
+    
+    -- Get user permissions
+    SELECT DISTINCT p.Id, p.Name, p.Description, p.Category
+    FROM Permissions p
+    INNER JOIN RolePermissions rp ON p.Id = rp.PermissionId
+    INNER JOIN UserRoles ur ON rp.RoleId = ur.RoleId
+    WHERE ur.UserId = @UserId;
+    
+    -- Get user outlet scopes
+    SELECT o.Id, o.Name, o.Location
+    FROM Outlets o
+    INNER JOIN UserOutletScopes uos ON o.Id = uos.OutletId
+    WHERE uos.UserId = @UserId AND o.IsActive = 1;
+END;
+GO
+
+-- Stored procedure to create a new audit log entry
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_CreateAuditLog]') AND type in (N'P', N'PC'))
+    DROP PROCEDURE [dbo].[sp_CreateAuditLog]
+GO
+
+CREATE PROCEDURE sp_CreateAuditLog
+    @UserId INT = NULL,
+    @Action NVARCHAR(100),
+    @Details NVARCHAR(MAX) = NULL,
+    @IpAddress NVARCHAR(50) = NULL,
+    @UserAgent NVARCHAR(500) = NULL,
+    @EntityName NVARCHAR(100) = NULL,
+    @EntityId NVARCHAR(50) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO AuditLog (UserId, Action, Details, IpAddress, UserAgent, EntityName, EntityId)
+    VALUES (@UserId, @Action, @Details, @IpAddress, @UserAgent, @EntityName, @EntityId);
+    
+    SELECT SCOPE_IDENTITY() AS Id;
+END;
+GO
+
+-- Stored procedure to create or update a session
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_CreateOrUpdateSession]') AND type in (N'P', N'PC'))
+    DROP PROCEDURE [dbo].[sp_CreateOrUpdateSession]
+GO
+
+CREATE PROCEDURE sp_CreateOrUpdateSession
+    @UserId INT,
+    @Token NVARCHAR(MAX),
+    @ExpiryMinutes INT = 60,
+    @IpAddress NVARCHAR(50) = NULL,
+    @DeviceId NVARCHAR(100) = NULL,
+    @UserAgent NVARCHAR(500) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @SessionId UNIQUEIDENTIFIER = NEWID();
+    DECLARE @ExpiryDate DATETIME = DATEADD(MINUTE, @ExpiryMinutes, GETDATE());
+    
+    -- Deactivate existing sessions for this user/device if necessary
+    UPDATE UserSessions
+    SET IsActive = 0
+    WHERE UserId = @UserId 
+      AND (DeviceId = @DeviceId OR DeviceId IS NULL)
+      AND IsActive = 1;
+    
+    -- Create new session
+    INSERT INTO UserSessions (Id, UserId, Token, ExpiryDate, LastActivityDate, IpAddress, DeviceId, UserAgent)
+    VALUES (@SessionId, @UserId, @Token, @ExpiryDate, GETDATE(), @IpAddress, @DeviceId, @UserAgent);
+    
+    -- Return session info
+    SELECT @SessionId AS SessionId, @ExpiryDate AS ExpiryDate;
+END;
+GO
+
+-- Stored procedure to validate session
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_ValidateSession]') AND type in (N'P', N'PC'))
+    DROP PROCEDURE [dbo].[sp_ValidateSession]
+GO
+
+CREATE PROCEDURE sp_ValidateSession
+    @Token NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @UserId INT;
+    DECLARE @IsActive BIT;
+    DECLARE @ExpiryDate DATETIME;
+    
+    -- Get session info
+    SELECT @UserId = UserId, @IsActive = IsActive, @ExpiryDate = ExpiryDate
+    FROM UserSessions
+    WHERE Token = @Token;
+    
+    -- Check if session exists and is valid
+    IF @UserId IS NULL OR @IsActive = 0 OR @ExpiryDate < GETDATE()
+    BEGIN
+        SELECT 0 AS IsValid, NULL AS UserId;
+        RETURN;
+    END
+    
+    -- Update last activity
+    UPDATE UserSessions
+    SET LastActivityDate = GETDATE()
+    WHERE Token = @Token;
+    
+    -- Return user info
+    SELECT 1 AS IsValid, u.Id AS UserId, u.Username, u.Email, u.FirstName, u.LastName
+    FROM Users u
+    WHERE u.Id = @UserId AND u.IsActive = 1;
+END;
+GO
+
+-- Stored procedure to handle override requests
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_CreateOverrideRequest]') AND type in (N'P', N'PC'))
+    DROP PROCEDURE [dbo].[sp_CreateOverrideRequest]
+GO
+
+CREATE PROCEDURE sp_CreateOverrideRequest
+    @RequestType NVARCHAR(50),
+    @RequesterId INT,
+    @Amount DECIMAL(18, 2) = NULL,
+    @OrderId INT = NULL,
+    @Justification NVARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO OverrideRequests (RequestType, RequesterId, Amount, OrderId, Justification)
+    VALUES (@RequestType, @RequesterId, @Amount, @OrderId, @Justification);
+    
+    DECLARE @RequestId INT = SCOPE_IDENTITY();
+    
+    -- Return the created request
+    SELECT Id, RequestType, Status, CreatedDate
+    FROM OverrideRequests
+    WHERE Id = @RequestId;
+END;
+GO
+
+-- Stored procedure to approve/deny override request
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_RespondToOverrideRequest]') AND type in (N'P', N'PC'))
+    DROP PROCEDURE [dbo].[sp_RespondToOverrideRequest]
+GO
+
+CREATE PROCEDURE sp_RespondToOverrideRequest
+    @RequestId INT,
+    @ApproverId INT,
+    @Status NVARCHAR(20), -- 'Approved' or 'Rejected'
+    @ApproverJustification NVARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE OverrideRequests
+    SET ApproverId = @ApproverId,
+        Status = @Status,
+        ApproverJustification = @ApproverJustification,
+        RespondedDate = GETDATE()
+    WHERE Id = @RequestId;
+    
+    -- Return the updated request
+    SELECT Id, RequestType, Status, CreatedDate, RespondedDate
+    FROM OverrideRequests
+    WHERE Id = @RequestId;
+END;
+GO

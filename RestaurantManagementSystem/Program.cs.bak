@@ -1,0 +1,144 @@
+using Microsoft.EntityFrameworkCore;
+using RestaurantManagementSystem.Data;
+using RestaurantManagementSystem.Middleware;
+using RestaurantManagementSystem.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
+using System;
+using RestaurantManagementSystem.Utilities; // For SetupDatabase
+using System.IO;
+using System.Text;
+using Microsoft.Extensions.Logging;
+
+namespace RestaurantManagementSystem
+{
+    public class Program2
+    {
+        public static void Main(string[] args)
+        {
+            var builder = WebApplication.CreateBuilder(args);
+            
+            // Add services to the container.
+            builder.Services.AddControllersWithViews();
+
+            // Add HttpContextAccessor
+            builder.Services.AddHttpContextAccessor();
+
+            // Add authentication services
+            builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(options =>
+                {
+                    options.ExpireTimeSpan = TimeSpan.FromHours(12);
+                    options.SlidingExpiration = true;
+                    options.AccessDeniedPath = "/Account/AccessDenied";
+                    options.LoginPath = "/Account/Login";
+                    options.LogoutPath = "/Account/Logout";
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                    options.Cookie.SameSite = SameSiteMode.Strict;
+                });
+
+            // Add authorization services
+            builder.Services.AddAuthorization(options =>
+            {
+                options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Administrator"));
+                options.AddPolicy("RequireManagerRole", policy => policy.RequireRole("Administrator", "Manager"));
+                options.AddPolicy("RequireStaffRole", policy => policy.RequireRole("Administrator", "Manager", "Staff"));
+            });
+
+            // Register custom services
+            builder.Services.AddScoped<AuthService>();
+
+            // Configure SQL Server database connection using connection string from appsettings.json
+            builder.Services.AddDbContext<RestaurantDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+                
+            var app = builder.Build();
+
+            // Initialize database connection
+            using (var scope = app.Services.CreateScope())
+            {
+                var services = scope.ServiceProvider;
+                try
+                {
+                    var dbContext = services.GetRequiredService<RestaurantDbContext>();
+                    
+                    // Just try to connect to the database to make sure the connection works
+                    var canConnect = dbContext.Database.CanConnect();
+                    Console.WriteLine($"Database connection established: {canConnect}");
+
+                    // Try each of our SQL setup scripts in order until one succeeds
+                    string[] setupScripts = new[]
+                    {
+                        Path.Combine(Directory.GetCurrentDirectory(), "SQL", "Direct_SQL_Fix.sql"),
+                        Path.Combine(Directory.GetCurrentDirectory(), "SQL", "Complete_Auth_Setup.sql"),
+                        Path.Combine(Directory.GetCurrentDirectory(), "SQL", "Direct_Admin_Setup.sql"),
+                        Path.Combine(Directory.GetCurrentDirectory(), "SQL", "Create_Admin_User.sql"),
+                        // Fallbacks for bin directory
+                        Path.Combine(AppContext.BaseDirectory, "SQL", "Direct_SQL_Fix.sql"),
+                        Path.Combine(AppContext.BaseDirectory, "SQL", "Complete_Auth_Setup.sql"),
+                        Path.Combine(AppContext.BaseDirectory, "SQL", "Direct_Admin_Setup.sql"),
+                        Path.Combine(AppContext.BaseDirectory, "SQL", "Create_Admin_User.sql")
+                    };
+                    
+                    bool scriptRan = false;
+                    
+                    foreach (var scriptPath in setupScripts)
+                    {
+                        if (File.Exists(scriptPath))
+                        {
+                            Console.WriteLine($"Attempting to run setup script: {Path.GetFileName(scriptPath)}");
+                            try
+                            {
+                                SetupDatabase.ExecuteSqlScript(builder.Configuration, scriptPath);
+                                Console.WriteLine($"Setup script {Path.GetFileName(scriptPath)} executed successfully!");
+                                scriptRan = true;
+                                break; // Exit the loop after a successful script run
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error executing {Path.GetFileName(scriptPath)}: {ex.Message}");
+                                // Continue to the next script
+                            }
+                        }
+                    }
+                    
+                    if (!scriptRan)
+                    {
+                        Console.WriteLine("Warning: No setup scripts were successfully executed.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var logger = services.GetRequiredService<ILogger<Program2>>();
+                    logger.LogError(ex, "An error occurred during database initialization.");
+                }
+            }
+
+            // Configure the HTTP request pipeline.
+            if (!app.Environment.IsDevelopment())
+            {
+                app.UseExceptionHandler("/Home/Error");
+                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+                app.UseHsts();
+            }
+
+            app.UseHttpsRedirection();
+            app.UseStaticFiles();
+
+            app.UseRouting();
+
+            // Use DatabaseColumnFixMiddleware
+            app.UseMiddleware<DatabaseColumnFixMiddleware>();
+
+            app.UseAuthentication();
+            app.UseAuthorization();
+
+            app.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=Home}/{action=Index}/{id?}");
+
+            app.Run();
+        }
+    }
+}

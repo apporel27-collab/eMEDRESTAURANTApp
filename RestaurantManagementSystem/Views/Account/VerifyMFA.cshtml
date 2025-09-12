@@ -1,0 +1,78 @@
+@model RestaurantManagementSystem.ViewModels.MFAViewModel
+@{
+    ViewData["Title"] = "Two-Factor Authentication";
+    Layout = "_AuthLayout";
+}
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <img src="~/images/restaurant-logo.png" alt="Restaurant Logo" class="login-logo" onerror="this.src='/images/default-logo.png'; this.onerror=null;" />
+            <h2>Two-Factor Authentication</h2>
+            <p>Please enter the verification code sent to your @Model.FactorType</p>
+        </div>
+        
+        <form method="post" class="login-form">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            
+            <div class="form-group">
+                <label asp-for="VerificationCode" class="control-label"></label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-key"></i></span>
+                    <input asp-for="VerificationCode" class="form-control mfa-code" placeholder="Enter code" autocomplete="one-time-code" autofocus maxlength="6" />
+                </div>
+                <span asp-validation-for="VerificationCode" class="text-danger"></span>
+            </div>
+            
+            <input type="hidden" asp-for="UserId" />
+            <input type="hidden" asp-for="FactorType" />
+            <input type="hidden" asp-for="ReturnUrl" />
+            
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary btn-block">Verify</button>
+            </div>
+            
+            <div class="text-center mt-3">
+                <p>Didn't receive a code? <a href="#" id="resendCode">Resend code</a></p>
+            </div>
+        </form>
+        
+        <div class="login-footer">
+            <a asp-action="Login" class="text-decoration-none"><i class="fas fa-arrow-left"></i> Back to login</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Add animation to login card
+            $('.login-card').addClass('animated fadeIn');
+            
+            // Auto focus on verification code input
+            $('#VerificationCode').focus();
+            
+            // Format verification code as it's entered
+            $('#VerificationCode').on('input', function() {
+                $(this).val($(this).val().replace(/[^0-9]/g, ''));
+            });
+            
+            // Simulated code resend functionality
+            $('#resendCode').on('click', function(e) {
+                e.preventDefault();
+                
+                // Show feedback to user
+                $(this).text('Sending...');
+                
+                // Simulate sending code delay
+                setTimeout(function() {
+                    $('#resendCode').text('Code sent!');
+                    
+                    setTimeout(function() {
+                        $('#resendCode').text('Resend code');
+                    }, 3000);
+                }, 1500);
+            });
+        });
+    </script>
+}

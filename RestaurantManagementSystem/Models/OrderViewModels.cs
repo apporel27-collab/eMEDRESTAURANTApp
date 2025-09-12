@@ -11,10 +11,12 @@ namespace RestaurantManagementSystem.Models
     {
         public List<OrderSummary> ActiveOrders { get; set; } = new List<OrderSummary>();
         public List<OrderSummary> CompletedOrders { get; set; } = new List<OrderSummary>();
+        public List<OrderSummary> CancelledOrders { get; set; } = new List<OrderSummary>();
         public int OpenOrdersCount { get; set; }
         public int InProgressOrdersCount { get; set; }
         public int ReadyOrdersCount { get; set; }
         public int CompletedOrdersCount { get; set; }
+        public int CancelledOrdersCount { get; set; }
         public decimal TotalSales { get; set; }
     }
     

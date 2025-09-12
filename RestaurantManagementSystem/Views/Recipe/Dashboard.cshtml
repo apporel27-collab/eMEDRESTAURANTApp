@@ -1,0 +1,72 @@
+@model List<RestaurantManagementSystem.Models.Recipe>
+@{
+    ViewData["Title"] = "Recipe Dashboard";
+}
+
+<div class="container-fluid">
+    <h2 class="mb-4">Recipe Dashboard</h2>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">All Recipes</h5>
+            <a asp-controller="Menu" asp-action="Index" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Select Menu Item for New Recipe
+            </a>
+        </div>
+        <div class="card-body">
+            @if (Model != null && Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Menu Item</th>
+                                <th>Recipe Title</th>
+                                <th>Prep Time</th>
+                                <th>Cooking Time</th>
+                                <th>Last Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var recipe in Model)
+                            {
+                                <tr>
+                                    <td>@recipe.MenuItemName</td>
+                                    <td>@recipe.Title</td>
+                                    <td>@recipe.PreparationTimeMinutes min</td>
+                                    <td>@recipe.CookingTimeMinutes min</td>
+                                    <td>@recipe.LastUpdated.ToString("MM/dd/yyyy")</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a asp-action="Details" asp-route-id="@recipe.Id" class="btn btn-sm btn-info">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            <a asp-action="Edit" asp-route-menuItemId="@recipe.MenuItemId" class="btn btn-sm btn-warning">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    No recipes found. <a asp-controller="Menu" asp-action="Index">Add a new recipe</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>

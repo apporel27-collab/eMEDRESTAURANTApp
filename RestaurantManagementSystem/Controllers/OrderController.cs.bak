@@ -968,240 +968,6 @@ namespace RestaurantManagementSystem.Controllers
             return RedirectToAction("Details", new { id = model.OrderId });
         }
         
-        // Cancel Entire Order
-        public IActionResult CancelOrder(int id)
-        {
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    connection.Open();
-
-                    // First check if the order exists and its status
-                    using (SqlCommand checkCommand = new SqlCommand(@"
-                        SELECT Status 
-                        FROM Orders 
-                        WHERE Id = @OrderId", connection))
-                    {
-                        checkCommand.Parameters.AddWithValue("@OrderId", id);
-                        var status = (int?)checkCommand.ExecuteScalar();
-
-                        if (status == null)
-                        {
-                            TempData["ErrorMessage"] = "Order not found.";
-                            return RedirectToAction("Dashboard");
-                        }
-
-                        if (status == 3) // If already completed
-                        {
-                            TempData["ErrorMessage"] = "Cannot cancel order that has already been completed.";
-                            return RedirectToAction("Dashboard");
-                        }
-                        
-                        if (status == 4) // If already cancelled
-                        {
-                            TempData["ErrorMessage"] = "This order has already been cancelled.";
-                            return RedirectToAction("Dashboard");
-                        }
-                    }
-
-                    // Begin transaction since we'll be updating multiple tables
-                    using (SqlTransaction transaction = connection.BeginTransaction())
-                    {
-                        try
-                        {
-                            // Update order status to cancelled
-                            using (SqlCommand updateCommand = new SqlCommand(@"
-                                UPDATE Orders 
-                                SET Status = 4, -- 4 = Cancelled
-                                    UpdatedAt = GETDATE()
-                                WHERE Id = @OrderId", connection, transaction))
-                            {
-                                updateCommand.Parameters.AddWithValue("@OrderId", id);
-                                updateCommand.ExecuteNonQuery();
-                            }
-                            
-                            // Update all pending order items to cancelled
-                            using (SqlCommand updateItemsCommand = new SqlCommand(@"
-                                UPDATE OrderItems 
-                                SET Status = 5, -- 5 = Cancelled
-                                    UpdatedAt = GETDATE() 
-                                WHERE OrderId = @OrderId
-                                AND Status = 0", connection, transaction)) // Only cancel pending items
-                            {
-                                updateItemsCommand.Parameters.AddWithValue("@OrderId", id);
-                                updateItemsCommand.ExecuteNonQuery();
-                            }
-
-                            // Check if OrderItemModifiers table exists
-                            using (SqlCommand checkTableCommand = new SqlCommand(@"
-                                SELECT CASE 
-                                    WHEN OBJECT_ID('OrderItemModifiers', 'U') IS NOT NULL THEN 1
-                                    WHEN OBJECT_ID('OrderItem_Modifiers', 'U') IS NOT NULL THEN 2
-                                    ELSE 0
-                                END", connection, transaction))
-                            {
-                                int tableCheck = Convert.ToInt32(checkTableCommand.ExecuteScalar());
-                                
-                                // Only try to delete if one of the tables exists
-                                if (tableCheck > 0)
-                                {
-                                    string tableName = tableCheck == 1 ? "OrderItemModifiers" : "OrderItem_Modifiers";
-                                    
-                                    using (SqlCommand deleteModifiersCommand = new SqlCommand($@"
-                                        DELETE FROM {tableName} 
-                                        WHERE OrderItemId IN (SELECT Id FROM OrderItems WHERE OrderId = @OrderId AND Status = 5)", 
-                                        connection, transaction))
-                                    {
-                                        deleteModifiersCommand.Parameters.AddWithValue("@OrderId", id);
-                                        deleteModifiersCommand.ExecuteNonQuery();
-                                    }
-                                }
-                            }
-
-                            transaction.Commit();
-                            TempData["SuccessMessage"] = "Order cancelled successfully.";
-                        }
-                        catch (Exception ex)
-                        {
-                            transaction.Rollback();
-                            throw new Exception("Error cancelling order: " + ex.Message);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                TempData["ErrorMessage"] = "Error cancelling order: " + ex.Message;
-            }
-
-            return RedirectToAction("Dashboard");
-        }
-
-        // Cancel Order Item
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult CancelOrderItem(int orderId, int orderItemId)
-        {
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    connection.Open();
-
-                    // First check if the order item has already been sent to kitchen
-                    using (SqlCommand checkCommand = new SqlCommand(@"
-                        SELECT Status 
-                        FROM OrderItems 
-                        WHERE Id = @OrderItemId AND OrderId = @OrderId", connection))
-                    {
-                        checkCommand.Parameters.AddWithValue("@OrderItemId", orderItemId);
-                        checkCommand.Parameters.AddWithValue("@OrderId", orderId);
-
-                        var status = (int?)checkCommand.ExecuteScalar();
-
-                        if (status == null)
-                        {
-                            TempData["ErrorMessage"] = "Order item not found.";
-                            return RedirectToAction("Details", new { id = orderId });
-                        }
-
-                        if (status > 0) // If already sent to kitchen
-                        {
-                            TempData["ErrorMessage"] = "Cannot cancel item that has already been sent to kitchen.";
-                            return RedirectToAction("Details", new { id = orderId });
-                        }
-                    }
-
-                    // Begin transaction since we'll be updating multiple tables
-                    using (SqlTransaction transaction = connection.BeginTransaction())
-                    {
-                        try
-                        {
-                            // Update order item status to cancelled
-                            using (SqlCommand updateCommand = new SqlCommand(@"
-                                UPDATE OrderItems 
-                                SET Status = 5, -- 5 = Cancelled
-                                    UpdatedAt = GETDATE() 
-                                WHERE Id = @OrderItemId AND OrderId = @OrderId", connection, transaction))
-                            {
-                                updateCommand.Parameters.AddWithValue("@OrderItemId", orderItemId);
-                                updateCommand.Parameters.AddWithValue("@OrderId", orderId);
-                                updateCommand.ExecuteNonQuery();
-                            }
-
-                            // Check if OrderItemModifiers table exists
-                            using (SqlCommand checkTableCommand = new SqlCommand(@"
-                                SELECT CASE 
-                                    WHEN OBJECT_ID('OrderItemModifiers', 'U') IS NOT NULL THEN 1
-                                    WHEN OBJECT_ID('OrderItem_Modifiers', 'U') IS NOT NULL THEN 2
-                                    ELSE 0
-                                END", connection, transaction))
-                            {
-                                int tableCheck = Convert.ToInt32(checkTableCommand.ExecuteScalar());
-                                
-                                // Only try to delete if one of the tables exists
-                                if (tableCheck > 0)
-                                {
-                                    string tableName = tableCheck == 1 ? "OrderItemModifiers" : "OrderItem_Modifiers";
-                                    
-                                    using (SqlCommand deleteModifiersCommand = new SqlCommand($@"
-                                        DELETE FROM {tableName} 
-                                        WHERE OrderItemId = @OrderItemId", connection, transaction))
-                                    {
-                                        deleteModifiersCommand.Parameters.AddWithValue("@OrderItemId", orderItemId);
-                                        deleteModifiersCommand.ExecuteNonQuery();
-                                    }
-                                }
-                            }
-
-                            // Recalculate order totals
-                            using (SqlCommand updateOrderCommand = new SqlCommand(@"
-                                UPDATE o
-                                SET o.Subtotal = (
-                                        SELECT ISNULL(SUM(oi.Subtotal), 0)
-                                        FROM OrderItems oi
-                                        WHERE oi.OrderId = o.Id
-                                          AND oi.Status != 5 -- Not cancelled
-                                    ),
-                                    o.TaxAmount = (
-                                        SELECT ISNULL(SUM(oi.Subtotal), 0) * 0.10 -- 10% tax
-                                        FROM OrderItems oi
-                                        WHERE oi.OrderId = o.Id
-                                          AND oi.Status != 5 -- Not cancelled
-                                    ),
-                                    o.UpdatedAt = GETDATE()
-                                FROM Orders o
-                                WHERE o.Id = @OrderId;
-
-                                -- Update total amount
-                                UPDATE Orders
-                                SET TotalAmount = Subtotal + TaxAmount - DiscountAmount + TipAmount
-                                WHERE Id = @OrderId;", connection, transaction))
-                            {
-                                updateOrderCommand.Parameters.AddWithValue("@OrderId", orderId);
-                                updateOrderCommand.ExecuteNonQuery();
-                            }
-
-                            transaction.Commit();
-                            TempData["SuccessMessage"] = "Order item cancelled successfully.";
-                        }
-                        catch (Exception ex)
-                        {
-                            transaction.Rollback();
-                            throw new Exception("Error cancelling order item: " + ex.Message);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                TempData["ErrorMessage"] = "Error cancelling order item: " + ex.Message;
-            }
-
-            return RedirectToAction("Details", new { id = orderId });
-        }
-
         // Browse Menu Items
         public IActionResult BrowseMenu(int id)
         {
@@ -1302,8 +1068,7 @@ namespace RestaurantManagementSystem.Controllers
             var model = new OrderDashboardViewModel
             {
                 ActiveOrders = new List<OrderSummary>(),
-                CompletedOrders = new List<OrderSummary>(),
-                CancelledOrders = new List<OrderSummary>()
+                CompletedOrders = new List<OrderSummary>()
             };
             
             using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -1317,8 +1082,7 @@ namespace RestaurantManagementSystem.Controllers
                         SUM(CASE WHEN Status = 1 THEN 1 ELSE 0 END) AS InProgressCount,
                         SUM(CASE WHEN Status = 2 THEN 1 ELSE 0 END) AS ReadyCount,
                         SUM(CASE WHEN Status = 3 THEN 1 ELSE 0 END) AS CompletedCount,
-                        SUM(CASE WHEN Status = 3 THEN TotalAmount ELSE 0 END) AS TotalSales,
-                        SUM(CASE WHEN Status = 4 THEN 1 ELSE 0 END) AS CancelledCount
+                        SUM(CASE WHEN Status = 3 THEN TotalAmount ELSE 0 END) AS TotalSales
                     FROM Orders
                     WHERE CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE)", connection))
                 {
@@ -1331,7 +1095,6 @@ namespace RestaurantManagementSystem.Controllers
                             model.ReadyOrdersCount = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
                             model.CompletedOrdersCount = reader.IsDBNull(3) ? 0 : reader.GetInt32(3);
                             model.TotalSales = reader.IsDBNull(4) ? 0 : reader.GetDecimal(4);
-                            model.CancelledOrdersCount = reader.IsDBNull(5) ? 0 : reader.GetInt32(5);
                         }
                     }
                 }
@@ -1459,68 +1222,6 @@ namespace RestaurantManagementSystem.Controllers
                                 OrderTypeDisplay = orderTypeDisplay,
                                 Status = 3, // Completed
                                 StatusDisplay = "Completed",
-                                TableName = reader.IsDBNull(4) ? null : reader.GetString(4),
-                                GuestName = reader.IsDBNull(5) ? null : reader.GetString(5),
-                                ServerName = reader.IsDBNull(6) ? null : reader.GetString(6),
-                                ItemCount = reader.GetInt32(7),
-                                TotalAmount = reader.GetDecimal(8),
-                                CreatedAt = reader.GetDateTime(9),
-                                Duration = TimeSpan.FromMinutes(reader.IsDBNull(10) ? 0 : reader.GetInt32(10))
-                            });
-                        }
-                    }
-                }
-                
-                // Get cancelled orders for today
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT 
-                        o.Id,
-                        o.OrderNumber,
-                        o.OrderType,
-                        o.Status,
-                        CASE 
-                            WHEN o.OrderType = 0 THEN t.TableName 
-                            ELSE NULL 
-                        END AS TableName,
-                        CASE 
-                            WHEN o.OrderType = 0 THEN tt.GuestName 
-                            ELSE o.CustomerName 
-                        END AS GuestName,
-                        CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
-                        (SELECT COUNT(1) FROM OrderItems WHERE OrderId = o.Id) AS ItemCount,
-                        o.TotalAmount,
-                        o.CreatedAt,
-                        DATEDIFF(MINUTE, o.CreatedAt, ISNULL(o.UpdatedAt, GETDATE())) AS DurationMinutes
-                    FROM Orders o
-                    LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
-                    LEFT JOIN Tables t ON tt.TableId = t.Id
-                    LEFT JOIN Users u ON o.UserId = u.Id
-                    WHERE o.Status = 4 -- Cancelled
-                    AND CAST(o.CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
-                    ORDER BY ISNULL(o.UpdatedAt, o.CreatedAt) DESC", connection))
-                {
-                    using (SqlDataReader reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            var orderType = reader.GetInt32(2);
-                            string orderTypeDisplay = orderType switch
-                            {
-                                0 => "Dine-In",
-                                1 => "Takeout",
-                                2 => "Delivery",
-                                3 => "Online",
-                                _ => "Unknown"
-                            };
-                            
-                            model.CancelledOrders.Add(new OrderSummary
-                            {
-                                Id = reader.GetInt32(0),
-                                OrderNumber = reader.GetString(1),
-                                OrderType = orderType,
-                                OrderTypeDisplay = orderTypeDisplay,
-                                Status = 4,
-                                StatusDisplay = "Cancelled",
                                 TableName = reader.IsDBNull(4) ? null : reader.GetString(4),
                                 GuestName = reader.IsDBNull(5) ? null : reader.GetString(5),
                                 ServerName = reader.IsDBNull(6) ? null : reader.GetString(6),
@@ -1931,24 +1632,18 @@ namespace RestaurantManagementSystem.Controllers
                             
                             try
                             {
-                                // First check if the table exists
-                                bool tableExists = TableExists(orderItemModifiersTable);
-                                
-                                if (tableExists)
+                                using (SqlDataReader reader = command.ExecuteReader())
                                 {
-                                    using (SqlDataReader reader = command.ExecuteReader())
+                                    while (reader.Read())
                                     {
-                                        while (reader.Read())
+                                        item.Modifiers.Add(new OrderItemModifierViewModel
                                         {
-                                            item.Modifiers.Add(new OrderItemModifierViewModel
-                                            {
-                                                Id = reader.GetInt32(0),
-                                                OrderItemId = item.Id,
-                                                ModifierId = reader.GetInt32(1),
-                                                ModifierName = reader.GetString(2),
-                                                Price = reader.GetDecimal(3)
-                                            });
-                                        }
+                                            Id = reader.GetInt32(0),
+                                            OrderItemId = item.Id,
+                                            ModifierId = reader.GetInt32(1),
+                                            ModifierName = reader.GetString(2),
+                                            Price = reader.GetDecimal(3)
+                                        });
                                     }
                                 }
                             }
@@ -2110,38 +1805,24 @@ namespace RestaurantManagementSystem.Controllers
                                 
                                 if (!string.IsNullOrEmpty(orderItemModifiersTable))
                                 {
-                                    // First check if the table exists
-                                    bool tableExists = TableExists(orderItemModifiersTable);
-                                    
-                                    if (tableExists)
+                                    using (SqlConnection modConnection = new SqlConnection(_connectionString))
                                     {
-                                        using (SqlConnection modConnection = new SqlConnection(_connectionString))
-                                        {
-                                            modConnection.Open();
-                                            string modifiersQuery = $@"
-                                                SELECT m.Name
-                                                FROM {orderItemModifiersTable} oim
-                                                INNER JOIN Modifiers m ON oim.ModifierId = m.Id
-                                                WHERE oim.OrderItemId = @OrderItemId";
-                                                
-                                            using (SqlCommand modifiersCommand = new SqlCommand(modifiersQuery, modConnection))
-                                            {
-                                                modifiersCommand.Parameters.AddWithValue("@OrderItemId", ticketItem.OrderItemId);
+                                        modConnection.Open();
+                                        string modifiersQuery = $@"
+                                            SELECT m.Name
+                                            FROM {orderItemModifiersTable} oim
+                                            INNER JOIN Modifiers m ON oim.ModifierId = m.Id
+                                            WHERE oim.OrderItemId = @OrderItemId";
                                             
-                                                try
+                                        using (SqlCommand modifiersCommand = new SqlCommand(modifiersQuery, modConnection))
+                                        {
+                                            modifiersCommand.Parameters.AddWithValue("@OrderItemId", ticketItem.OrderItemId);
+                                        
+                                            using (SqlDataReader modifiersReader = modifiersCommand.ExecuteReader())
+                                            {
+                                                while (modifiersReader.Read())
                                                 {
-                                                    using (SqlDataReader modifiersReader = modifiersCommand.ExecuteReader())
-                                                    {
-                                                        while (modifiersReader.Read())
-                                                        {
-                                                            ticketItem.Modifiers.Add(modifiersReader.GetString(0));
-                                                        }
-                                                    }
-                                                }
-                                                catch (Exception ex)
-                                                {
-                                                    // Log but don't crash if there are any remaining issues
-                                                    Console.WriteLine($"Error getting modifiers for kitchen ticket item: {ex.Message}");
+                                                    ticketItem.Modifiers.Add(modifiersReader.GetString(0));
                                                 }
                                             }
                                         }
@@ -2176,6 +1857,463 @@ namespace RestaurantManagementSystem.Controllers
             
             return order;
         }
+        private OrderViewModel GetOrderDetails(int id)
+        {
+            OrderViewModel order = null;
+            
+            // Use separate connections for different data readers to avoid nested DataReader issues
+            using (SqlConnection orderConnection = new SqlConnection(_connectionString))
+            {
+                orderConnection.Open();
+                
+                // Get order details
+                // First check if the UpdatedAt column exists in the Orders table
+                bool hasUpdatedAtColumn = ColumnExistsInTable("Orders", "UpdatedAt");
+                
+                // Build the SQL query based on column existence
+                string selectSql = hasUpdatedAtColumn 
+                    ? @"SELECT 
+                        o.Id,
+                        o.OrderNumber,
+                        o.TableTurnoverId,
+                        o.OrderType,
+                        o.Status,
+                        o.UserId,
+                        CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
+                        o.CustomerName,
+                        o.CustomerPhone,
+                        o.Subtotal,
+                        o.TaxAmount,
+                        o.TipAmount,
+                        o.DiscountAmount,
+                        o.TotalAmount,
+                        o.SpecialInstructions,
+                        o.CreatedAt,
+                        o.UpdatedAt,
+                        o.CompletedAt,"
+                    : @"SELECT 
+                        o.Id,
+                        o.OrderNumber,
+                        o.TableTurnoverId,
+                        o.OrderType,
+                        o.Status,
+                        o.UserId,
+                        CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
+                        o.CustomerName,
+                        o.CustomerPhone,
+                        o.Subtotal,
+                        o.TaxAmount,
+                        o.TipAmount,
+                        o.DiscountAmount,
+                        o.TotalAmount,
+                        o.SpecialInstructions,
+                        o.CreatedAt,
+                        o.CreatedAt AS UpdatedAt, -- Use CreatedAt as a fallback
+                        o.CompletedAt,";
+
+                using (SqlCommand command = new SqlCommand(selectSql + @"
+                        CASE 
+                            WHEN o.TableTurnoverId IS NOT NULL THEN t.TableName 
+                            ELSE NULL 
+                        END AS TableName,
+                        CASE 
+                            WHEN o.TableTurnoverId IS NOT NULL THEN tt.GuestName 
+                            ELSE o.CustomerName 
+                        END AS GuestName
+                    FROM Orders o
+                    LEFT JOIN Users u ON o.UserId = u.Id
+                    LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
+                    LEFT JOIN Tables t ON tt.TableId = t.Id
+                    WHERE o.Id = @OrderId", orderConnection))
+                {
+                    command.Parameters.AddWithValue("@OrderId", id);
+                    
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            var orderType = reader.GetInt32(3);
+                            string orderTypeDisplay = orderType switch
+                            {
+                                0 => "Dine-In",
+                                1 => "Takeout",
+                                2 => "Delivery",
+                                3 => "Online",
+                                _ => "Unknown"
+                            };
+                            
+                            var status = reader.GetInt32(4);
+                            string statusDisplay = status switch
+                            {
+                                0 => "Open",
+                                1 => "In Progress",
+                                2 => "Ready",
+                                3 => "Completed",
+                                4 => "Cancelled",
+                                _ => "Unknown"
+                            };
+                            
+                            order = new OrderViewModel
+                            {
+                                Id = reader.GetInt32(0),
+                                OrderNumber = reader.GetString(1),
+                                TableTurnoverId = reader.IsDBNull(2) ? null : (int?)reader.GetInt32(2),
+                                OrderType = orderType,
+                                OrderTypeDisplay = orderTypeDisplay,
+                                Status = status,
+                                StatusDisplay = statusDisplay,
+                                ServerName = reader.IsDBNull(6) ? null : reader.GetString(6),
+                                CustomerName = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                CustomerPhone = reader.IsDBNull(8) ? null : reader.GetString(8),
+                                Subtotal = reader.GetDecimal(9),
+                                TaxAmount = reader.GetDecimal(10),
+                                TipAmount = reader.GetDecimal(11),
+                                DiscountAmount = reader.GetDecimal(12),
+                                TotalAmount = reader.GetDecimal(13),
+                                SpecialInstructions = reader.IsDBNull(14) ? null : reader.GetString(14),
+                                CreatedAt = reader.GetDateTime(15),
+                                UpdatedAt = reader.GetDateTime(16), // We've handled this in the SQL query
+                                CompletedAt = reader.IsDBNull(17) ? null : (DateTime?)reader.GetDateTime(17),
+                                TableName = reader.IsDBNull(18) ? null : reader.GetString(18),
+                                GuestName = reader.IsDBNull(19) ? null : reader.GetString(19),
+                                Items = new List<OrderItemViewModel>(),
+                                KitchenTickets = new List<KitchenTicketViewModel>()
+                            };
+                        }
+                        else
+                        {
+                            return null; // Order not found
+                        }
+                    }
+                }
+                
+                // Get order items with a separate connection
+                using (SqlConnection itemsConnection = new SqlConnection(_connectionString))
+                {
+                    itemsConnection.Open();
+                    
+                    using (SqlCommand command = new SqlCommand(@"
+                        SELECT 
+                            oi.Id,
+                            oi.MenuItemId,
+                            mi.Name AS MenuItemName,
+                            mi.Description AS MenuItemDescription,
+                            oi.Quantity,
+                            oi.UnitPrice,
+                            oi.Subtotal,
+                            oi.SpecialInstructions,
+                            oi.CourseId,
+                            ct.Name AS CourseName,
+                            oi.Status,
+                            oi.FireTime,
+                            oi.CompletionTime,
+                            oi.DeliveryTime
+                        FROM OrderItems oi
+                        INNER JOIN MenuItems mi ON oi.MenuItemId = mi.Id
+                        LEFT JOIN CourseTypes ct ON oi.CourseId = ct.Id
+                        WHERE oi.OrderId = @OrderId
+                        ORDER BY 
+                            CASE WHEN oi.CourseId IS NULL THEN 999 ELSE oi.CourseId END,
+                            oi.CreatedAt", itemsConnection))
+                {
+                    command.Parameters.AddWithValue("@OrderId", id);
+                    
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var status = reader.GetInt32(10);
+                            string statusDisplay = status switch
+                            {
+                                0 => "New",
+                                1 => "Fired",
+                                2 => "Cooking",
+                                3 => "Ready",
+                                4 => "Delivered",
+                                5 => "Cancelled",
+                                _ => "Unknown"
+                            };
+                            
+                            var orderItem = new OrderItemViewModel
+                            {
+                                Id = reader.GetInt32(0),
+                                OrderId = id,
+                                MenuItemId = reader.GetInt32(1),
+                                MenuItemName = reader.GetString(2),
+                                MenuItemDescription = reader.IsDBNull(3) ? null : reader.GetString(3),
+                                Quantity = reader.GetInt32(4),
+                                UnitPrice = reader.GetDecimal(5),
+                                Subtotal = reader.GetDecimal(6),
+                                SpecialInstructions = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                CourseId = reader.IsDBNull(8) ? null : (int?)reader.GetInt32(8),
+                                CourseName = reader.IsDBNull(9) ? null : reader.GetString(9),
+                                Status = status,
+                                StatusDisplay = statusDisplay,
+                                FireTime = reader.IsDBNull(11) ? null : (DateTime?)reader.GetDateTime(11),
+                                CompletionTime = reader.IsDBNull(12) ? null : (DateTime?)reader.GetDateTime(12),
+                                DeliveryTime = reader.IsDBNull(13) ? null : (DateTime?)reader.GetDateTime(13),
+                                Modifiers = new List<OrderItemModifierViewModel>()
+                            };
+                            
+                            order.Items.Add(orderItem);
+                        }
+                    }
+                }
+                
+                // Get order item modifiers
+                foreach (var item in order.Items)
+                {
+                    // Check which version of the table exists (with or without underscore)
+                    string orderItemModifiersTable = GetCorrectTableName("OrderItemModifiers", "OrderItem_Modifiers");
+                    
+                    if (!string.IsNullOrEmpty(orderItemModifiersTable))
+                    {
+                        // Use a separate connection for modifiers to avoid DataReader issues
+                        using (SqlConnection modifiersConnection = new SqlConnection(_connectionString))
+                        {
+                            modifiersConnection.Open();
+                            
+                            string modifiersQuery = $@"
+                                SELECT 
+                                    oim.Id,
+                                    oim.ModifierId,
+                                    m.Name AS ModifierName,
+                                    oim.Price
+                                FROM {orderItemModifiersTable} oim
+                                INNER JOIN Modifiers m ON oim.ModifierId = m.Id
+                                WHERE oim.OrderItemId = @OrderItemId";
+                                
+                            using (SqlCommand command = new SqlCommand(modifiersQuery, modifiersConnection))
+                            {
+                                command.Parameters.AddWithValue("@OrderItemId", item.Id);
+                                
+                                try
+                                {
+                                    using (SqlDataReader reader = command.ExecuteReader())
+                                    {
+                                        while (reader.Read())
+                                        {
+                                            item.Modifiers.Add(new OrderItemModifierViewModel
+                                            {
+                                                Id = reader.GetInt32(0),
+                                                OrderItemId = item.Id,
+                                                ModifierId = reader.GetInt32(1),
+                                                ModifierName = reader.GetString(2),
+                                                Price = reader.GetDecimal(3)
+                                            });
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    // Log the exception
+                                    Console.WriteLine($"Error getting modifiers for order item {item.Id}: {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Get kitchen tickets using a separate connection
+                using (SqlConnection ticketsConnection = new SqlConnection(_connectionString))
+                {
+                    ticketsConnection.Open();
+                    
+                    string stationIdFieldName = GetSafeStationIdFieldName();
+                    string kitchenTicketQuery = $@"
+                        SELECT 
+                            kt.Id,
+                            kt.TicketNumber,
+                            kt.{stationIdFieldName},
+                            kt.Status,
+                            kt.CreatedAt,
+                            kt.CompletedAt
+                        FROM KitchenTickets kt
+                        WHERE kt.OrderId = @OrderId
+                        ORDER BY kt.CreatedAt DESC";
+                    
+                    using (SqlCommand command = new SqlCommand(kitchenTicketQuery, ticketsConnection))
+                    {
+                        command.Parameters.AddWithValue("@OrderId", id);
+                        
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var status = reader.GetInt32(3);
+                                string statusDisplay = status switch
+                                {
+                                    0 => "New",
+                                    1 => "In Progress",
+                                    2 => "Ready",
+                                    3 => "Completed",
+                                    4 => "Cancelled",
+                                    _ => "Unknown"
+                                };
+                                
+                                var kitchenTicket = new KitchenTicketViewModel
+                                {
+                                    Id = reader.GetInt32(0),
+                                    TicketNumber = reader.GetString(1),
+                                    OrderId = id,
+                                    OrderNumber = order.OrderNumber,
+                                    StationId = reader.IsDBNull(2) ? null : (int?)reader.GetInt32(2),
+                                    Status = status,
+                                    StatusDisplay = statusDisplay,
+                                    CreatedAt = reader.GetDateTime(4),
+                                    CompletedAt = reader.IsDBNull(5) ? null : (DateTime?)reader.GetDateTime(5),
+                                    Items = new List<KitchenTicketItemViewModel>()
+                                };
+                                
+                                order.KitchenTickets.Add(kitchenTicket);
+                            }
+                        }
+                    }
+                }
+                
+            }
+            
+            // Use a new connection for kitchen ticket items to avoid DataReader issues
+            using (SqlConnection kitchenConnection = new SqlConnection(_connectionString))
+            {
+                kitchenConnection.Open();
+                
+                // Get kitchen ticket items
+                foreach (var ticket in order.KitchenTickets)
+                {
+                    // Get the correct table name for kitchen ticket items
+                    string kitchenTicketItemsTable = GetCorrectTableName("KitchenTicketItems", "Kitchen_TicketItems");
+                    
+                    string queryString;
+                    if (kitchenTicketItemsTable == "KitchenTicketItems")
+                    {
+                        // Use direct field access because the schema might have changed
+                        queryString = $@"
+                            SELECT 
+                                kti.Id,
+                                kti.OrderItemId,
+                                COALESCE(kti.MenuItemName, mi.Name) AS MenuItemName,
+                                oi.Quantity,
+                                oi.SpecialInstructions,
+                                kti.Status,
+                                kti.StartTime,
+                                kti.CompletionTime,
+                                kti.Notes
+                            FROM {kitchenTicketItemsTable} kti
+                            INNER JOIN OrderItems oi ON kti.OrderItemId = oi.Id
+                            LEFT JOIN MenuItems mi ON oi.MenuItemId = mi.Id
+                            WHERE kti.KitchenTicketId = @KitchenTicketId";
+                    }
+                    else
+                    {
+                        // Use the old schema
+                        queryString = $@"
+                            SELECT 
+                                kti.Id,
+                                kti.OrderItemId,
+                                mi.Name AS MenuItemName,
+                                oi.Quantity,
+                                oi.SpecialInstructions,
+                                kti.Status,
+                                kti.StartTime,
+                                kti.CompletionTime,
+                                kti.Notes
+                            FROM {kitchenTicketItemsTable} kti
+                            INNER JOIN OrderItems oi ON kti.OrderItemId = oi.Id
+                            INNER JOIN MenuItems mi ON oi.MenuItemId = mi.Id
+                            WHERE kti.KitchenTicketId = @KitchenTicketId";
+                    }
+                    
+                    using (SqlCommand command = new SqlCommand(queryString, kitchenConnection))
+                    {
+                        command.Parameters.AddWithValue("@KitchenTicketId", ticket.Id);
+                        
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var status = reader.GetInt32(5);
+                                string statusDisplay = status switch
+                                {
+                                    0 => "New",
+                                    1 => "In Progress",
+                                    2 => "Ready",
+                                    3 => "Completed",
+                                    4 => "Cancelled",
+                                    _ => "Unknown"
+                                };
+                                
+                                var ticketItem = new KitchenTicketItemViewModel
+                                {
+                                    Id = reader.GetInt32(0),
+                                    KitchenTicketId = ticket.Id,
+                                    OrderItemId = reader.GetInt32(1),
+                                    MenuItemName = reader.GetString(2),
+                                    Quantity = reader.GetInt32(3),
+                                    SpecialInstructions = reader.IsDBNull(4) ? null : reader.GetString(4),
+                                    Status = status,
+                                    StatusDisplay = statusDisplay,
+                                    StartTime = reader.IsDBNull(6) ? null : (DateTime?)reader.GetDateTime(6),
+                                    CompletionTime = reader.IsDBNull(7) ? null : (DateTime?)reader.GetDateTime(7),
+                                    Notes = reader.IsDBNull(8) ? null : reader.GetString(8),
+                                    Modifiers = new List<string>()
+                                };
+                                
+                                // Get modifiers for this ticket item
+                                // Check which version of the table exists (with or without underscore)
+                                string orderItemModifiersTable = GetCorrectTableName("OrderItemModifiers", "OrderItem_Modifiers");
+                                
+                                if (!string.IsNullOrEmpty(orderItemModifiersTable))
+                                {
+                                    string modifiersQuery = $@"
+                                        SELECT m.Name
+                                        FROM {orderItemModifiersTable} oim
+                                        INNER JOIN Modifiers m ON oim.ModifierId = m.Id
+                                        WHERE oim.OrderItemId = @OrderItemId";
+                                        
+                                    using (SqlCommand modifiersCommand = new SqlCommand(modifiersQuery, kitchenConnection))
+                                    {
+                                        modifiersCommand.Parameters.AddWithValue("@OrderItemId", ticketItem.OrderItemId);
+                                    
+                                        using (SqlDataReader modifiersReader = modifiersCommand.ExecuteReader())
+                                        {
+                                            while (modifiersReader.Read())
+                                            {
+                                                ticketItem.Modifiers.Add(modifiersReader.GetString(0));
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                ticket.Items.Add(ticketItem);
+                            }
+                        }
+                    }
+                }
+                
+                // Get available courses for new items
+                using (SqlCommand command = new SqlCommand(@"
+                    SELECT Id, Name
+                    FROM CourseTypes
+                    ORDER BY DisplayOrder", kitchenConnection))
+                {
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            order.AvailableCourses.Add(new CourseType
+                            {
+                                Id = reader.GetInt32(0),
+                                Name = reader.GetString(1)
+                            });
+                        }
+                    }
+                }
+            }
+            
+            return order;
+        }
+        
         private int GetCurrentUserId()
         {
             // In a real application, get this from authentication

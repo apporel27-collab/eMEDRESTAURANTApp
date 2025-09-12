@@ -1,0 +1,27 @@
+@model List<string>
+
+@{
+    ViewData["Title"] = "Database Fix Results";
+}
+
+<div class="container mt-5">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h3>Database Fix Results</h3>
+        </div>
+        <div class="card-body">
+            <div class="list-group">
+                @foreach (var message in Model)
+                {
+                    <div class="list-group-item @(message.StartsWith("Error") ? "list-group-item-danger" : (message.StartsWith("Added") ? "list-group-item-success" : "list-group-item-info"))">
+                        @message
+                    </div>
+                }
+            </div>
+            <div class="mt-4">
+                <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">Return to Home</a>
+                <a asp-controller="Menu" asp-action="Create" class="btn btn-primary">Try Creating Menu Item</a>
+            </div>
+        </div>
+    </div>
+</div>

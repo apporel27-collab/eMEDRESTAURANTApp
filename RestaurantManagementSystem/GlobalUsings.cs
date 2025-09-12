@@ -1,0 +1,41 @@
+// Global using directives
+global using Microsoft.AspNetCore.Mvc;
+global using Microsoft.AspNetCore.Mvc.Filters;
+global using Microsoft.AspNetCore.Authorization;
+global using Microsoft.AspNetCore.Mvc.ViewFeatures;
+global using Microsoft.AspNetCore.Mvc.Rendering;
+global using Microsoft.Data.SqlClient;
+global using System.Data;
+global using Microsoft.AspNetCore.Http;
+global using Microsoft.AspNetCore.Mvc.ModelBinding;
+global using Microsoft.AspNetCore.Mvc.Abstractions;
+global using Microsoft.AspNetCore.Mvc.Infrastructure;
+global using Microsoft.AspNetCore.Mvc.ApplicationModels;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.AspNetCore.Hosting;
+global using Microsoft.Extensions.Hosting;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.AspNetCore.Mvc.RazorPages;
+global using Microsoft.AspNetCore.Http.Features;
+global using Microsoft.AspNetCore.Builder;
+global using Microsoft.AspNetCore.ResponseCaching;
+global using Microsoft.AspNetCore.Authentication;
+global using Microsoft.AspNetCore.Authentication.Cookies;
+global using Microsoft.AspNetCore.Routing;
+global using Microsoft.AspNetCore.StaticFiles;
+global using System.Security.Claims;
+global using System.Diagnostics;
+global using System.ComponentModel.DataAnnotations;
+global using System.ComponentModel.DataAnnotations.Schema;
+global using System.Text;
+global using System.Text.Json;
+global using System.Text.RegularExpressions;
+
+// Add the model namespace to make all models accessible
+global using RestaurantManagementSystem.Models;
+global using RestaurantManagementSystem.ViewModels;
+global using RestaurantManagementSystem.Data;
+global using RestaurantManagementSystem.Services;
+global using RestaurantManagementSystem.Middleware;

@@ -1,0 +1,241 @@
+@model RestaurantManagementSystem.Models.RecipeViewModel
+@{
+    ViewData["Title"] = "Create Recipe";
+    var menuItem = ViewBag.MenuItem as RestaurantManagementSystem.Models.MenuItem;
+}
+
+<div class="container-fluid py-3">
+    @if (ViewData.ModelState.ErrorCount > 0)
+    {
+        <div class="alert alert-danger mb-3">
+            <strong>Error creating recipe:</strong>
+            <ul>
+                @foreach (var modelState in ViewData.ModelState.Values)
+                {
+                    foreach (var error in modelState.Errors)
+                    {
+                        <li>@error.ErrorMessage</li>
+                    }
+                }
+            </ul>
+        </div>
+    }
+
+    @if (menuItem != null)
+    {
+        <div class="alert alert-info mb-3">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle me-2"></i>
+                <div>
+                    <strong>Creating recipe for:</strong> @menuItem.Name
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white py-2">
+            <h5 class="mb-0">Create Recipe</h5>
+        </div>
+        <div class="card-body">
+            <form asp-action="Create" method="post">
+                <input type="hidden" asp-for="MenuItemId" value="@(menuItem?.Id ?? 0)" />
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label asp-for="Title" class="form-label">Title</label>
+                            <input asp-for="Title" class="form-control" value="@(menuItem != null ? $"Recipe for {menuItem.Name}" : "")" required />
+                            <span asp-validation-for="Title" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label asp-for="Yield" class="form-label">Yield</label>
+                                    <input asp-for="Yield" class="form-control" min="1" value="1" required />
+                                    <span asp-validation-for="Yield" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label asp-for="YieldPercentage" class="form-label">Yield %</label>
+                                    <input asp-for="YieldPercentage" class="form-control" min="1" max="100" value="100" required />
+                                    <span asp-validation-for="YieldPercentage" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label asp-for="PreparationTimeMinutes" class="form-label">Prep Time</label>
+                                    <input asp-for="PreparationTimeMinutes" class="form-control" min="1" value="15" required />
+                                    <span asp-validation-for="PreparationTimeMinutes" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label asp-for="CookingTimeMinutes" class="form-label">Cook Time</label>
+                                    <input asp-for="CookingTimeMinutes" class="form-control" min="1" value="15" required />
+                                    <span asp-validation-for="CookingTimeMinutes" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Basic Instructions -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label asp-for="PreparationInstructions" class="form-label">Preparation Instructions</label>
+                            <textarea asp-for="PreparationInstructions" class="form-control" rows="4" required>Prepare all ingredients according to specifications.</textarea>
+                            <span asp-validation-for="PreparationInstructions" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label asp-for="CookingInstructions" class="form-label">Cooking Instructions</label>
+                            <textarea asp-for="CookingInstructions" class="form-control" rows="4" required>Cook according to standard procedures.</textarea>
+                            <span asp-validation-for="CookingInstructions" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label asp-for="PlatingInstructions" class="form-label">Plating Instructions</label>
+                            <textarea asp-for="PlatingInstructions" class="form-control" rows="4">Plate according to chef's specifications.</textarea>
+                            <span asp-validation-for="PlatingInstructions" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ingredients -->
+                <h5 class="mt-4 mb-3">Ingredients</h5>
+                <div class="mb-3">
+                    <button id="addIngredientBtn" type="button" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-plus"></i> Add Ingredient
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Ingredient</th>
+                                <th style="width:100px">Quantity</th>
+                                <th style="width:100px">Unit</th>
+                                <th style="width:80px">Optional</th>
+                                <th>Instructions</th>
+                                <th style="width:70px">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ingredientsList">
+                            <!-- Ingredients will be added dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-group mb-4">
+                    <label asp-for="Notes" class="form-label">Additional Notes</label>
+                    <textarea asp-for="Notes" class="form-control" rows="3">Standard recipe notes.</textarea>
+                    <span asp-validation-for="Notes" class="text-danger"></span>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Recipe
+                    </button>
+                    <button id="setupDbBtn" type="button" class="btn btn-warning">
+                        <i class="fas fa-database"></i> Setup Database
+                    </button>
+                    <a href="/Recipe/RecipeDebug" class="btn btn-info">
+                        <i class="fas fa-bug"></i> Debug Console
+                    </a>
+                    <a asp-controller="Menu" asp-action="Details" asp-route-id="@(menuItem?.Id ?? 0)" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Menu Item
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            let ingredientIndex = 0;
+            
+            // Setup Database button
+            $("#setupDbBtn").click(function() {
+                $.ajax({
+                    url: '@Url.Action("SetupRecipeScripts")',
+                    method: 'GET',
+                    success: function(result) {
+                        if (result.success) {
+                            alert('Database setup complete: ' + result.message);
+                        } else {
+                            alert('Database setup failed: ' + result.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error setting up database: ' + error);
+                    }
+                });
+            });
+            
+            // Add ingredient row
+            $("#addIngredientBtn").click(function() {
+                addIngredientRow();
+            });
+            
+            function addIngredientRow() {
+                const row = `
+                    <tr>
+                        <td>
+                            <select name="Ingredients[${ingredientIndex}].IngredientId" class="form-control" required>
+                                <option value="">Select Ingredient</option>
+                                @foreach (var ing in ViewBag.Ingredients)
+                                {
+                                    <option value="@ing.Value">@ing.Text</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" name="Ingredients[${ingredientIndex}].Quantity" class="form-control" step="0.01" min="0.01" value="1" required />
+                        </td>
+                        <td>
+                            <input type="text" name="Ingredients[${ingredientIndex}].Unit" class="form-control" value="each" required />
+                        </td>
+                        <td class="text-center">
+                            <div class="form-check d-flex justify-content-center">
+                                <input type="checkbox" name="Ingredients[${ingredientIndex}].IsOptional" id="ingredient-optional-${ingredientIndex}" class="form-check-input" />
+                            </div>
+                        </td>
+                        <td>
+                            <input type="text" name="Ingredients[${ingredientIndex}].Instructions" class="form-control" placeholder="Special instructions" />
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm remove-ingredient">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                
+                $("#ingredientsList").append(row);
+                ingredientIndex++;
+                
+                // Bind remove event to new row
+                $(".remove-ingredient").last().click(function() {
+                    $(this).closest("tr").remove();
+                });
+            }
+            
+            // Add at least one ingredient row by default
+            if ($("#ingredientsList tr").length === 0) {
+                addIngredientRow();
+            }
+        });
+    </script>
+}
