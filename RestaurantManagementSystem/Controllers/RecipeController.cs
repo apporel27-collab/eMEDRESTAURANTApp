@@ -50,11 +50,87 @@ namespace RestaurantManagementSystem.Controllers
             return View(recipe);
         }
 
-        // GET: Recipe/Create?menuItemId=5 (legacy) => redirect to Menu/Recipe/5
+        // GET: Recipe/Create/5 (where 5 is the MenuItemId)
         public IActionResult Create(int menuItemId)
         {
-            // Preserve existing deep-link compatibility but serve from MenuController.Recipe
-            return RedirectToAction("Recipe", "Menu", new { id = menuItemId });
+            var menuItem = GetMenuItemById(menuItemId);
+            if (menuItem == null)
+            {
+                return NotFound();
+            }
+
+            ViewBag.MenuItem = menuItem;
+            ViewBag.Ingredients = new SelectList(GetAllIngredients(), "Id", "IngredientsName");
+            
+            var recipeViewModel = new RecipeViewModel
+            {
+                MenuItemId = menuItemId,
+                PreparationTimeMinutes = 15,
+                CookingTimeMinutes = 15,
+                Yield = 1,
+                YieldPercentage = 100
+            };
+            
+            return View(recipeViewModel);
+        }
+
+        // GET: Recipe/SetupRecipeScripts
+        [HttpGet]
+        public IActionResult SetupRecipeScripts()
+        {
+            try
+            {
+                var scriptPath = Path.Combine(_webHostEnvironment.ContentRootPath, "SQL", "Menu_Recipe_Setup.sql");
+                if (!System.IO.File.Exists(scriptPath))
+                {
+                    return NotFound(new { ok = false, message = "Setup script not found." });
+                }
+
+                var script = System.IO.File.ReadAllText(scriptPath);
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    ExecuteSqlWithGoBatches(connection, script);
+                }
+
+                return Ok(new { ok = true });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { ok = false, message = ex.Message });
+            }
+        }
+
+        private static void ExecuteSqlWithGoBatches(SqlConnection connection, string script)
+        {
+            var batches = new List<string>();
+            using (var reader = new StringReader(script))
+            {
+                var sb = new System.Text.StringBuilder();
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (line.Trim().Equals("GO", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (sb.Length > 0)
+                        {
+                            batches.Add(sb.ToString());
+                            sb.Clear();
+                        }
+                    }
+                    else
+                    {
+                        sb.AppendLine(line);
+                    }
+                }
+                if (sb.Length > 0) batches.Add(sb.ToString());
+            }
+
+            foreach (var batch in batches)
+            {
+                using var cmd = new SqlCommand(batch, connection) { CommandTimeout = 120 };
+                cmd.ExecuteNonQuery();
+            }
         }
 
         // POST: Recipe/Create

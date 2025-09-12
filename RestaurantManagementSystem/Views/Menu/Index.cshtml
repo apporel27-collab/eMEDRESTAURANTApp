@@ -87,7 +87,7 @@
                                             <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-primary">
                                                 <i class="fa fa-edit"></i>
                                             </a>
-                                            <a asp-action="Recipe" asp-route-id="@item.Id" class="btn btn-sm btn-secondary">
+                                            <a asp-controller="Recipe" asp-action="Create" asp-route-menuItemId="@item.Id" class="btn btn-sm btn-secondary recipe-link" data-menu-id="@item.Id">
                                                 <i class="fa fa-book"></i> Recipe
                                             </a>
                                             <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">
@@ -114,15 +114,23 @@
                 "autoWidth": false,
                 "pageLength": 25,
                 "columns": [
-                    null, // PLU Code
-                    { "orderable": false }, // Image
-                    null, // Name
-                    null, // Category
-                    null, // Price
-                    null, // Prep Time
-                    null, // Status
-                    { "orderable": false } // Actions
+                    null,
+                    { "orderable": false },
+                    null,
+                    null,
+                    null,
+                    null,
+                    { "orderable": false }
                 ]
+            });
+
+            // Ensure DB objects exist before navigating to recipe page
+            $(document).on('click', 'a.recipe-link', function (e) {
+                e.preventDefault();
+                const href = $(this).attr('href');
+                fetch('/Recipe/SetupRecipeScripts')
+                    .then(() => { window.location.href = href; })
+                    .catch(() => { window.location.href = href; });
             });
         });
     </script>
