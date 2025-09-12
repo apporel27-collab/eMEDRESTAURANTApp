@@ -50,28 +50,11 @@ namespace RestaurantManagementSystem.Controllers
             return View(recipe);
         }
 
-        // GET: Recipe/Create/5 (where 5 is the MenuItemId)
+        // GET: Recipe/Create?menuItemId=5 (legacy) => redirect to Menu/Recipe/5
         public IActionResult Create(int menuItemId)
         {
-            var menuItem = GetMenuItemById(menuItemId);
-            if (menuItem == null)
-            {
-                return NotFound();
-            }
-
-            ViewBag.MenuItem = menuItem;
-            ViewBag.Ingredients = new SelectList(GetAllIngredients(), "Id", "IngredientsName");
-            
-            var recipeViewModel = new RecipeViewModel
-            {
-                MenuItemId = menuItemId,
-                PreparationTimeMinutes = 15,
-                CookingTimeMinutes = 15,
-                Yield = 1,
-                YieldPercentage = 100
-            };
-            
-            return View(recipeViewModel);
+            // Preserve existing deep-link compatibility but serve from MenuController.Recipe
+            return RedirectToAction("Recipe", "Menu", new { id = menuItemId });
         }
 
         // POST: Recipe/Create

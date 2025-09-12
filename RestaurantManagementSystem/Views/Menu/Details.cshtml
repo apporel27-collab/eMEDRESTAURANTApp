@@ -39,10 +39,10 @@
                             <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-sm btn-primary">
                                 <i class="fa fa-edit"></i> Edit
                             </a>
-                            <a asp-controller="Recipe" asp-action="Details" asp-route-id="@Model.Id" class="btn btn-sm btn-info" id="recipeBtn">
+                            <a asp-controller="Menu" asp-action="Recipe" asp-route-id="@Model.Id" class="btn btn-sm btn-info" id="recipeBtn">
                                 <i class="fa fa-book"></i> Recipe
                             </a>
-                            <a asp-controller="Recipe" asp-action="Create" asp-route-menuItemId="@Model.Id" class="btn btn-sm btn-secondary">
+                            <a asp-controller="Menu" asp-action="Recipe" asp-route-id="@Model.Id" class="btn btn-sm btn-secondary">
                                 <i class="fa fa-plus"></i> Add Recipe
                             </a>
                             <a asp-controller="Recipe" asp-action="CalculateSuggestedPrice" asp-route-id="@Model.Id" class="btn btn-sm btn-success">
