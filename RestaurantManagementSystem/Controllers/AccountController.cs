@@ -53,7 +53,7 @@ namespace RestaurantManagementSystem.Controllers
                         // Redirect to MFA verification
                         // In a real application, you would generate and send an MFA code here
                         // For now, we'll simulate MFA by just showing the MFA view
-                        TempData["UserId"] = user.Id;
+                        TempData["Username"] = user.Username;
                         TempData["RememberMe"] = model.RememberMe;
                         TempData["ReturnUrl"] = model.ReturnUrl;
                         

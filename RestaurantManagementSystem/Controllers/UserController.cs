@@ -2,24 +2,28 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using RestaurantManagementSystem.Models;
+using RestaurantManagementSystem.Services;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace RestaurantManagementSystem.Controllers
 {
     public class UserController : Controller
     {
         private readonly IConfiguration _config;
+        private readonly UserRoleService _userRoleService;
 
-        public UserController(IConfiguration configuration)
+        public UserController(IConfiguration configuration, UserRoleService userRoleService)
         {
             _config = configuration;
+            _userRoleService = userRoleService;
         }
 
         // Users List
-        public IActionResult UserList()
+        public async Task<IActionResult> UserList()
         {
             try
             {
@@ -31,30 +35,50 @@ namespace RestaurantManagementSystem.Controllers
                     // First ensure Users table exists
                     EnsureUsersTableExists(con);
                     
-                    // Fix User table schema if needed
-                    EnsureUserTableColumns(con);
-                    
-                    // Use a simpler and safer query approach
-                    using (var cmd = new SqlCommand("SELECT Id, Username, FirstName, LastName, Email, IsActive FROM Users", con))
+                    // Create or update a robust stored procedure to list users safely across schema variants
+                    var createSp = @"CREATE OR ALTER PROCEDURE dbo.usp_GetUsersList
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('dbo.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
+    
+    DECLARE @sql nvarchar(max) = N'SELECT Id, Username, FirstName, LastName, Email, IsActive, ' +
+        CASE WHEN @hasPhone=1 THEN N'Phone' ELSE N'CAST(NULL AS NVARCHAR(20)) AS Phone' END +
+        N' FROM dbo.Users';
+    EXEC sp_executesql @sql;
+END";
+                    using (var createCmd = new SqlCommand(createSp, con))
                     {
+                        createCmd.ExecuteNonQuery();
+                    }
+
+                    using (var cmd = new SqlCommand("dbo.usp_GetUsersList", con))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
                         using (var reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                users.Add(new User
+                                var user = new User
                                 {
                                     Id = reader.GetInt32(0),
                                     Username = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
                                     FirstName = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                                     LastName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
                                     Email = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                                    Phone = string.Empty, // Default value
-                                    Role = UserRole.Guest, // Default value
-                                    IsActive = reader.GetBoolean(5)
-                                });
+                                    IsActive = reader.GetBoolean(5),
+                                    Phone = reader.FieldCount > 6 && !reader.IsDBNull(6) ? reader.GetString(6) : string.Empty
+                                };
+                                users.Add(user);
                             }
                         }
                     }
+                }
+                
+                // For each user, get their roles
+                foreach (var user in users)
+                {
+                    user.Roles = (await _userRoleService.GetUserRolesAsync(user.Id)).ToList();
                 }
                 
                 return View(users);
@@ -68,17 +92,15 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // User Add/Edit/View Form
-        public IActionResult UserForm(int? id, bool isView = false)
+        public async Task<IActionResult> UserForm(int? id, bool isView = false)
         {
             try
             {
                 User model = new User { Username = "", FirstName = "", LastName = "" };
                 ViewBag.IsView = isView;
-                ViewBag.Roles = Enum.GetValues(typeof(UserRole))
-                    .Cast<UserRole>()
-                    .Where(r => r < UserRole.CRMMarketing) // Filter out system integration roles
-                    .Select(r => new { Id = (int)r, Name = r.ToString() })
-                    .ToList();
+                
+                // Get all roles for dropdown
+                ViewBag.AllRoles = await _userRoleService.GetAllRolesAsync();
 
                 if (id.HasValue)
                 {
@@ -90,8 +112,26 @@ namespace RestaurantManagementSystem.Controllers
                         EnsureUsersTableExists(con);
                         EnsureUserTableColumns(con);
                         
-                        using (var cmd = new SqlCommand("SELECT Id, Username, FirstName, LastName, Email, IsActive FROM Users WHERE Id = @Id", con))
+                        // Create or alter a stored procedure to fetch a single user robustly
+                        var createSp = @"CREATE OR ALTER PROCEDURE dbo.usp_GetUserById
+                            @Id INT
+                        AS
+                        BEGIN
+                            SET NOCOUNT ON;
+                            DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('dbo.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
+                            
+                            DECLARE @sql nvarchar(max) = N'SELECT Id, Username, FirstName, LastName, Email, IsActive, ' +
+                                CASE WHEN @hasPhone=1 THEN N'Phone' ELSE N'CAST(NULL AS NVARCHAR(20)) AS Phone' END +
+                                N' FROM dbo.Users WHERE Id = @Id';
+                            EXEC sp_executesql @sql, N'@Id int', @Id=@Id;
+                        END";
+                        using (var createCmd = new SqlCommand(createSp, con))
                         {
+                            createCmd.ExecuteNonQuery();
+                        }
+                        using (var cmd = new SqlCommand("dbo.usp_GetUserById", con))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
                             cmd.Parameters.AddWithValue("@Id", id.Value);
                             using (var reader = cmd.ExecuteReader())
                             {
@@ -104,13 +144,18 @@ namespace RestaurantManagementSystem.Controllers
                                         FirstName = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                                         LastName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
                                         Email = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                                        Phone = string.Empty, // Default value
-                                        Role = UserRole.Guest, // Default value
-                                        IsActive = reader.GetBoolean(5)
+                                        IsActive = reader.GetBoolean(5),
+                                        Phone = reader.FieldCount > 6 && !reader.IsDBNull(6) ? reader.GetString(6) : string.Empty
                                     };
                                 }
                             }
                         }
+                    }
+                    
+                    // Get user roles
+                    if (model.Id > 0)
+                    {
+                        model.Roles = (await _userRoleService.GetUserRolesAsync(model.Id)).ToList();
                     }
                 }
                 return View(model);
@@ -125,8 +170,32 @@ namespace RestaurantManagementSystem.Controllers
 
         // Save User
         [HttpPost]
-        public IActionResult SaveUser(User model)
+        public async Task<IActionResult> SaveUser(User model, List<int> selectedRoles)
         {
+            // Handle password validation/binding for create vs edit
+            if (model.Id == 0)
+            {
+                var postedPassword = Request.Form["password"].FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(postedPassword))
+                {
+                    ModelState.AddModelError("Password", "Password is required.");
+                }
+                else
+                {
+                    model.Password = postedPassword.Trim();
+                    // Remove default model state error for Password since we're setting it manually
+                    if (ModelState.ContainsKey("Password")) ModelState.Remove("Password");
+                }
+            }
+            else
+            {
+                // Editing: password is optional
+                if (ModelState.ContainsKey("Password")) ModelState.Remove("Password");
+            }
+            
+            // Get all roles for dropdown in case we need to return the view
+            ViewBag.AllRoles = await _userRoleService.GetAllRolesAsync();
+
             if (ModelState.IsValid)
             {
                 try
@@ -137,11 +206,6 @@ namespace RestaurantManagementSystem.Controllers
                     if (isUsernameInUse)
                     {
                         ModelState.AddModelError("Username", "Username is already in use");
-                        ViewBag.Roles = Enum.GetValues(typeof(UserRole))
-                            .Cast<UserRole>()
-                            .Where(r => r < UserRole.CRMMarketing)
-                            .Select(r => new { Id = (int)r, Name = r.ToString() })
-                            .ToList();
                         return View("UserForm", model);
                     }
 
@@ -154,26 +218,41 @@ namespace RestaurantManagementSystem.Controllers
                         EnsureUserTableColumns(con);
                         
                         string sql;
+                        bool hasPhone = false, hasRole = false, hasRoleId = false;
+                        // Probe column existence for conditional writes
+                        using (var probe = new SqlCommand("SELECT "+
+                            "CONVERT(bit, CASE WHEN COL_LENGTH('dbo.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END),"+
+                            "CONVERT(bit, CASE WHEN COL_LENGTH('dbo.Users','Role') IS NOT NULL THEN 1 ELSE 0 END),"+
+                            "CONVERT(bit, CASE WHEN COL_LENGTH('dbo.Users','RoleId') IS NOT NULL THEN 1 ELSE 0 END)", con))
+                        using (var readerProbe = probe.ExecuteReader())
+                        {
+                            if (readerProbe.Read())
+                            {
+                                hasPhone = readerProbe.GetBoolean(0);
+                                hasRole = readerProbe.GetBoolean(1);
+                                hasRoleId = readerProbe.GetBoolean(2);
+                            }
+                        }
                         if (model.Id > 0)
                         {
                             // Update
-                            sql = @"
-                                UPDATE Users SET 
+                            sql = @"UPDATE Users SET 
                                     Username = @Username, 
                                     FirstName = @FirstName, 
                                     LastName = @LastName,
                                     Email = @Email, 
-                                    IsActive = @IsActive
+                                    " + (hasPhone ? "Phone = @Phone,\n" : "") +
+                                    (hasRole ? "[Role] = @Role,\n" : hasRoleId ? "RoleId = @Role,\n" : "") +
+                                    @"IsActive = @IsActive
                                 WHERE Id = @Id;
                                 SELECT 'User updated successfully' as Message;";
                         }
                         else
                         {
                             // Insert
-                            sql = @"
-                                INSERT INTO Users (Username, Password, FirstName, LastName, Email, IsActive)
-                                VALUES (@Username, @Password, @FirstName, @LastName, @Email, @IsActive);
-                                SELECT 'User added successfully' as Message;";
+                            string insertCols = "Username, Password, FirstName, LastName, Email" + (hasPhone ? ", Phone" : "") + ((hasRole || hasRoleId) ? ", " + (hasRole ? "[Role]" : "RoleId") : "") + ", IsActive";
+                            string insertVals = "@Username, @Password, @FirstName, @LastName, @Email" + (hasPhone ? ", @Phone" : "") + ((hasRole || hasRoleId) ? ", @Role" : "") + ", @IsActive";
+                            sql = $"INSERT INTO Users ({insertCols}) VALUES ({insertVals}); SELECT 'User added successfully' as Message;";
                         }
 
                         using (var cmd = new SqlCommand(sql, con))
@@ -191,13 +270,17 @@ namespace RestaurantManagementSystem.Controllers
                             }
                             else
                             {
-                                // For new users, set a default password
-                                cmd.Parameters.AddWithValue("@Password", "password123"); // In production, use proper password hashing
+                                // For new users, use the validated posted password (already ensured above)
+                                cmd.Parameters.AddWithValue("@Password", model.Password);
                             }
                             
                             cmd.Parameters.AddWithValue("@FirstName", model.FirstName);
                             cmd.Parameters.AddWithValue("@LastName", model.LastName ?? (object)DBNull.Value);
                             cmd.Parameters.AddWithValue("@Email", model.Email ?? (object)DBNull.Value);
+                            if (hasPhone)
+                                cmd.Parameters.AddWithValue("@Phone", string.IsNullOrWhiteSpace(model.Phone) ? (object)DBNull.Value : model.Phone);
+                            if (hasRole || hasRoleId)
+                                cmd.Parameters.AddWithValue("@Role", (int)model.Role);
                             cmd.Parameters.AddWithValue("@IsActive", model.IsActive);
 
                             using (var reader = cmd.ExecuteReader())
@@ -218,11 +301,8 @@ namespace RestaurantManagementSystem.Controllers
                 }
             }
             
-            ViewBag.Roles = Enum.GetValues(typeof(UserRole))
-                .Cast<UserRole>()
-                .Where(r => r < UserRole.CRMMarketing)
-                .Select(r => new { Id = (int)r, Name = r.ToString() })
-                .ToList();
+            // Get roles for dropdown before returning
+            ViewBag.AllRoles = _userRoleService.GetAllRolesAsync().Result;
             return View("UserForm", model);
         }
 
