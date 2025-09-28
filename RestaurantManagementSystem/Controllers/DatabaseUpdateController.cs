@@ -22,13 +22,13 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
                     // Check if column exists
                     bool columnExists = false;
-                    using (SqlCommand checkCommand = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand checkCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT COUNT(*) 
                         FROM INFORMATION_SCHEMA.COLUMNS 
                         WHERE TABLE_NAME = 'Orders' 
@@ -41,7 +41,7 @@ namespace RestaurantManagementSystem.Controllers
                     if (!columnExists)
                     {
                         // Add the column
-                        using (SqlCommand alterCommand = new SqlCommand(@"
+                        using (Microsoft.Data.SqlClient.SqlCommand alterCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                             ALTER TABLE Orders
                             ADD CancelledAt DATETIME NULL", connection))
                         {
@@ -66,11 +66,11 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
                         FROM INFORMATION_SCHEMA.COLUMNS
                         WHERE TABLE_NAME = 'Orders'
@@ -110,7 +110,7 @@ namespace RestaurantManagementSystem.Controllers
                 string script = System.IO.File.ReadAllText(scriptPath);
                 
                 // Execute the script
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
@@ -121,7 +121,7 @@ namespace RestaurantManagementSystem.Controllers
                     {
                         if (!string.IsNullOrWhiteSpace(batch))
                         {
-                            using (var command = new SqlCommand(batch, connection))
+                            using (var command = new Microsoft.Data.SqlClient.SqlCommand(batch, connection))
                             {
                                 command.ExecuteNonQuery();
                             }

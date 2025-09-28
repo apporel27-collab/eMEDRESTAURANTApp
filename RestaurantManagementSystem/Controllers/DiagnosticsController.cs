@@ -27,12 +27,12 @@ namespace RestaurantManagementSystem.Controllers
             
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
                     // Check if table exists
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @TableName",
                         connection))
                     {
@@ -43,7 +43,7 @@ namespace RestaurantManagementSystem.Controllers
                         if (tableExists > 0)
                         {
                             // Get column info
-                            using (var columnsCommand = new SqlCommand(
+                            using (var columnsCommand = new Microsoft.Data.SqlClient.SqlCommand(
                                 "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @TableName",
                                 connection))
                             {
@@ -67,7 +67,7 @@ namespace RestaurantManagementSystem.Controllers
                             }
                             
                             // Get row count
-                            using (var countCommand = new SqlCommand(
+                            using (var countCommand = new Microsoft.Data.SqlClient.SqlCommand(
                                 $"SELECT COUNT(*) FROM {tableName}",
                                 connection))
                             {
@@ -77,7 +77,7 @@ namespace RestaurantManagementSystem.Controllers
                                 // Get sample data (first 10 rows)
                                 if (rowCount > 0)
                                 {
-                                    using (var dataCommand = new SqlCommand(
+                                    using (var dataCommand = new Microsoft.Data.SqlClient.SqlCommand(
                                         $"SELECT TOP 10 * FROM {tableName}",
                                         connection))
                                     {

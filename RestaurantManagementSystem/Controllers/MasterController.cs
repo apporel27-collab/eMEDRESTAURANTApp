@@ -35,7 +35,7 @@ namespace RestaurantManagementSystem.Controllers
         return View(model);
     }
 
-    [HttpPost]
+    [HttpPostAttribute]
     public IActionResult CategoryForm(Category model)
     {
         string resultMessage;
@@ -100,7 +100,7 @@ namespace RestaurantManagementSystem.Controllers
         return View("Ingredients", model);
     }
 
-    [HttpPost]
+    [HttpPostAttribute]
     public IActionResult IngredientsForm(Ingredients model)
     {
         if (ModelState.IsValid)

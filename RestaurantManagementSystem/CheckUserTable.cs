@@ -22,7 +22,7 @@ namespace RestaurantManagementSystem
 
             Console.WriteLine("Checking Users table structure...");
             
-            using (SqlConnection connection = new SqlConnection(connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString))
             {
                 try
                 {
@@ -36,7 +36,7 @@ namespace RestaurantManagementSystem
                         ELSE
                             SELECT 'Table does not exist' as Status";
 
-                    using (SqlCommand cmd = new SqlCommand(checkTableQuery, connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(checkTableQuery, connection))
                     {
                         string tableStatus = cmd.ExecuteScalar().ToString();
                         Console.WriteLine($"Users table status: {tableStatus}");
@@ -49,9 +49,9 @@ namespace RestaurantManagementSystem
                         WHERE TABLE_NAME = 'Users'
                         ORDER BY ORDINAL_POSITION";
 
-                    using (SqlCommand cmd = new SqlCommand(getColumnsQuery, connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(getColumnsQuery, connection))
                     {
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = cmd.ExecuteReader())
                         {
                             if (reader.HasRows)
                             {
@@ -85,7 +85,7 @@ namespace RestaurantManagementSystem
                         ELSE
                             SELECT 'Table does not exist' as Status";
 
-                    using (SqlCommand cmd = new SqlCommand(checkRoleTableQuery, connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(checkRoleTableQuery, connection))
                     {
                         string tableStatus = cmd.ExecuteScalar().ToString();
                         Console.WriteLine($"\nUserRoles table status: {tableStatus}");
@@ -98,9 +98,9 @@ namespace RestaurantManagementSystem
                         WHERE TABLE_NAME = 'UserRoles'
                         ORDER BY ORDINAL_POSITION";
 
-                    using (SqlCommand cmd = new SqlCommand(getRoleColumnsQuery, connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(getRoleColumnsQuery, connection))
                     {
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = cmd.ExecuteReader())
                         {
                             if (reader.HasRows)
                             {
@@ -134,7 +134,7 @@ namespace RestaurantManagementSystem
                         ELSE
                             SELECT 'Admin user does not exist' as Status";
 
-                    using (SqlCommand cmd = new SqlCommand(checkAdminQuery, connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(checkAdminQuery, connection))
                     {
                         try
                         {
@@ -149,11 +149,11 @@ namespace RestaurantManagementSystem
 
                     // Get all users
                     string getUsersQuery = @"SELECT * FROM Users";
-                    using (SqlCommand cmd = new SqlCommand(getUsersQuery, connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(getUsersQuery, connection))
                     {
                         try
                         {
-                            using (SqlDataReader reader = cmd.ExecuteReader())
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = cmd.ExecuteReader())
                             {
                                 if (reader.HasRows)
                                 {

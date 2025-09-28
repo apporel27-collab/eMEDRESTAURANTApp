@@ -1,0 +1,240 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using RestaurantManagementSystem.Models;
+using RestaurantManagementSystem.Services;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace RestaurantManagementSystem.Controllers
+{
+    [Authorize(Roles = "Administrator")]
+    public class UserManagementController : Controller
+    {
+        private readonly UserService _userService;
+        private readonly UserRoleService _userRoleService;
+        private readonly AuthService _authService;
+        
+        public UserManagementController(
+            UserService userService, 
+            UserRoleService userRoleService,
+            AuthService authService)
+        {
+            _userService = userService;
+            _userRoleService = userRoleService;
+            _authService = authService;
+        }
+        
+        // GET: /UserManagement/
+        public async Task<IActionResult> Index()
+        {
+            var users = await _userService.GetAllUsersAsync();
+            return View(users);
+        }
+        
+        // GET: /UserManagement/Create
+        public async Task<IActionResult> Create()
+        {
+            var roles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.Roles = roles;
+            return View(new User());
+        }
+        
+        // POST: /UserManagement/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(User user)
+        {
+            // Remove validation for password fields when editing
+            ModelState.Remove("Id");
+            
+            if (ModelState.IsValid)
+            {
+                // Get current user ID for audit trail
+                var currentUserId = _authService.GetCurrentUserId();
+                
+                // Create the user
+                var success = await _userService.CreateUserAsync(user, currentUserId);
+                
+                if (success)
+                {
+                    // Set user roles if any were selected
+                    if (user.SelectedRoleIds != null && user.SelectedRoleIds.Any())
+                    {
+                        await _userRoleService.SetUserRolesAsync(user.Id, user.SelectedRoleIds);
+                    }
+                    
+                    TempData["SuccessMessage"] = "User created successfully";
+                    return RedirectToAction(nameof(Index));
+                }
+                else
+                {
+                    ModelState.AddModelError("", "Failed to create user");
+                }
+            }
+            
+            // If we got this far, something failed, redisplay form
+            var roles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.Roles = roles;
+            return View(user);
+        }
+        
+        // GET: /UserManagement/Edit/5
+        public async Task<IActionResult> Edit(int id)
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            
+            if (user == null)
+            {
+                return NotFound();
+            }
+            
+            // Get user roles
+            var userRoles = await _userRoleService.GetUserRolesAsync(id);
+            user.SelectedRoleIds = userRoles.Select(r => r.Id).ToList();
+            
+            // Get all available roles for selection
+            var allRoles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.Roles = allRoles;
+            
+            return View(user);
+        }
+        
+        // POST: /UserManagement/Edit/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, User user)
+        {
+            if (id != user.Id)
+            {
+                return NotFound();
+            }
+            
+            // Remove password validation for edit
+            ModelState.Remove("Password");
+            ModelState.Remove("ConfirmPassword");
+            
+            if (ModelState.IsValid)
+            {
+                // Get current user ID for audit trail
+                var currentUserId = _authService.GetCurrentUserId();
+                
+                // Update the user
+                var success = await _userService.UpdateUserAsync(user, currentUserId);
+                
+                if (success)
+                {
+                    // Set user roles if any were selected
+                    if (user.SelectedRoleIds != null)
+                    {
+                        await _userRoleService.SetUserRolesAsync(user.Id, user.SelectedRoleIds);
+                    }
+                    
+                    TempData["SuccessMessage"] = "User updated successfully";
+                    return RedirectToAction(nameof(Index));
+                }
+                else
+                {
+                    ModelState.AddModelError("", "Failed to update user");
+                }
+            }
+            
+            // If we got this far, something failed, redisplay form
+            var roles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.Roles = roles;
+            return View(user);
+        }
+        
+        // GET: /UserManagement/Details/5
+        public async Task<IActionResult> Details(int id)
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            
+            if (user == null)
+            {
+                return NotFound();
+            }
+            
+            // Get user roles
+            var userRoles = await _userRoleService.GetUserRolesAsync(id);
+            ViewBag.UserRoles = userRoles;
+            
+            return View(user);
+        }
+        
+        // GET: /UserManagement/Delete/5
+        public async Task<IActionResult> Delete(int id)
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            
+            if (user == null)
+            {
+                return NotFound();
+            }
+            
+            return View(user);
+        }
+        
+        // POST: /UserManagement/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            var success = await _userService.DeleteUserAsync(id);
+            
+            if (success)
+            {
+                TempData["SuccessMessage"] = "User deleted successfully";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = "Failed to delete user";
+            }
+            
+            return RedirectToAction(nameof(Index));
+        }
+        
+        // GET: /UserManagement/ChangePassword/5
+        public async Task<IActionResult> ChangePassword(int id)
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            
+            if (user == null)
+            {
+                return NotFound();
+            }
+            
+            ViewBag.User = user;
+            
+            return View();
+        }
+        
+        // POST: /UserManagement/ChangePassword/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangePassword(int id, string newPassword)
+        {
+            if (string.IsNullOrEmpty(newPassword))
+            {
+                ModelState.AddModelError("newPassword", "Password cannot be empty");
+                var user = await _userService.GetUserByIdAsync(id);
+                ViewBag.User = user;
+                return View();
+            }
+            
+            var currentUserId = _authService.GetCurrentUserId();
+            var success = await _userService.ChangePasswordAsync(id, newPassword, currentUserId);
+            
+            if (success)
+            {
+                TempData["SuccessMessage"] = "Password changed successfully";
+                return RedirectToAction(nameof(Details), new { id });
+            }
+            else
+            {
+                TempData["ErrorMessage"] = "Failed to change password";
+                return RedirectToAction(nameof(ChangePassword), new { id });
+            }
+        }
+    }
+}

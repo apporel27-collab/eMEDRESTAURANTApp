@@ -16,6 +16,11 @@ namespace RestaurantManagementSystem.Data
         public DbSet<Table> Tables { get; set; } = null!;
         public DbSet<Reservation> Reservations { get; set; } = null!;
         
+        // User Management
+        public DbSet<User> Users { get; set; } = null!;
+        public DbSet<Role> Roles { get; set; } = null!;
+        public DbSet<UserRoleAssignment> UserRoles { get; set; } = null!;
+        
         // Menu and Recipe Management
         public DbSet<MenuItem> MenuItems { get; set; } = null!;
         public DbSet<Allergen> Allergens { get; set; } = null!;

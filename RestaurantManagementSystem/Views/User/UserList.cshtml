@@ -17,6 +17,10 @@
     {
         <div class="alert alert-info">@TempData["ResultMessage"]</div>
     }
+    @if (ViewBag.ErrorMessage != null)
+    {
+        <div class="alert alert-danger">@ViewBag.ErrorMessage</div>
+    }
 
     <div class="table-responsive">
         <table class="table table-striped" id="userTable">
@@ -39,7 +43,7 @@
                         <td>@user.FirstName @user.LastName</td>
                         <td>@user.Email</td>
                         <td>@user.Phone</td>
-                        <td>@user.Role</td>
+                        <td>@(user.Roles != null && user.Roles.Any() ? string.Join(", ", user.Roles.Select(r => r.Name)) : "-")</td>
                         <td>@(user.IsActive ? "Active" : "Inactive")</td>
                         <td>
                             <a asp-action="UserForm" asp-route-id="@user.Id" class="btn btn-sm btn-primary">Edit</a>

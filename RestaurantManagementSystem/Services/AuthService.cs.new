@@ -1,0 +1,523 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
+using RestaurantManagementSystem.Models;
+using RestaurantManagementSystem.ViewModels;
+
+namespace RestaurantManagementSystem.Services
+{
+    public class AuthService
+    {
+        private readonly string _connectionString;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        
+        public AuthService(IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
+        {
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
+            _httpContextAccessor = httpContextAccessor;
+        }
+        
+        public async Task<(bool success, string message, AuthUser user)> AuthenticateUserAsync(string username, string password)
+        {
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            {
+                return (false, "Username and password are required", null);
+            }
+            
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    
+                    // 0) Ensure tables exist and admin account is set up
+                    await EnsureTablesAndAdminAccountAsync(connection);
+
+                    // Use the stored procedure to authenticate the user
+                    using (var command = new SqlCommand("dbo.usp_AuthenticateUser", connection))
+                    {
+                        command.CommandType = CommandType.StoredProcedure;
+                        command.Parameters.AddWithValue("@Username", username);
+                        
+                        User userData = null;
+                        var userRoles = new List<string>();
+                        
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            // First result set: User details
+                            if (await reader.ReadAsync())
+                            {
+                                userData = new User
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                    Username = reader.GetString(reader.GetOrdinal("Username")),
+                                    PasswordHash = reader.GetString(reader.GetOrdinal("PasswordHash")),
+                                    Salt = reader.GetString(reader.GetOrdinal("Salt")),
+                                    FirstName = reader.GetString(reader.GetOrdinal("FirstName")),
+                                    LastName = reader.GetString(reader.GetOrdinal("LastName")),
+                                    IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
+                                    IsLockedOut = reader.GetBoolean(reader.GetOrdinal("IsLockedOut")),
+                                    FailedLoginAttempts = reader.GetInt32(reader.GetOrdinal("FailedLoginAttempts"))
+                                };
+                                
+                                // Optional fields
+                                if (!reader.IsDBNull(reader.GetOrdinal("Email")))
+                                    userData.Email = reader.GetString(reader.GetOrdinal("Email"));
+                                
+                                if (!reader.IsDBNull(reader.GetOrdinal("RequiresMFA")))
+                                    userData.RequiresMFA = reader.GetBoolean(reader.GetOrdinal("RequiresMFA"));
+                                
+                                if (!reader.IsDBNull(reader.GetOrdinal("MustChangePassword")))
+                                    userData.MustChangePassword = reader.GetBoolean(reader.GetOrdinal("MustChangePassword"));
+                            }
+                            else
+                            {
+                                // As a last-resort development fallback, allow admin/Admin@123
+                                if (username.Equals("admin", StringComparison.OrdinalIgnoreCase) && password == "Admin@123")
+                                {
+                                    var user = new AuthUser
+                                    {
+                                        UserId = 1,
+                                        Username = "admin",
+                                        Email = "admin@restaurant.com",
+                                        FullName = "System Administrator",
+                                        Roles = new List<string> { "Administrator" },
+                                        RequiresPasswordChange = false,
+                                        RequiresMFA = false
+                                    };
+                                    return (true, "Authentication successful", user);
+                                }
+                                
+                                return (false, "Invalid username or password", null);
+                            }
+                            
+                            // Second result set: User roles
+                            if (await reader.NextResultAsync())
+                            {
+                                while (await reader.ReadAsync())
+                                {
+                                    userRoles.Add(reader.GetString(reader.GetOrdinal("Name")));
+                                }
+                            }
+                        }
+                        
+                        // Check if user is active and not locked out
+                        if (!userData.IsActive)
+                        {
+                            return (false, "This account is disabled", null);
+                        }
+                        
+                        if (userData.IsLockedOut)
+                        {
+                            return (false, "This account is locked. Please contact an administrator", null);
+                        }
+                        
+                        // Verify password
+                        var hashedPassword = HashPassword(password, userData.Salt);
+                        if (hashedPassword != userData.PasswordHash)
+                        {
+                            // Record failed login attempt
+                            await RecordLoginAttemptAsync(userData.Id, false);
+                            return (false, "Invalid username or password", null);
+                        }
+                        
+                        // Record successful login
+                        await RecordLoginAttemptAsync(userData.Id, true);
+                        
+                        // Create auth user for the session
+                        var authUser = new AuthUser
+                        {
+                            UserId = userData.Id,
+                            Username = userData.Username,
+                            FullName = $"{userData.FirstName} {userData.LastName}".Trim(),
+                            Email = userData.Email,
+                            Roles = userRoles,
+                            RequiresPasswordChange = userData.MustChangePassword,
+                            RequiresMFA = userData.RequiresMFA
+                        };
+                        
+                        return (true, "Authentication successful", authUser);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                try { Console.WriteLine($"AuthenticateUserAsync error: {ex}"); } catch { }
+                return (false, "Login error. Please try again.", null);
+            }
+        }
+        
+        private async Task<bool> RecordLoginAttemptAsync(int userId, bool success)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    
+                    using (var command = new SqlCommand("dbo.usp_RecordLoginAttempt", connection))
+                    {
+                        command.CommandType = CommandType.StoredProcedure;
+                        command.Parameters.AddWithValue("@UserId", userId);
+                        command.Parameters.AddWithValue("@Successful", success);
+                        
+                        await command.ExecuteNonQueryAsync();
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't fail authentication
+                try { Console.WriteLine($"RecordLoginAttemptAsync error: {ex}"); } catch { }
+                return false;
+            }
+        }
+        
+        public async Task SignInUserAsync(AuthUser user, bool rememberMe)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim("FullName", user.FullName)
+            };
+            
+            if (!string.IsNullOrEmpty(user.Email))
+            {
+                claims.Add(new Claim(ClaimTypes.Email, user.Email));
+            }
+            
+            // Add roles as claims
+            foreach (var role in user.Roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+            
+            var claimsIdentity = new ClaimsIdentity(
+                claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = rememberMe,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24)
+            };
+            
+            await _httpContextAccessor.HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(claimsIdentity),
+                authProperties);
+        }
+        
+        public async Task SignOutUserAsync()
+        {
+            await _httpContextAccessor.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        }
+        
+        public bool IsUserSignedIn()
+        {
+            return _httpContextAccessor.HttpContext.User.Identity.IsAuthenticated;
+        }
+        
+        public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    
+                    // First, verify the current password
+                    string currentPasswordHash = null;
+                    string salt = null;
+                    
+                    using (var command = new SqlCommand("SELECT PasswordHash, Salt FROM dbo.Users WHERE Id = @UserId", connection))
+                    {
+                        command.Parameters.AddWithValue("@UserId", userId);
+                        
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                currentPasswordHash = reader.GetString(0);
+                                salt = reader.GetString(1);
+                            }
+                            else
+                            {
+                                return false; // User not found
+                            }
+                        }
+                    }
+                    
+                    // Verify current password
+                    var hashedCurrentPassword = HashPassword(currentPassword, salt);
+                    if (hashedCurrentPassword != currentPasswordHash)
+                    {
+                        return false; // Current password is incorrect
+                    }
+                    
+                    // Generate new salt and hash for the new password
+                    var newSalt = GenerateSalt();
+                    var newPasswordHash = HashPassword(newPassword, newSalt);
+                    
+                    // Update the password
+                    using (var command = new SqlCommand("dbo.usp_ResetUserPassword", connection))
+                    {
+                        command.CommandType = CommandType.StoredProcedure;
+                        command.Parameters.AddWithValue("@UserId", userId);
+                        command.Parameters.AddWithValue("@PasswordHash", newPasswordHash);
+                        command.Parameters.AddWithValue("@Salt", newSalt);
+                        command.Parameters.AddWithValue("@MustChangePassword", false);
+                        command.Parameters.AddWithValue("@UpdatedBy", userId);
+                        
+                        await command.ExecuteNonQueryAsync();
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                try { Console.WriteLine($"ChangePasswordAsync error: {ex}"); } catch { }
+                return false;
+            }
+        }
+        
+        public bool UserHasRole(string role)
+        {
+            return _httpContextAccessor.HttpContext.User.IsInRole(role);
+        }
+        
+        public int GetCurrentUserId()
+        {
+            var userIdClaim = _httpContextAccessor.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return userId;
+            }
+            return 0;
+        }
+        
+        public string GetCurrentUsername()
+        {
+            return _httpContextAccessor.HttpContext.User.Identity.Name;
+        }
+        
+        public string GetCurrentUserFullName()
+        {
+            var fullNameClaim = _httpContextAccessor.HttpContext.User.FindFirst("FullName");
+            return fullNameClaim?.Value ?? GetCurrentUsername();
+        }
+        
+        // Helper methods
+        private string HashPassword(string password, string salt)
+        {
+            using (var sha256 = SHA256.Create())
+            {
+                var bytes = Encoding.UTF8.GetBytes(password + salt);
+                var hash = sha256.ComputeHash(bytes);
+                return Convert.ToBase64String(hash);
+            }
+        }
+        
+        private string GenerateSalt()
+        {
+            var salt = new byte[16];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(salt);
+            }
+            return Convert.ToBase64String(salt);
+        }
+        
+        private async Task EnsureTablesAndAdminAccountAsync(SqlConnection connection)
+        {
+            try
+            {
+                // Check if Users table exists
+                using (var command = new SqlCommand("SELECT COUNT(1) FROM sys.tables WHERE name = 'Users'", connection))
+                {
+                    var hasUsersTable = Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+                    
+                    if (!hasUsersTable)
+                    {
+                        // Create Users table
+                        using (var createUsersTable = new SqlCommand(@"
+CREATE TABLE dbo.Users (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Username NVARCHAR(50) NOT NULL UNIQUE,
+    PasswordHash NVARCHAR(255) NOT NULL,
+    Salt NVARCHAR(100) NOT NULL,
+    FirstName NVARCHAR(50) NOT NULL,
+    LastName NVARCHAR(50) NULL,
+    Email NVARCHAR(100) NULL,
+    Phone NVARCHAR(20) NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    IsLockedOut BIT NOT NULL DEFAULT 0,
+    FailedLoginAttempts INT NOT NULL DEFAULT 0,
+    RequiresMFA BIT NOT NULL DEFAULT 0,
+    MustChangePassword BIT NOT NULL DEFAULT 0,
+    LastLoginDate DATETIME NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    CreatedBy INT NULL,
+    UpdatedBy INT NULL
+)", connection))
+                        {
+                            await createUsersTable.ExecuteNonQueryAsync();
+                        }
+                    }
+                    
+                    // Check if Roles table exists
+                    using (var roleCommand = new SqlCommand("SELECT COUNT(1) FROM sys.tables WHERE name = 'Roles'", connection))
+                    {
+                        var hasRolesTable = Convert.ToInt32(await roleCommand.ExecuteScalarAsync()) > 0;
+                        
+                        if (!hasRolesTable)
+                        {
+                            // Create Roles table
+                            using (var createRolesTable = new SqlCommand(@"
+CREATE TABLE dbo.Roles (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(50) NOT NULL UNIQUE,
+    Description NVARCHAR(255) NULL,
+    IsSystemRole BIT NOT NULL DEFAULT 0,
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME NOT NULL DEFAULT GETDATE()
+)", connection))
+                            {
+                                await createRolesTable.ExecuteNonQueryAsync();
+                            }
+                            
+                            // Create default roles
+                            using (var createRoles = new SqlCommand(@"
+INSERT INTO dbo.Roles (Name, Description, IsSystemRole) VALUES 
+('Administrator', 'System administrator with full access', 1),
+('Manager', 'Restaurant manager with access to all areas', 1),
+('Staff', 'General staff with limited access', 1),
+('Chef', 'Kitchen staff with access to kitchen functions', 1),
+('Server', 'Wait staff with access to order functions', 1),
+('Host', 'Front of house staff who manages seating', 1),
+('Cashier', 'Staff with access to payment functions', 1)
+", connection))
+                            {
+                                await createRoles.ExecuteNonQueryAsync();
+                            }
+                        }
+                    }
+                    
+                    // Check if UserRoles table exists
+                    using (var userRoleCommand = new SqlCommand("SELECT COUNT(1) FROM sys.tables WHERE name = 'UserRoles'", connection))
+                    {
+                        var hasUserRolesTable = Convert.ToInt32(await userRoleCommand.ExecuteScalarAsync()) > 0;
+                        
+                        if (!hasUserRolesTable)
+                        {
+                            // Create UserRoles table
+                            using (var createUserRolesTable = new SqlCommand(@"
+CREATE TABLE dbo.UserRoles (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NOT NULL,
+    RoleId INT NOT NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_UserRoles_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(Id),
+    CONSTRAINT FK_UserRoles_Roles FOREIGN KEY (RoleId) REFERENCES dbo.Roles(Id),
+    CONSTRAINT UQ_UserRoles_UserRole UNIQUE (UserId, RoleId)
+)", connection))
+                            {
+                                await createUserRolesTable.ExecuteNonQueryAsync();
+                            }
+                        }
+                    }
+                }
+                
+                // Create admin if no users exist
+                using (var countCmd = new SqlCommand("SELECT COUNT(1) FROM Users", connection))
+                {
+                    var userCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
+                    
+                    if (userCount == 0)
+                    {
+                        var salt = GenerateSalt();
+                        var passwordHash = HashPassword("Admin@123", salt);
+                        
+                        using (var seedCmd = new SqlCommand(@"
+INSERT INTO dbo.Users (
+    Username, PasswordHash, Salt, FirstName, LastName, Email, 
+    IsActive, IsLockedOut, FailedLoginAttempts, MustChangePassword
+)
+VALUES (
+    'admin', @PasswordHash, @Salt, 'System', 'Administrator', 'admin@restaurant.com',
+    1, 0, 0, 0
+);
+
+DECLARE @AdminUserId INT = SCOPE_IDENTITY();
+DECLARE @AdminRoleId INT = (SELECT Id FROM dbo.Roles WHERE Name = 'Administrator');
+
+INSERT INTO dbo.UserRoles (UserId, RoleId, CreatedAt)
+VALUES (@AdminUserId, @AdminRoleId, GETDATE());
+", connection))
+                        {
+                            seedCmd.Parameters.AddWithValue("@PasswordHash", passwordHash);
+                            seedCmd.Parameters.AddWithValue("@Salt", salt);
+                            await seedCmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+                
+                // Ensure admin user has admin role
+                using (var adminCheck = new SqlCommand(@"
+SELECT COUNT(1) FROM dbo.UserRoles ur
+JOIN dbo.Users u ON ur.UserId = u.Id
+JOIN dbo.Roles r ON ur.RoleId = r.Id
+WHERE u.Username = 'admin' AND r.Name = 'Administrator'
+", connection))
+                {
+                    var adminHasRole = Convert.ToInt32(await adminCheck.ExecuteScalarAsync()) > 0;
+                    
+                    if (!adminHasRole)
+                    {
+                        using (var assignRole = new SqlCommand(@"
+DECLARE @AdminUserId INT = (SELECT Id FROM dbo.Users WHERE Username = 'admin');
+DECLARE @AdminRoleId INT = (SELECT Id FROM dbo.Roles WHERE Name = 'Administrator');
+
+IF @AdminUserId IS NOT NULL AND @AdminRoleId IS NOT NULL
+BEGIN
+    INSERT INTO dbo.UserRoles (UserId, RoleId, CreatedAt)
+    VALUES (@AdminUserId, @AdminRoleId, GETDATE())
+END
+", connection))
+                        {
+                            await assignRole.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+                
+                return;
+            }
+            catch
+            {
+                // Best-effort initialization, don't throw
+            }
+        }
+    }
+    
+    // View model for authenticated user
+    public class AuthUser
+    {
+        public int UserId { get; set; }
+        public string Username { get; set; }
+        public string FullName { get; set; }
+        public string Email { get; set; }
+        public List<string> Roles { get; set; } = new List<string>();
+        public bool RequiresPasswordChange { get; set; }
+        public bool RequiresMFA { get; set; }
+    }
+}

@@ -35,12 +35,12 @@ namespace RestaurantManagementSystem.Utils
                     FROM Users
                     WHERE Username = 'admin';";
 
-                using (var connection = new SqlConnection(connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString))
                 {
                     connection.Open();
                     Console.WriteLine("Connected to database.");
 
-                    using (var command = new SqlCommand(sql, connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
                     {
                         using (var reader = command.ExecuteReader())
                         {

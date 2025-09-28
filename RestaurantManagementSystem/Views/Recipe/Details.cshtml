@@ -1,4 +1,4 @@
-@model RestaurantManagementSystem.Models.Recipe
+@model RestaurantManagementSystem.Models.RecipeViewModel
 
 @{
     ViewData["Title"] = "Recipe Details";
@@ -11,7 +11,7 @@
                 <div class="card-header">
                     <h4>Recipe Details: @Model.Title</h4>
                     <div class="float-right">
-                        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">
+                        <a asp-action="Edit" asp-route-menuItemId="@Model.MenuItemId" class="btn btn-primary">
                             <i class="fa fa-edit"></i> Edit
                         </a>
                         <a asp-controller="Menu" asp-action="Details" asp-route-id="@Model.MenuItemId" class="btn btn-secondary">
@@ -33,7 +33,7 @@
                                     <table class="table table-borderless">
                                         <tr>
                                             <th>Menu Item:</th>
-                                            <td>@Model.MenuItem?.Name</td>
+                                            <td>@Model.MenuItemName</td>
                                         </tr>
                                         <tr>
                                             <th>Yield:</th>

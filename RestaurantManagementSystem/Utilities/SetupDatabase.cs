@@ -19,7 +19,7 @@ namespace RestaurantManagementSystem.Utilities
                 // Split the script by GO statements to execute each batch separately
                 string[] batches = script.Split(new string[] { "GO", "go" }, StringSplitOptions.RemoveEmptyEntries);
                 
-                using (SqlConnection connection = new SqlConnection(connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString))
                 {
                     connection.Open();
                     Console.WriteLine($"Connected to database. Executing script: {scriptPath}");
@@ -29,7 +29,7 @@ namespace RestaurantManagementSystem.Utilities
                     {
                         if (!string.IsNullOrWhiteSpace(batch))
                         {
-                            using (SqlCommand command = new SqlCommand(batch, connection))
+                            using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(batch, connection))
                             {
                                 try
                                 {

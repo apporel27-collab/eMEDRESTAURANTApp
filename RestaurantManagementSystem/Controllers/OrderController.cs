@@ -1,14 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.Extensions.Configuration;
-using RestaurantManagementSystem.Models;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using Microsoft.Data.SqlClient;
-using System.Linq;
-using System.Threading.Tasks;
-
 namespace RestaurantManagementSystem.Controllers
 {
     public class OrderController : Controller
@@ -35,18 +24,18 @@ namespace RestaurantManagementSystem.Controllers
             var model = new CreateOrderViewModel();
             
             // Get available tables
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get available tables
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, TableName, Capacity, Status
                     FROM Tables
                     WHERE Status = 0
                     ORDER BY TableName", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -63,14 +52,14 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get occupied tables with turnover info
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT tt.Id, t.Id, t.TableName, tt.GuestName, tt.PartySize, tt.Status
                     FROM TableTurnovers tt
                     INNER JOIN Tables t ON tt.TableId = t.Id
                     WHERE tt.Status < 5 -- Not departed
                     ORDER BY t.TableName", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -91,62 +80,66 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult Create(CreateOrderViewModel model)
         {
             if (ModelState.IsValid)
             {
                 try
                 {
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
-                        
-                        using (SqlCommand command = new SqlCommand("usp_CreateOrder", connection))
+                        using (var transaction = connection.BeginTransaction())
                         {
-                            command.CommandType = CommandType.StoredProcedure;
-                            
-                            command.Parameters.AddWithValue("@TableTurnoverId", model.TableTurnoverId ?? (object)DBNull.Value);
-                            command.Parameters.AddWithValue("@OrderType", model.OrderType);
-                            command.Parameters.AddWithValue("@UserId", GetCurrentUserId());
-                            command.Parameters.AddWithValue("@CustomerName", string.IsNullOrEmpty(model.CustomerName) ? (object)DBNull.Value : model.CustomerName);
-                            command.Parameters.AddWithValue("@CustomerPhone", string.IsNullOrEmpty(model.CustomerPhone) ? (object)DBNull.Value : model.CustomerPhone);
-                            command.Parameters.AddWithValue("@SpecialInstructions", string.IsNullOrEmpty(model.SpecialInstructions) ? (object)DBNull.Value : model.SpecialInstructions);
-                            
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            try
                             {
-                                int orderId = 0;
-                                string orderNumber = "";
-                                string message = "Failed to create order.";
-                                
-                                if (reader.Read())
+                                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_CreateOrder", connection, transaction))
                                 {
-                                    orderId = reader.GetInt32(0);
-                                    orderNumber = reader.GetString(1);
-                                    message = reader.GetString(2);
-                                }
-                                
-                                // Close the reader before executing another command on the same connection
-                                reader.Close();
-                                
-                                if (orderId > 0)
-                                {
-                                    // Create kitchen tickets for the new order if it has items
-                                    using (SqlCommand kitchenCommand = new SqlCommand("UpdateKitchenTicketsForOrder", connection))
+                                    command.CommandType = CommandType.StoredProcedure;
+                                    command.Parameters.AddWithValue("@TableTurnoverId", model.TableTurnoverId ?? (object)DBNull.Value);
+                                    command.Parameters.AddWithValue("@OrderType", model.OrderType);
+                                    command.Parameters.AddWithValue("@UserId", GetCurrentUserId());
+                                    command.Parameters.AddWithValue("@CustomerName", string.IsNullOrEmpty(model.CustomerName) ? (object)DBNull.Value : model.CustomerName);
+                                    command.Parameters.AddWithValue("@CustomerPhone", string.IsNullOrEmpty(model.CustomerPhone) ? (object)DBNull.Value : model.CustomerPhone);
+                                    command.Parameters.AddWithValue("@SpecialInstructions", string.IsNullOrEmpty(model.SpecialInstructions) ? (object)DBNull.Value : model.SpecialInstructions);
+                                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                                     {
-                                        kitchenCommand.CommandType = CommandType.StoredProcedure;
-                                        kitchenCommand.Parameters.AddWithValue("@OrderId", orderId);
-                                        kitchenCommand.ExecuteNonQuery();
+                                        int orderId = 0;
+                                        string orderNumber = "";
+                                        string message = "Failed to create order.";
+                                        if (reader.Read())
+                                        {
+                                            orderId = reader.GetInt32(0);
+                                            orderNumber = reader.GetString(1);
+                                            message = reader.GetString(2);
+                                        }
+                                        reader.Close();
+                                        if (orderId > 0)
+                                        {
+                                            using (Microsoft.Data.SqlClient.SqlCommand kitchenCommand = new Microsoft.Data.SqlClient.SqlCommand("UpdateKitchenTicketsForOrder", connection, transaction))
+                                            {
+                                                kitchenCommand.CommandType = CommandType.StoredProcedure;
+                                                kitchenCommand.Parameters.AddWithValue("@OrderId", orderId);
+                                                kitchenCommand.ExecuteNonQuery();
+                                            }
+                                            transaction.Commit();
+                                            TempData["SuccessMessage"] = $"Order {orderNumber} created successfully.";
+                                            return RedirectToAction("Details", new { id = orderId });
+                                        }
+                                        else
+                                        {
+                                            transaction.Rollback();
+                                            ModelState.AddModelError("", message);
+                                        }
                                     }
-                                    
-                                    TempData["SuccessMessage"] = $"Order {orderNumber} created successfully.";
-                                    return RedirectToAction("Details", new { id = orderId });
                                 }
-                                else
-                                {
-                                    ModelState.AddModelError("", message);
-                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                transaction.Rollback();
+                                ModelState.AddModelError("", $"An error occurred: {ex.Message}");
                             }
                         }
                     }
@@ -158,18 +151,18 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             // If we get here, something went wrong - repopulate the model
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get available tables
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, TableName, Capacity, Status
                     FROM Tables
                     WHERE Status = 0
                     ORDER BY TableName", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -186,14 +179,14 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get occupied tables with turnover info
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT tt.Id, t.Id, t.TableName, tt.GuestName, tt.PartySize, tt.Status
                     FROM TableTurnovers tt
                     INNER JOIN Tables t ON tt.TableId = t.Id
                     WHERE tt.Status < 5 -- Not departed
                     ORDER BY t.TableName", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -218,13 +211,76 @@ namespace RestaurantManagementSystem.Controllers
         public IActionResult Details(int id)
         {
             var model = GetOrderDetails(id);
-            
             if (model == null)
             {
                 return NotFound();
             }
-            
+            // Populate available menu items for quick add
+            model.AvailableMenuItems = new List<MenuItem>();
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand("SELECT Id, Name, Description, Price FROM MenuItems WHERE IsAvailable = 1 ORDER BY Name", connection))
+                {
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            model.AvailableMenuItems.Add(new MenuItem
+                            {
+                                Id = reader.GetInt32(0),
+                                Name = reader.GetString(1),
+                                Description = reader.IsDBNull(2) ? null : reader.GetString(2),
+                                Price = reader.GetDecimal(3)
+                            });
+                        }
+                    }
+                }
+            }
             return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult QuickAddMenuItem(int orderId, string menuItemNameOrId, int quantity)
+        {
+            if (quantity < 1) quantity = 1;
+            int menuItemId = 0;
+            // Try to parse as ID, otherwise resolve by name
+            if (!int.TryParse(menuItemNameOrId, out menuItemId))
+            {
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("SELECT TOP 1 Id FROM MenuItems WHERE Name = @Name", connection))
+                    {
+                        command.Parameters.AddWithValue("@Name", menuItemNameOrId);
+                        var result = command.ExecuteScalar();
+                        if (result != null)
+                        {
+                            menuItemId = Convert.ToInt32(result);
+                        }
+                        else
+                        {
+                            TempData["ErrorMessage"] = "Menu item not found.";
+                            return RedirectToAction("Details", new { id = orderId });
+                        }
+                    }
+                }
+            }
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"INSERT INTO OrderItems (OrderId, MenuItemId, Quantity, UnitPrice, Subtotal, Status, CreatedAt) SELECT @OrderId, Id, @Quantity, Price, Price * @Quantity, 0, GETDATE() FROM MenuItems WHERE Id = @MenuItemId", connection))
+                {
+                    command.Parameters.AddWithValue("@OrderId", orderId);
+                    command.Parameters.AddWithValue("@MenuItemId", menuItemId);
+                    command.Parameters.AddWithValue("@Quantity", quantity);
+                    command.ExecuteNonQuery();
+                }
+            }
+            TempData["SuccessMessage"] = "Menu item added to order.";
+            return RedirectToAction("Details", new { id = orderId });
         }
         
         // Add Item to Order
@@ -235,12 +291,12 @@ namespace RestaurantManagementSystem.Controllers
                 OrderId = orderId
             };
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get order details
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT o.OrderNumber, ISNULL(t.TableName, 'N/A') AS TableNumber
                     FROM Orders o
                     LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
@@ -249,7 +305,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", orderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -264,12 +320,12 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get available courses
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name
                     FROM CourseTypes
                     ORDER BY DisplayOrder", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -283,7 +339,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get current order items for the order summary
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT oi.Id, oi.MenuItemId, oi.Quantity, oi.UnitPrice, oi.Subtotal, 
                            oi.SpecialInstructions, mi.Name
                     FROM OrderItems oi
@@ -293,7 +349,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", orderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -321,14 +377,14 @@ namespace RestaurantManagementSystem.Controllers
                     model.MenuItemId = menuItemId.Value;
                     
                     // Get menu item details
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT Id, Name, Description, Price, CategoryId, ImagePath
                         FROM MenuItems
                         WHERE Id = @MenuItemId AND IsAvailable = 1", connection))
                     {
                         command.Parameters.AddWithValue("@MenuItemId", menuItemId.Value);
                         
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             if (reader.Read())
                             {
@@ -363,12 +419,12 @@ namespace RestaurantManagementSystem.Controllers
                     
                     try
                     {
-                        using (SqlConnection checkCon = new SqlConnection(_connectionString))
+                        using (Microsoft.Data.SqlClient.SqlConnection checkCon = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                         {
                             checkCon.Open();
                             
                             // Try with underscore first
-                            using (SqlCommand cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID('MenuItem_Modifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", checkCon))
+                            using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT CASE WHEN OBJECT_ID('MenuItem_Modifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", checkCon))
                             {
                                 if (Convert.ToBoolean(cmd.ExecuteScalar()))
                                 {
@@ -380,7 +436,7 @@ namespace RestaurantManagementSystem.Controllers
                             // If not found, try without underscore
                             if (!tableExists)
                             {
-                                using (SqlCommand cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID('MenuItemModifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", checkCon))
+                                using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT CASE WHEN OBJECT_ID('MenuItemModifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", checkCon))
                                 {
                                     if (Convert.ToBoolean(cmd.ExecuteScalar()))
                                     {
@@ -438,52 +494,78 @@ namespace RestaurantManagementSystem.Controllers
                             ORDER BY m.Name";
                     }
                         
-                    using (SqlCommand command = new SqlCommand(modifiersQuery, connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(modifiersQuery, connection))
                     {
                         command.Parameters.AddWithValue("@MenuItemId", menuItemId.Value);
-                        
-                        using (SqlDataReader reader = command.ExecuteReader())
+
+                        try
                         {
-                            while (reader.Read())
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
-                                var modifier = new ModifierViewModel
+                                while (reader.Read())
                                 {
-                                    Id = reader.GetInt32(0),
-                                    Name = reader.GetString(1),
-                                    Price = reader.GetDecimal(2),
-                                    IsDefault = reader.GetBoolean(3),
-                                    IsSelected = false, // Changed to false by default
-                                    ModifierId = reader.GetInt32(0)
-                                };
-                                
-                                model.AvailableModifiers.Add(modifier);
-                                
-                                if (modifier.IsDefault)
+                                    var modifier = new ModifierViewModel
+                                    {
+                                        Id = reader.GetInt32(0),
+                                        Name = reader.GetString(1),
+                                        Price = reader.GetDecimal(2),
+                                        IsDefault = reader.GetBoolean(3),
+                                        IsSelected = false, // Changed to false by default
+                                        ModifierId = reader.GetInt32(0)
+                                    };
+
+                                    model.AvailableModifiers.Add(modifier);
+
+                                    if (modifier.IsDefault)
+                                    {
+                                        model.SelectedModifiers.Add(modifier.Id);
+                                    }
+                                }
+                            }
+                        }
+                        catch (SqlException)
+                        {
+                            // Fallback if relationship table still causes errors
+                            using (Microsoft.Data.SqlClient.SqlCommand fallback = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT m.Id, m.Name, 0 AS Price, 0 AS IsDefault FROM Modifiers m ORDER BY m.Name", connection))
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = fallback.ExecuteReader())
+                            {
+                                while (reader.Read())
                                 {
-                                    model.SelectedModifiers.Add(modifier.Id);
+                                    model.AvailableModifiers.Add(new ModifierViewModel
+                                    {
+                                        Id = reader.GetInt32(0),
+                                        Name = reader.GetString(1),
+                                        Price = reader.GetDecimal(2),
+                                        IsDefault = false,
+                                        IsSelected = false,
+                                        ModifierId = reader.GetInt32(0)
+                                    });
                                 }
                             }
                         }
                     }
                     
-                    // Get allergens for the menu item
+                    // Get allergens for the menu item (only if the relationship table exists)
                     string allergensTableName = GetMenuItemRelationshipTableName("Allergens");
-                    string allergensQuery = $@"
-                        SELECT a.Name
-                        FROM Allergens a
-                        INNER JOIN {allergensTableName} ma ON a.Id = ma.AllergenId
-                        WHERE ma.MenuItemId = @MenuItemId
-                        ORDER BY a.Name";
-                        
-                    using (SqlCommand command = new SqlCommand(allergensQuery, connection))
+                    if (TableExists(allergensTableName))
                     {
-                        command.Parameters.AddWithValue("@MenuItemId", menuItemId.Value);
-                        
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        string allergensQuery = $@"
+                            SELECT a.Name
+                            FROM Allergens a
+                            INNER JOIN {allergensTableName} ma ON a.Id = ma.AllergenId
+                            WHERE ma.MenuItemId = @MenuItemId
+                            ORDER BY a.Name";
+
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(allergensQuery, connection))
                         {
-                            while (reader.Read())
+                            command.Parameters.AddWithValue("@MenuItemId", menuItemId.Value);
+
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
-                                model.CommonAllergens.Add(reader.GetString(0));
+                                while (reader.Read())
+                                {
+                                    model.CommonAllergens.Add(reader.GetString(0));
+                                }
                             }
                         }
                     }
@@ -493,63 +575,78 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult AddItem(AddOrderItemViewModel model)
         {
             if (ModelState.IsValid)
             {
                 try
                 {
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
-                        
-                        // Convert selected modifiers to comma-separated string
-                        string modifierIds = model.SelectedModifiers != null && model.SelectedModifiers.Any()
-                            ? string.Join(",", model.SelectedModifiers)
-                            : null;
-                        
-                        using (SqlCommand command = new SqlCommand("usp_AddOrderItem", connection))
+
+                        using (Microsoft.Data.SqlClient.SqlTransaction transaction = connection.BeginTransaction())
                         {
-                            command.CommandType = CommandType.StoredProcedure;
-                            
-                            command.Parameters.AddWithValue("@OrderId", model.OrderId);
-                            command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
-                            command.Parameters.AddWithValue("@Quantity", model.Quantity);
-                            command.Parameters.AddWithValue("@SpecialInstructions", string.IsNullOrEmpty(model.SpecialInstructions) ? (object)DBNull.Value : model.SpecialInstructions);
-                            command.Parameters.AddWithValue("@CourseId", model.CourseId.HasValue ? model.CourseId.Value : (object)DBNull.Value);
-                            command.Parameters.AddWithValue("@ModifierIds", modifierIds ?? (object)DBNull.Value);
-                            
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            try
                             {
-                                if (reader.Read())
+                                // Convert selected modifiers to comma-separated string
+                                string modifierIds = model.SelectedModifiers != null && model.SelectedModifiers.Any()
+                                    ? string.Join(",", model.SelectedModifiers)
+                                    : null;
+
+                                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_AddOrderItem", connection, transaction))
                                 {
-                                    int orderItemId = reader.GetInt32(0);
-                                    string message = reader.GetString(1);
-                                    
-                                    if (orderItemId > 0)
+                                    command.CommandType = CommandType.StoredProcedure;
+
+                                    command.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                    command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
+                                    command.Parameters.AddWithValue("@Quantity", model.Quantity);
+                                    command.Parameters.AddWithValue("@SpecialInstructions", string.IsNullOrEmpty(model.SpecialInstructions) ? (object)DBNull.Value : model.SpecialInstructions);
+                                    command.Parameters.AddWithValue("@CourseId", model.CourseId.HasValue ? model.CourseId.Value : (object)DBNull.Value);
+                                    command.Parameters.AddWithValue("@ModifierIds", modifierIds ?? (object)DBNull.Value);
+
+                                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                                     {
-                                        // Create or update kitchen ticket after adding an item
-                                        using (SqlCommand kitchenCommand = new SqlCommand("UpdateKitchenTicketsForOrder", connection))
+                                        int orderItemId = 0;
+                                        string message = "Failed to add item to order.";
+                                        if (reader.Read())
                                         {
-                                            kitchenCommand.CommandType = CommandType.StoredProcedure;
-                                            kitchenCommand.Parameters.AddWithValue("@OrderId", model.OrderId);
-                                            kitchenCommand.ExecuteNonQuery();
+                                            orderItemId = reader.GetInt32(0);
+                                            message = reader.GetString(1);
                                         }
-                                        
-                                        TempData["SuccessMessage"] = "Item added to order successfully.";
-                                        return RedirectToAction("Details", new { id = model.OrderId });
-                                    }
-                                    else
-                                    {
-                                        ModelState.AddModelError("", message);
+                                        reader.Close();
+
+                                        if (orderItemId > 0)
+                                        {
+                                            // Create or update kitchen ticket after adding an item
+                                            using (Microsoft.Data.SqlClient.SqlCommand kitchenCommand = new Microsoft.Data.SqlClient.SqlCommand("UpdateKitchenTicketsForOrder", connection, transaction))
+                                            {
+                                                kitchenCommand.CommandType = CommandType.StoredProcedure;
+                                                kitchenCommand.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                                kitchenCommand.ExecuteNonQuery();
+                                            }
+
+                                            // All good, commit
+                                            transaction.Commit();
+                                            TempData["SuccessMessage"] = "Item added to order successfully.";
+                                            return RedirectToAction("Details", new { id = model.OrderId });
+                                        }
+                                        else
+                                        {
+                                            // Validation message from SP
+                                            transaction.Rollback();
+                                            ModelState.AddModelError("", message);
+                                        }
                                     }
                                 }
-                                else
-                                {
-                                    ModelState.AddModelError("", "Failed to add item to order.");
-                                }
+                            }
+                            catch (Exception)
+                            {
+                                // Ensure rollback on any error
+                                transaction.Rollback();
+                                throw;
                             }
                         }
                     }
@@ -561,17 +658,17 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             // If we get here, something went wrong - repopulate the model
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get available courses
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name
                     FROM CourseTypes
                     ORDER BY DisplayOrder", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -585,14 +682,14 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get menu item details
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name, Description, Price, CategoryId
                     FROM MenuItems
                     WHERE Id = @MenuItemId AND IsAvailable = 1", connection))
                 {
                     command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -608,46 +705,112 @@ namespace RestaurantManagementSystem.Controllers
                     }
                 }
                 
-                // Get available modifiers for the menu item
-                using (SqlCommand command = new SqlCommand(@"
-                    SELECT m.Id, m.Name, m.Price, m.IsDefault
-                    FROM Modifiers m
-                    INNER JOIN MenuItem_Modifiers mm ON m.Id = mm.ModifierId
-                    WHERE mm.MenuItemId = @MenuItemId
-                    ORDER BY m.Name", connection))
+                // Get available modifiers for the menu item (robust to table variations)
+                string modifiersTableNamePost = string.Empty;
+                bool modsTableExists = false;
+                try
+                {
+                    using (Microsoft.Data.SqlClient.SqlConnection checkCon = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                    {
+                        checkCon.Open();
+                        using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT CASE WHEN OBJECT_ID('MenuItem_Modifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", checkCon))
+                        {
+                            if (Convert.ToBoolean(cmd.ExecuteScalar()))
+                            {
+                                modsTableExists = true;
+                                modifiersTableNamePost = "MenuItem_Modifiers";
+                            }
+                        }
+                        if (!modsTableExists)
+                        {
+                            using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT CASE WHEN OBJECT_ID('MenuItemModifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", checkCon))
+                            {
+                                if (Convert.ToBoolean(cmd.ExecuteScalar()))
+                                {
+                                    modsTableExists = true;
+                                    modifiersTableNamePost = "MenuItemModifiers";
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { modsTableExists = false; }
+
+                string modifiersQueryPost;
+                if (modsTableExists)
+                {
+                    bool hasPriceAdjustment = ColumnExistsInTable(modifiersTableNamePost, "PriceAdjustment");
+                    bool hasIsDefault = ColumnExistsInTable(modifiersTableNamePost, "IsDefault");
+                    modifiersQueryPost = (hasPriceAdjustment && hasIsDefault)
+                        ? $@"SELECT m.Id, m.Name, mm.PriceAdjustment AS Price, mm.IsDefault
+                             FROM Modifiers m
+                             INNER JOIN {modifiersTableNamePost} mm ON m.Id = mm.ModifierId
+                             WHERE mm.MenuItemId = @MenuItemId
+                             ORDER BY m.Name"
+                        : $@"SELECT m.Id, m.Name, 0 AS Price, 0 AS IsDefault
+                             FROM Modifiers m
+                             INNER JOIN {modifiersTableNamePost} mm ON m.Id = mm.ModifierId
+                             WHERE mm.MenuItemId = @MenuItemId
+                             ORDER BY m.Name";
+                }
+                else
+                {
+                    modifiersQueryPost = @"SELECT m.Id, m.Name, 0 AS Price, 0 AS IsDefault FROM Modifiers m ORDER BY m.Name";
+                }
+
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(modifiersQueryPost, connection))
                 {
                     command.Parameters.AddWithValue("@MenuItemId", model.MenuItemId);
-                    
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    try
                     {
-                        while (reader.Read())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
-                            model.AvailableModifiers.Add(new ModifierViewModel
+                            while (reader.Read())
                             {
-                                Id = reader.GetInt32(0),
-                                Name = reader.GetString(1),
-                                Price = reader.GetDecimal(2),
-                                IsDefault = reader.GetBoolean(3),
-                                IsSelected = model.SelectedModifiers?.Contains(reader.GetInt32(0)) ?? false
-                            });
+                                model.AvailableModifiers.Add(new ModifierViewModel
+                                {
+                                    Id = reader.GetInt32(0),
+                                    Name = reader.GetString(1),
+                                    Price = reader.GetDecimal(2),
+                                    IsDefault = reader.GetBoolean(3),
+                                    IsSelected = model.SelectedModifiers?.Contains(reader.GetInt32(0)) ?? false
+                                });
+                            }
+                        }
+                    }
+                    catch (SqlException)
+                    {
+                        using (Microsoft.Data.SqlClient.SqlCommand fallback = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT m.Id, m.Name, 0 AS Price, 0 AS IsDefault FROM Modifiers m ORDER BY m.Name", connection))
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = fallback.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                model.AvailableModifiers.Add(new ModifierViewModel
+                                {
+                                    Id = reader.GetInt32(0),
+                                    Name = reader.GetString(1),
+                                    Price = reader.GetDecimal(2),
+                                    IsDefault = false,
+                                    IsSelected = model.SelectedModifiers?.Contains(reader.GetInt32(0)) ?? false
+                                });
+                            }
                         }
                     }
                 }
             }
-            
             return View(model);
         }
         
         // Fire Items to Kitchen
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult FireItems(FireOrderItemsViewModel model)
         {
             if (ModelState.IsValid)
             {
                 try
                 {
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
@@ -678,7 +841,7 @@ namespace RestaurantManagementSystem.Controllers
                         try
                         {
                             // Start a transaction
-                            using (SqlTransaction transaction = connection.BeginTransaction())
+                            using (Microsoft.Data.SqlClient.SqlTransaction transaction = connection.BeginTransaction())
                             {
                                 try
                                 {
@@ -695,7 +858,7 @@ namespace RestaurantManagementSystem.Controllers
                                     
                                     Console.WriteLine("Generating ticket number with SQL: " + ticketNumberSql);
                                     
-                                    using (SqlCommand cmd = new SqlCommand(ticketNumberSql, connection, transaction))
+                                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(ticketNumberSql, connection, transaction))
                                     {
                                         ticketNumber = (string)cmd.ExecuteScalar();
                                         Console.WriteLine($"Generated ticket number: {ticketNumber}");
@@ -712,9 +875,9 @@ namespace RestaurantManagementSystem.Controllers
                                         WHERE t.name = 'KitchenTickets' AND t.type = 'U'";
                                         
                                     List<string> kitchenTicketColumns = new List<string>();
-                                    using (SqlCommand cmd = new SqlCommand(schemaQuery, connection, transaction))
+                                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(schemaQuery, connection, transaction))
                                     {
-                                        using (SqlDataReader reader = cmd.ExecuteReader())
+                                        using (Microsoft.Data.SqlClient.SqlDataReader reader = cmd.ExecuteReader())
                                         {
                                             while (reader.Read())
                                             {
@@ -731,7 +894,7 @@ namespace RestaurantManagementSystem.Controllers
                                     
                                     // We need to get the order number first
                                     string orderNumber = null;
-                                    using (SqlCommand cmd = new SqlCommand(@"
+                                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
                                         SELECT OrderNumber FROM Orders WHERE Id = @OrderId
                                     ", connection, transaction))
                                     {
@@ -769,7 +932,7 @@ namespace RestaurantManagementSystem.Controllers
                                     Console.WriteLine("Using SQL: " + insertKitchenTicketSql);
                                     
                                     // Create kitchen ticket
-                                    using (SqlCommand cmd = new SqlCommand(insertKitchenTicketSql, connection, transaction))
+                                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(insertKitchenTicketSql, connection, transaction))
                                     {
                                         cmd.Parameters.AddWithValue("@TicketNumber", ticketNumber);
                                         cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
@@ -799,7 +962,7 @@ namespace RestaurantManagementSystem.Controllers
                                                         [FireTime] = GETDATE()
                                                     WHERE [Id] = @ItemId AND [OrderId] = @OrderId AND [Status] = 0;";
                                             
-                                            using (SqlCommand cmd = new SqlCommand(updateItemSql, connection, transaction))
+                                            using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(updateItemSql, connection, transaction))
                                             {
                                                 cmd.Parameters.AddWithValue("@ItemId", itemId);
                                                 cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
@@ -808,7 +971,7 @@ namespace RestaurantManagementSystem.Controllers
                                             
                                             // Get the menu item name
                                             string menuItemName = null;
-                                            using (SqlCommand menuItemCmd = new SqlCommand(@"
+                                            using (Microsoft.Data.SqlClient.SqlCommand menuItemCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
                                                 SELECT mi.Name
                                                 FROM OrderItems oi
                                                 INNER JOIN MenuItems mi ON oi.MenuItemId = mi.Id
@@ -831,7 +994,7 @@ namespace RestaurantManagementSystem.Controllers
                                             }
                                             
                                             // Add to kitchen ticket items with the menu item name
-                                            using (SqlCommand cmd = new SqlCommand($@"
+                                            using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand($@"
                                                 INSERT INTO [{kitchenTicketItemsTableName}] (
                                                     [KitchenTicketId], 
                                                     [OrderItemId], 
@@ -873,14 +1036,14 @@ namespace RestaurantManagementSystem.Controllers
                                                 WHERE oi.[OrderId] = @OrderId AND oi.[Status] = 0;";
                                         
                                         // Update all unfired order items
-                                        using (SqlCommand cmd = new SqlCommand(updateAllItemsSql, connection, transaction))
+                                        using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(updateAllItemsSql, connection, transaction))
                                         {
                                             cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
                                             cmd.ExecuteNonQuery();
                                         }
                                         
                                         // Add all newly fired items to kitchen ticket items including menu item names
-                                        using (SqlCommand cmd = new SqlCommand($@"
+                                        using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand($@"
                                             INSERT INTO [{kitchenTicketItemsTableName}] (
                                                 [KitchenTicketId], 
                                                 [OrderItemId], 
@@ -918,7 +1081,7 @@ namespace RestaurantManagementSystem.Controllers
                                             WHERE [Id] = @OrderId;";
                                     
                                     // Update order status
-                                    using (SqlCommand cmd = new SqlCommand(updateOrderSql, connection, transaction))
+                                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(updateOrderSql, connection, transaction))
                                     {
                                         cmd.Parameters.AddWithValue("@OrderId", model.OrderId);
                                         cmd.ExecuteNonQuery();
@@ -973,12 +1136,12 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
 
                     // First check if the order exists and its status
-                    using (SqlCommand checkCommand = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand checkCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT Status 
                         FROM Orders 
                         WHERE Id = @OrderId", connection))
@@ -1006,12 +1169,12 @@ namespace RestaurantManagementSystem.Controllers
                     }
 
                     // Begin transaction since we'll be updating multiple tables
-                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    using (Microsoft.Data.SqlClient.SqlTransaction transaction = connection.BeginTransaction())
                     {
                         try
                         {
                             // Update order status to cancelled
-                            using (SqlCommand updateCommand = new SqlCommand(@"
+                            using (Microsoft.Data.SqlClient.SqlCommand updateCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                                 UPDATE Orders 
                                 SET Status = 4, -- 4 = Cancelled
                                     UpdatedAt = GETDATE()
@@ -1022,7 +1185,7 @@ namespace RestaurantManagementSystem.Controllers
                             }
                             
                             // Update all pending order items to cancelled
-                            using (SqlCommand updateItemsCommand = new SqlCommand(@"
+                            using (Microsoft.Data.SqlClient.SqlCommand updateItemsCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                                 UPDATE OrderItems 
                                 SET Status = 5, -- 5 = Cancelled
                                     UpdatedAt = GETDATE() 
@@ -1034,7 +1197,7 @@ namespace RestaurantManagementSystem.Controllers
                             }
 
                             // Check if OrderItemModifiers table exists
-                            using (SqlCommand checkTableCommand = new SqlCommand(@"
+                            using (Microsoft.Data.SqlClient.SqlCommand checkTableCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                                 SELECT CASE 
                                     WHEN OBJECT_ID('OrderItemModifiers', 'U') IS NOT NULL THEN 1
                                     WHEN OBJECT_ID('OrderItem_Modifiers', 'U') IS NOT NULL THEN 2
@@ -1048,7 +1211,7 @@ namespace RestaurantManagementSystem.Controllers
                                 {
                                     string tableName = tableCheck == 1 ? "OrderItemModifiers" : "OrderItem_Modifiers";
                                     
-                                    using (SqlCommand deleteModifiersCommand = new SqlCommand($@"
+                                    using (Microsoft.Data.SqlClient.SqlCommand deleteModifiersCommand = new Microsoft.Data.SqlClient.SqlCommand($@"
                                         DELETE FROM {tableName} 
                                         WHERE OrderItemId IN (SELECT Id FROM OrderItems WHERE OrderId = @OrderId AND Status = 5)", 
                                         connection, transaction))
@@ -1079,18 +1242,18 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // Cancel Order Item
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult CancelOrderItem(int orderId, int orderItemId)
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
 
                     // First check if the order item has already been sent to kitchen
-                    using (SqlCommand checkCommand = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand checkCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT Status 
                         FROM OrderItems 
                         WHERE Id = @OrderItemId AND OrderId = @OrderId", connection))
@@ -1114,12 +1277,12 @@ namespace RestaurantManagementSystem.Controllers
                     }
 
                     // Begin transaction since we'll be updating multiple tables
-                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    using (Microsoft.Data.SqlClient.SqlTransaction transaction = connection.BeginTransaction())
                     {
                         try
                         {
                             // Update order item status to cancelled
-                            using (SqlCommand updateCommand = new SqlCommand(@"
+                            using (Microsoft.Data.SqlClient.SqlCommand updateCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                                 UPDATE OrderItems 
                                 SET Status = 5, -- 5 = Cancelled
                                     UpdatedAt = GETDATE() 
@@ -1131,7 +1294,7 @@ namespace RestaurantManagementSystem.Controllers
                             }
 
                             // Check if OrderItemModifiers table exists
-                            using (SqlCommand checkTableCommand = new SqlCommand(@"
+                            using (Microsoft.Data.SqlClient.SqlCommand checkTableCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                                 SELECT CASE 
                                     WHEN OBJECT_ID('OrderItemModifiers', 'U') IS NOT NULL THEN 1
                                     WHEN OBJECT_ID('OrderItem_Modifiers', 'U') IS NOT NULL THEN 2
@@ -1145,7 +1308,7 @@ namespace RestaurantManagementSystem.Controllers
                                 {
                                     string tableName = tableCheck == 1 ? "OrderItemModifiers" : "OrderItem_Modifiers";
                                     
-                                    using (SqlCommand deleteModifiersCommand = new SqlCommand($@"
+                                    using (Microsoft.Data.SqlClient.SqlCommand deleteModifiersCommand = new Microsoft.Data.SqlClient.SqlCommand($@"
                                         DELETE FROM {tableName} 
                                         WHERE OrderItemId = @OrderItemId", connection, transaction))
                                     {
@@ -1156,7 +1319,7 @@ namespace RestaurantManagementSystem.Controllers
                             }
 
                             // Recalculate order totals
-                            using (SqlCommand updateOrderCommand = new SqlCommand(@"
+                            using (Microsoft.Data.SqlClient.SqlCommand updateOrderCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                                 UPDATE o
                                 SET o.Subtotal = (
                                         SELECT ISNULL(SUM(oi.Subtotal), 0)
@@ -1211,12 +1374,12 @@ namespace RestaurantManagementSystem.Controllers
                 MenuCategories = new List<MenuCategoryViewModel>()
             };
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get order details
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT o.OrderNumber, ISNULL(t.TableName, 'N/A') AS TableName 
                     FROM Orders o
                     LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
@@ -1225,7 +1388,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", id);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -1240,12 +1403,12 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get all categories
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name
                     FROM Categories
                     ORDER BY Name", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1262,7 +1425,7 @@ namespace RestaurantManagementSystem.Controllers
                 // Get menu items for each category
                 foreach (var category in model.MenuCategories)
                 {
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT Id, Name, Description, Price, IsAvailable, ImagePath
                         FROM MenuItems
                         WHERE CategoryId = @CategoryId AND IsAvailable = 1
@@ -1270,7 +1433,7 @@ namespace RestaurantManagementSystem.Controllers
                     {
                         command.Parameters.AddWithValue("@CategoryId", category.CategoryId);
                         
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
@@ -1306,12 +1469,12 @@ namespace RestaurantManagementSystem.Controllers
                 CancelledOrders = new List<OrderSummary>()
             };
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get order counts and total sales for today
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT
                         SUM(CASE WHEN Status = 0 THEN 1 ELSE 0 END) AS OpenCount,
                         SUM(CASE WHEN Status = 1 THEN 1 ELSE 0 END) AS InProgressCount,
@@ -1322,7 +1485,7 @@ namespace RestaurantManagementSystem.Controllers
                     FROM Orders
                     WHERE CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE)", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -1337,7 +1500,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get active orders
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         o.Id,
                         o.OrderNumber,
@@ -1364,7 +1527,7 @@ namespace RestaurantManagementSystem.Controllers
                     AND CAST(o.CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
                     ORDER BY o.CreatedAt DESC", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1410,7 +1573,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get completed orders for today
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         o.Id,
                         o.OrderNumber,
@@ -1437,7 +1600,7 @@ namespace RestaurantManagementSystem.Controllers
                     AND CAST(o.CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
                     ORDER BY o.CompletedAt DESC", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1472,7 +1635,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get cancelled orders for today
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         o.Id,
                         o.OrderNumber,
@@ -1499,7 +1662,7 @@ namespace RestaurantManagementSystem.Controllers
                     AND CAST(o.CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
                     ORDER BY ISNULL(o.UpdatedAt, o.CreatedAt) DESC", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1558,12 +1721,12 @@ namespace RestaurantManagementSystem.Controllers
             
             try
             {
-                using (SqlConnection con = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection con = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     con.Open();
                     
                     // Check if table with underscore exists
-                    using (SqlCommand cmd = new SqlCommand($"SELECT CASE WHEN OBJECT_ID('MenuItem_{relationship}', 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand($"SELECT CASE WHEN OBJECT_ID('MenuItem_{relationship}', 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
                     {
                         tableWithUnderscoreExists = Convert.ToBoolean(cmd.ExecuteScalar());
                     }
@@ -1571,7 +1734,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Only check without underscore if underscore version doesn't exist
                     if (!tableWithUnderscoreExists)
                     {
-                        using (SqlCommand cmd = new SqlCommand($"SELECT CASE WHEN OBJECT_ID('MenuItem{relationship}', 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
+                        using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand($"SELECT CASE WHEN OBJECT_ID('MenuItem{relationship}', 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
                         {
                             tableWithoutUnderscoreExists = Convert.ToBoolean(cmd.ExecuteScalar());
                         }
@@ -1613,7 +1776,7 @@ namespace RestaurantManagementSystem.Controllers
                     cleanTableName = cleanTableName.Split('.').Last();
                 }
                 
-                using (SqlConnection con = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection con = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     con.Open();
                     
@@ -1623,7 +1786,7 @@ namespace RestaurantManagementSystem.Controllers
                         FROM sys.tables
                         WHERE name = @TableName";
                         
-                    using (SqlCommand cmd = new SqlCommand(tableQuery, con))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(tableQuery, con))
                     {
                         cmd.Parameters.AddWithValue("@TableName", cleanTableName);
                         int tableExists = Convert.ToInt32(cmd.ExecuteScalar());
@@ -1641,7 +1804,7 @@ namespace RestaurantManagementSystem.Controllers
                         JOIN sys.tables t ON c.object_id = t.object_id
                         WHERE t.name = @TableName AND c.name = @ColumnName";
                     
-                    using (SqlCommand cmd = new SqlCommand(columnQuery, con))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand(columnQuery, con))
                     {
                         cmd.Parameters.AddWithValue("@TableName", cleanTableName);
                         cmd.Parameters.AddWithValue("@ColumnName", columnName);
@@ -1667,11 +1830,11 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                using (SqlConnection con = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection con = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     con.Open();
                     
-                    using (SqlCommand cmd = new SqlCommand($"SELECT CASE WHEN OBJECT_ID(@TableName, 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
+                    using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand($"SELECT CASE WHEN OBJECT_ID(@TableName, 'U') IS NOT NULL THEN 1 ELSE 0 END", con))
                     {
                         cmd.Parameters.AddWithValue("@TableName", tableName);
                         return Convert.ToBoolean(cmd.ExecuteScalar());
@@ -1707,7 +1870,7 @@ namespace RestaurantManagementSystem.Controllers
             OrderViewModel order = null;
             
             // Use separate connections for different data readers to avoid nested DataReader issues
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -1756,7 +1919,7 @@ namespace RestaurantManagementSystem.Controllers
                         o.CreatedAt AS UpdatedAt, -- Use CreatedAt as a fallback
                         o.CompletedAt,";
 
-                using (SqlCommand command = new SqlCommand(selectSql + @"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(selectSql + @"
                         CASE 
                             WHEN o.TableTurnoverId IS NOT NULL THEN t.TableName 
                             ELSE NULL 
@@ -1773,7 +1936,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", id);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -1833,7 +1996,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get order items
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         oi.Id,
                         oi.MenuItemId,
@@ -1859,7 +2022,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", id);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1911,7 +2074,7 @@ namespace RestaurantManagementSystem.Controllers
                 if (!string.IsNullOrEmpty(orderItemModifiersTable))
                 {
                     // Use a separate connection for modifiers to avoid DataReader issues
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
@@ -1925,7 +2088,7 @@ namespace RestaurantManagementSystem.Controllers
                             INNER JOIN Modifiers m ON oim.ModifierId = m.Id
                             WHERE oim.OrderItemId = @OrderItemId";
                             
-                        using (SqlCommand command = new SqlCommand(modifiersQuery, connection))
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(modifiersQuery, connection))
                         {
                             command.Parameters.AddWithValue("@OrderItemId", item.Id);
                             
@@ -1936,7 +2099,7 @@ namespace RestaurantManagementSystem.Controllers
                                 
                                 if (tableExists)
                                 {
-                                    using (SqlDataReader reader = command.ExecuteReader())
+                                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                                     {
                                         while (reader.Read())
                                         {
@@ -1963,7 +2126,7 @@ namespace RestaurantManagementSystem.Controllers
             }
                 
             // Get kitchen tickets using a separate connection
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -1980,11 +2143,11 @@ namespace RestaurantManagementSystem.Controllers
                     WHERE kt.OrderId = @OrderId
                     ORDER BY kt.CreatedAt DESC";
                 
-                using (SqlCommand command = new SqlCommand(kitchenTicketQuery, connection))
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(kitchenTicketQuery, connection))
                 {
                     command.Parameters.AddWithValue("@OrderId", id);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -2020,7 +2183,7 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             // Use a new connection for kitchen ticket items to avoid DataReader issues
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -2070,11 +2233,11 @@ namespace RestaurantManagementSystem.Controllers
                             WHERE kti.KitchenTicketId = @KitchenTicketId";
                     }
                     
-                    using (SqlCommand command = new SqlCommand(queryString, connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(queryString, connection))
                     {
                         command.Parameters.AddWithValue("@KitchenTicketId", ticket.Id);
                         
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
@@ -2115,7 +2278,7 @@ namespace RestaurantManagementSystem.Controllers
                                     
                                     if (tableExists)
                                     {
-                                        using (SqlConnection modConnection = new SqlConnection(_connectionString))
+                                        using (Microsoft.Data.SqlClient.SqlConnection modConnection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                                         {
                                             modConnection.Open();
                                             string modifiersQuery = $@"
@@ -2124,13 +2287,13 @@ namespace RestaurantManagementSystem.Controllers
                                                 INNER JOIN Modifiers m ON oim.ModifierId = m.Id
                                                 WHERE oim.OrderItemId = @OrderItemId";
                                                 
-                                            using (SqlCommand modifiersCommand = new SqlCommand(modifiersQuery, modConnection))
+                                            using (Microsoft.Data.SqlClient.SqlCommand modifiersCommand = new Microsoft.Data.SqlClient.SqlCommand(modifiersQuery, modConnection))
                                             {
                                                 modifiersCommand.Parameters.AddWithValue("@OrderItemId", ticketItem.OrderItemId);
                                             
                                                 try
                                                 {
-                                                    using (SqlDataReader modifiersReader = modifiersCommand.ExecuteReader())
+                                                    using (Microsoft.Data.SqlClient.SqlDataReader modifiersReader = modifiersCommand.ExecuteReader())
                                                     {
                                                         while (modifiersReader.Read())
                                                         {
@@ -2155,12 +2318,12 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get available courses for new items
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name
                     FROM CourseTypes
                     ORDER BY DisplayOrder", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -2181,6 +2344,41 @@ namespace RestaurantManagementSystem.Controllers
             // In a real application, get this from authentication
             // For now, hardcode to 1 (assuming ID 1 is an admin/host user)
             return 1;
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult UpdateOrderItemQty(int orderId, int orderItemId, int quantity, string specialInstructions)
+        {
+            if (quantity < 1)
+            {
+                TempData["ErrorMessage"] = "Quantity must be at least 1.";
+                return RedirectToAction("Details", new { id = orderId });
+            }
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+            {
+                connection.Open();
+                // Update quantity, subtotal, and special instructions
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"UPDATE OrderItems SET Quantity = @Quantity, Subtotal = UnitPrice * @Quantity, SpecialInstructions = @SpecialInstructions WHERE Id = @OrderItemId", connection))
+                {
+                    command.Parameters.AddWithValue("@Quantity", quantity);
+                    command.Parameters.AddWithValue("@OrderItemId", orderItemId);
+                    command.Parameters.AddWithValue("@SpecialInstructions", (object?)specialInstructions ?? DBNull.Value);
+                    command.ExecuteNonQuery();
+                }
+                // Recalculate order totals
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                    UPDATE Orders
+                    SET Subtotal = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId),
+                        TotalAmount = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId) + ISNULL(TaxAmount,0) + ISNULL(TipAmount,0) - ISNULL(DiscountAmount,0)
+                    WHERE Id = @OrderId", connection))
+                {
+                    command.Parameters.AddWithValue("@OrderId", orderId);
+                    command.ExecuteNonQuery();
+                }
+            }
+            TempData["SuccessMessage"] = "Item updated.";
+            return RedirectToAction("Details", new { id = orderId });
         }
     }
 }

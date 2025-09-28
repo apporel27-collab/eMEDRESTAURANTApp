@@ -34,11 +34,6 @@
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="ingredients-tab" data-bs-toggle="tab" data-bs-target="#ingredients" type="button" role="tab" aria-controls="ingredients" aria-selected="false">
-                                    <i class="fas fa-carrot me-1"></i> Ingredients
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="modifiers-tab" data-bs-toggle="tab" data-bs-target="#modifiers" type="button" role="tab" aria-controls="modifiers" aria-selected="false">
                                     <i class="fas fa-sliders-h me-1"></i> Modifiers
                                 </button>
@@ -178,77 +173,7 @@
                                 </div>
                             </div>
                             
-                            <!-- Ingredients Tab -->
-                            <div class="tab-pane fade" id="ingredients" role="tabpanel" aria-labelledby="ingredients-tab">
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <button type="button" id="addIngredientButton" class="btn btn-success">
-                                            <i class="fa fa-plus"></i> Add Ingredient
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <div id="ingredientsContainer">
-                                    @if (Model.Ingredients != null && Model.Ingredients.Any())
-                                    {
-                                        @for (var i = 0; i < Model.Ingredients.Count; i++)
-                                        {
-                                            <div class="card mb-3 ingredient-card">
-                                                <div class="card-body">
-                                                    <div class="row">
-                                                        <div class="col-md-11">
-                                                            <div class="row">
-                                                                <div class="col-md-4">
-                                                                    <div class="form-group">
-                                                                        <label>Ingredient</label>
-                                                                        <select name="Ingredients[@i].IngredientId" class="form-control" required>
-                                                                            <option value="">-- Select Ingredient --</option>
-                                                                            @if (ViewBag.Ingredients != null)
-                                                                            {
-                                                                                @foreach (var item in ViewBag.Ingredients)
-                                                                                {
-                                                                                    <option value="@item.Value" selected="@(Model.Ingredients[i].IngredientId == int.Parse(item.Value))">@item.Text</option>
-                                                                                }
-                                                                            }
-                                                                        </select>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="col-md-2">
-                                                                    <div class="form-group">
-                                                                        <label>Quantity</label>
-                                                                        <input type="number" name="Ingredients[@i].Quantity" value="@Model.Ingredients[i].Quantity" class="form-control" step="0.01" required />
-                                                                    </div>
-                                                                </div>
-                                                                <div class="col-md-2">
-                                                                    <div class="form-group">
-                                                                        <label>Unit</label>
-                                                                        <input type="text" name="Ingredients[@i].Unit" value="@Model.Ingredients[i].Unit" class="form-control" required />
-                                                                    </div>
-                                                                </div>
-                                                                <div class="col-md-4">
-                                                                    <div class="form-group">
-                                                                        <label>Instructions</label>
-                                                                        <input type="text" name="Ingredients[@i].Instructions" value="@Model.Ingredients[i].Instructions" class="form-control" />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="form-check">
-                                                                <input type="checkbox" name="Ingredients[@i].IsOptional" class="form-check-input" id="isOptional@i" value="true" @(Model.Ingredients[i].IsOptional ? "checked" : "") />
-                                                                <label class="form-check-label" for="isOptional@i">Optional</label>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-1 d-flex align-items-center justify-content-center">
-                                                            <button type="button" class="btn btn-danger remove-ingredient">
-                                                                <i class="fa fa-trash"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        }
-                                    }
-                                </div>
-                            </div>
+                            <!-- Ingredients tab removed intentionally -->
                             
                             <!-- Modifiers Tab -->
                             <div class="tab-pane fade" id="modifiers" role="tabpanel" aria-labelledby="modifiers-tab">
@@ -313,61 +238,7 @@
     </div>
 </div>
 
-<!-- Template for ingredient items -->
-<template id="ingredientTemplate">
-    <div class="card mb-3 ingredient-card">
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-11">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="form-group">
-                                <label>Ingredient</label>
-                                <select name="Ingredients[{index}].IngredientId" class="form-control" required>
-                                    <option value="">-- Select Ingredient --</option>
-                                    @if (ViewBag.Ingredients != null)
-                                    {
-                                        @foreach (var item in ViewBag.Ingredients)
-                                        {
-                                            <option value="@item.Value">@item.Text</option>
-                                        }
-                                    }
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>Quantity</label>
-                                <input type="number" name="Ingredients[{index}].Quantity" class="form-control" step="0.01" required />
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>Unit</label>
-                                <input type="text" name="Ingredients[{index}].Unit" class="form-control" required />
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-group">
-                                <label>Instructions</label>
-                                <input type="text" name="Ingredients[{index}].Instructions" class="form-control" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-check">
-                        <input type="checkbox" name="Ingredients[{index}].IsOptional" class="form-check-input" id="isOptional{index}" value="true" />
-                        <label class="form-check-label" for="isOptional{index}">Optional</label>
-                    </div>
-                </div>
-                <div class="col-md-1 d-flex align-items-center justify-content-center">
-                    <button type="button" class="btn btn-danger remove-ingredient">
-                        <i class="fa fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
+<!-- Ingredients feature removed intentionally -->
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
@@ -393,8 +264,7 @@
             }
         }
         
-        $(document).ready(function() {
-            let ingredientIndex = @(Model.Ingredients?.Count ?? 0);
+    $(document).ready(function() {
             
             // Initialize Bootstrap tooltips
             $('[data-bs-toggle="tooltip"]').tooltip();
@@ -406,23 +276,7 @@
                 $('#' + tabId).tab('show');
             }
             
-            // Add ingredient
-            $("#addIngredientButton").click(function() {
-                const template = $("#ingredientTemplate").html();
-                const newRow = template.replace(/{index}/g, ingredientIndex);
-                $("#ingredientsContainer").append(newRow);
-                ingredientIndex++;
-            });
-            
-            // Remove ingredient
-            $(document).on("click", ".remove-ingredient", function() {
-                $(this).closest(".ingredient-card").remove();
-            });
-            
-            // Add one ingredient by default if none exist
-            if ($("#ingredientsContainer").children().length === 0) {
-                $("#addIngredientButton").click();
-            }
+            // Ingredients feature removed
             
             // Add event handler for modifier checkboxes
             $(document).on("change", ".modifier-checkbox", function() {

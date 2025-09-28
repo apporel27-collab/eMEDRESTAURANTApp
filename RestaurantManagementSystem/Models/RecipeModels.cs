@@ -58,6 +58,9 @@ namespace RestaurantManagementSystem.Models
 
         [Display(Name = "Is Archived")]
         public bool IsArchived { get; set; }
+
+    [Display(Name = "Last Updated")]
+    public DateTime LastUpdated { get; set; } = DateTime.Now;
         
         public List<RecipeStepViewModel> Steps { get; set; } = new List<RecipeStepViewModel>();
         

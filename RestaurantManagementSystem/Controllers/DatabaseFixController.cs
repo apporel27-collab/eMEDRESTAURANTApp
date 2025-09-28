@@ -26,7 +26,7 @@ namespace RestaurantManagementSystem.Controllers
             
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     messages.Add("Database connection opened successfully.");
@@ -34,7 +34,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Fix PreparationTimeMinutes column
                     if (!ColumnExists(connection, "MenuItems", "PreparationTimeMinutes"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE MenuItems ADD PreparationTimeMinutes INT NOT NULL DEFAULT 15", 
                             connection))
                         {
@@ -50,7 +50,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Fix KitchenStationId column
                     if (!ColumnExists(connection, "MenuItems", "KitchenStationId"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE MenuItems ADD KitchenStationId INT NULL", 
                             connection))
                         {
@@ -66,7 +66,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Fix CalorieCount column
                     if (!ColumnExists(connection, "MenuItems", "CalorieCount"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE MenuItems ADD CalorieCount INT NULL", 
                             connection))
                         {
@@ -82,7 +82,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Fix IsFeatured column
                     if (!ColumnExists(connection, "MenuItems", "IsFeatured"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE MenuItems ADD IsFeatured BIT NOT NULL DEFAULT 0", 
                             connection))
                         {
@@ -98,7 +98,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Fix IsSpecial column
                     if (!ColumnExists(connection, "MenuItems", "IsSpecial"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE MenuItems ADD IsSpecial BIT NOT NULL DEFAULT 0", 
                             connection))
                         {
@@ -114,7 +114,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Fix DiscountPercentage column
                     if (!ColumnExists(connection, "MenuItems", "DiscountPercentage"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE MenuItems ADD DiscountPercentage DECIMAL(5,2) NULL", 
                             connection))
                         {
@@ -142,9 +142,9 @@ namespace RestaurantManagementSystem.Controllers
             return View("FixResult", messages);
         }
         
-        private bool ColumnExists(SqlConnection connection, string tableName, string columnName)
+        private bool ColumnExists(Microsoft.Data.SqlClient.SqlConnection connection, string tableName, string columnName)
         {
-            using (var command = new SqlCommand(
+            using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                 @"SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
                 WHERE TABLE_NAME = @tableName AND COLUMN_NAME = @columnName",
                 connection))
@@ -156,9 +156,9 @@ namespace RestaurantManagementSystem.Controllers
             }
         }
         
-        private bool TableExists(SqlConnection connection, string tableName)
+        private bool TableExists(Microsoft.Data.SqlClient.SqlConnection connection, string tableName)
         {
-            using (var command = new SqlCommand(
+            using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                 @"SELECT 1 FROM INFORMATION_SCHEMA.TABLES 
                 WHERE TABLE_NAME = @tableName",
                 connection))
@@ -175,7 +175,7 @@ namespace RestaurantManagementSystem.Controllers
             
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     messages.Add("Database connection opened successfully.");
@@ -183,7 +183,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Create Ingredients table if it doesn't exist
                     if (!TableExists(connection, "Ingredients"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"CREATE TABLE [dbo].[Ingredients] (
                                 [Id] INT IDENTITY(1,1) PRIMARY KEY,
                                 [Name] NVARCHAR(100) NOT NULL,
@@ -210,7 +210,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Create Allergens table if it doesn't exist
                     if (!TableExists(connection, "Allergens"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"CREATE TABLE [dbo].[Allergens] (
                                 [Id] INT IDENTITY(1,1) PRIMARY KEY,
                                 [Name] NVARCHAR(100) NOT NULL,
@@ -231,7 +231,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Create Modifiers table if it doesn't exist
                     if (!TableExists(connection, "Modifiers"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"CREATE TABLE [dbo].[Modifiers] (
                                 [Id] INT IDENTITY(1,1) PRIMARY KEY,
                                 [Name] NVARCHAR(100) NOT NULL,
@@ -253,7 +253,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Create MenuItemAllergens table if it doesn't exist
                     if (!TableExists(connection, "MenuItemAllergens"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"CREATE TABLE [dbo].[MenuItemAllergens] (
                                 [Id] INT IDENTITY(1,1) PRIMARY KEY,
                                 [MenuItemId] INT NOT NULL,
@@ -275,7 +275,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Create MenuItemIngredients table if it doesn't exist
                     if (!TableExists(connection, "MenuItemIngredients"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"CREATE TABLE [dbo].[MenuItemIngredients] (
                                 [Id] INT IDENTITY(1,1) PRIMARY KEY,
                                 [MenuItemId] INT NOT NULL,
@@ -301,7 +301,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Create MenuItemModifiers table if it doesn't exist
                     if (!TableExists(connection, "MenuItemModifiers"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"CREATE TABLE [dbo].[MenuItemModifiers] (
                                 [Id] INT IDENTITY(1,1) PRIMARY KEY,
                                 [MenuItemId] INT NOT NULL,

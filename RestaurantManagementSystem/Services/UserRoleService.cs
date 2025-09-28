@@ -27,13 +27,17 @@ namespace RestaurantManagementSystem.Services
             
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_GetAllRoles", connection))
+                    // Use direct SQL query instead of stored procedure
+                    string sql = @"SELECT Id, Name, Description, 
+                                  CASE WHEN IsSystemRole IS NULL THEN 0 ELSE IsSystemRole END AS IsSystemRole 
+                                  FROM purojit2_idmcbp.Roles";
+                                  
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
                     {
-                        command.CommandType = CommandType.StoredProcedure;
                         
                         using (var reader = await command.ExecuteReaderAsync())
                         {
@@ -64,18 +68,19 @@ namespace RestaurantManagementSystem.Services
         /// <summary>
         /// Gets a role by its ID, including users assigned to the role
         /// </summary>
-        public async Task<(Role Role, List<User> Users)> GetRoleByIdAsync(int id)
+        // Original method with original return type
+        public async Task<(Role Role, List<User> Users)> GetRoleWithUsersAsync(int id)
         {
             Role role = null;
             var users = new List<User>();
             
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_GetRoleById", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_GetRoleById", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@Id", id);
@@ -123,17 +128,39 @@ namespace RestaurantManagementSystem.Services
         }
         
         /// <summary>
-        /// Creates a new role
+        /// Gets a role by its ID with success/failure information
         /// </summary>
-        public async Task<(bool Success, string Message, int? RoleId)> CreateRoleAsync(Role role)
+        public async Task<(bool Success, string Message, Role role)> GetRoleByIdAsync(int id)
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                var result = await GetRoleWithUsersAsync(id);
+                if (result.Role == null)
+                {
+                    return (false, $"Role with ID {id} not found", null);
+                }
+                return (true, "Role retrieved successfully", result.Role);
+            }
+            catch (Exception ex)
+            {
+                // Log the exception
+                Console.WriteLine($"Error getting role by ID {id}: {ex.Message}");
+                return (false, $"Error retrieving role: {ex.Message}", null);
+            }
+        }
+        
+        /// <summary>
+        /// Creates a new role
+        /// </summary>
+        public async Task<(bool Success, string Message)> CreateRoleAsync(Role role)
+        {
+            try
+            {
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_CreateRole", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_CreateRole", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         
@@ -149,24 +176,24 @@ namespace RestaurantManagementSystem.Services
                                 int roleId = Convert.ToInt32(reader["RoleId"]);
                                 string message = reader["Message"].ToString();
                                 
-                                return (true, message, roleId);
+                                return (true, message);
                             }
                         }
                     }
                 }
                 
-                return (false, "Failed to create role", null);
+                return (false, "Failed to create role");
             }
             catch (SqlException ex)
             {
                 // Handle specific SQL exceptions
-                return (false, ex.Message, null);
+                return (false, ex.Message);
             }
             catch (Exception ex)
             {
                 // Log the exception
                 Console.WriteLine($"Error creating role: {ex.Message}");
-                return (false, "An error occurred while creating the role", null);
+                return (false, "An error occurred while creating the role");
             }
         }
         
@@ -177,11 +204,11 @@ namespace RestaurantManagementSystem.Services
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_UpdateRole", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_UpdateRole", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         
@@ -223,11 +250,11 @@ namespace RestaurantManagementSystem.Services
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_DeleteRole", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_DeleteRole", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@Id", id);
@@ -267,13 +294,19 @@ namespace RestaurantManagementSystem.Services
             
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_GetUserRoles", connection))
+                    // Use direct SQL query instead of stored procedure
+                    string sql = @"
+                        SELECT r.Id AS RoleId, r.Name AS RoleName, r.Description AS RoleDescription
+                        FROM purojit2_idmcbp.Roles r
+                        INNER JOIN purojit2_idmcbp.UserRoles ur ON r.Id = ur.RoleId
+                        WHERE ur.UserId = @UserId";
+                        
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
                     {
-                        command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@UserId", userId);
                         
                         using (var reader = await command.ExecuteReaderAsync())
@@ -308,11 +341,11 @@ namespace RestaurantManagementSystem.Services
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_AssignRoleToUser", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"INSERT INTO purojit2_idmcbp.UserRoles (UserId, RoleId) VALUES (@UserId, @RoleId); SELECT 'Role assigned' AS Message;", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         
@@ -352,11 +385,11 @@ namespace RestaurantManagementSystem.Services
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_RemoveRoleFromUser", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"DELETE FROM purojit2_idmcbp.UserRoles WHERE UserId = @UserId AND RoleId = @RoleId; SELECT 'Role removed' AS Message;", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         
@@ -406,13 +439,12 @@ namespace RestaurantManagementSystem.Services
             try
             {
                 // First remove all existing roles for this user
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_RemoveAllRolesFromUser", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"DELETE FROM purojit2_idmcbp.UserRoles WHERE UserId = @UserId", connection))
                     {
-                        command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@UserId", userId);
                         await command.ExecuteNonQueryAsync();
                     }
@@ -442,6 +474,12 @@ namespace RestaurantManagementSystem.Services
                 return (false, $"An error occurred while setting user roles: {ex.Message}");
             }
         }
+        
+        // Add alias method for backward compatibility
+        public async Task<(bool Success, string Message)> UpdateUserRolesAsync(int userId, List<int> roleIds)
+        {
+            return await SetUserRolesAsync(userId, roleIds);
+        }
 
         /// <summary>
         /// Gets all users with their role status for a specific role
@@ -452,11 +490,11 @@ namespace RestaurantManagementSystem.Services
             
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_GetAllUsersWithRoleStatus", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_GetAllUsersWithRoleStatus", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@RoleId", roleId);
@@ -495,11 +533,11 @@ namespace RestaurantManagementSystem.Services
             try
             {
                 // First remove all users from this role
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new SqlCommand("dbo.usp_RemoveAllUsersFromRole", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_RemoveAllUsersFromRole", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@RoleId", roleId);
@@ -536,6 +574,7 @@ namespace RestaurantManagementSystem.Services
     /// <summary>
     /// View Model for User Role Management
     /// </summary>
+    // This is an internal ViewModel used by the service
     public class UserRoleViewModel
     {
         public int UserId { get; set; }
@@ -543,5 +582,12 @@ namespace RestaurantManagementSystem.Services
         public string Email { get; set; }
         public string FullName { get; set; }
         public bool HasRole { get; set; }
+        
+        // Property for compatibility with ViewModels.UserRoleViewModel
+        public bool IsAssigned 
+        { 
+            get { return HasRole; }
+            set { HasRole = value; }
+        }
     }
 }

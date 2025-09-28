@@ -34,14 +34,14 @@ namespace RestaurantManagementSystem.Middleware
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
 
                     // Fix Tables table
                     if (!ColumnExists(connection, "Tables", "TableName"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"ALTER TABLE [dbo].[Tables] 
                             ADD [TableName] AS ([TableNumber])", connection))
                         {
@@ -53,7 +53,7 @@ namespace RestaurantManagementSystem.Middleware
                     // Fix Users table
                     if (!ColumnExists(connection, "Users", "FullName"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"ALTER TABLE [dbo].[Users] 
                             ADD [FullName] AS (LTRIM(RTRIM(ISNULL([FirstName], '') + ' ' + ISNULL([LastName], ''))))", 
                             connection))
@@ -66,7 +66,7 @@ namespace RestaurantManagementSystem.Middleware
                     // Add Phone column if it doesn't exist
                     if (!ColumnExists(connection, "Users", "Phone"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE [dbo].[Users] ADD [Phone] NVARCHAR(20) NULL", 
                             connection))
                         {
@@ -78,7 +78,7 @@ namespace RestaurantManagementSystem.Middleware
                     // Add Role column if it doesn't exist - maps RoleId to Role
                     if (!ColumnExists(connection, "Users", "Role"))
                     {
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE [dbo].[Users] ADD [Role] INT NOT NULL DEFAULT 3", 
                             connection))
                         {
@@ -86,14 +86,17 @@ namespace RestaurantManagementSystem.Middleware
                             Console.WriteLine("Added Role column to Users table.");
                         }
                     }
-                    
-                    // Update Role column with RoleId values if needed
-                    using (var command = new SqlCommand(
-                        "UPDATE [dbo].[Users] SET [Role] = [RoleId] WHERE [Role] <> [RoleId]", 
-                        connection))
+
+                    // Only update Role from RoleId if BOTH columns exist
+                    if (ColumnExists(connection, "Users", "Role") && ColumnExists(connection, "Users", "RoleId"))
                     {
-                        command.ExecuteNonQuery();
-                        Console.WriteLine("Updated Role column with RoleId values.");
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
+                            "UPDATE [dbo].[Users] SET [Role] = [RoleId] WHERE [Role] <> [RoleId]", 
+                            connection))
+                        {
+                            command.ExecuteNonQuery();
+                            Console.WriteLine("Updated Role column with RoleId values.");
+                        }
                     }
                     
                     // Check for missing tables and create them if needed
@@ -112,9 +115,9 @@ namespace RestaurantManagementSystem.Middleware
             }
         }
 
-        private bool ColumnExists(SqlConnection connection, string tableName, string columnName)
+        private bool ColumnExists(Microsoft.Data.SqlClient.SqlConnection connection, string tableName, string columnName)
         {
-            using (var command = new SqlCommand(
+            using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                 $"SELECT COUNT(1) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.{tableName}') AND name = '{columnName}'", 
                 connection))
             {
@@ -123,9 +126,9 @@ namespace RestaurantManagementSystem.Middleware
             }
         }
         
-        private bool TableExists(SqlConnection connection, string tableName)
+        private bool TableExists(Microsoft.Data.SqlClient.SqlConnection connection, string tableName)
         {
-            using (var command = new SqlCommand(
+            using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                 $"SELECT COUNT(1) FROM sys.tables WHERE name = '{tableName}'", 
                 connection))
             {
@@ -134,14 +137,14 @@ namespace RestaurantManagementSystem.Middleware
             }
         }
         
-        private void CreateRequiredTablesIfMissing(SqlConnection connection)
+        private void CreateRequiredTablesIfMissing(Microsoft.Data.SqlClient.SqlConnection connection)
         {
             try
             {
                 // Create Categories table (base table)
                 if (!TableExists(connection, "Categories"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[Categories] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [CategoryName] NVARCHAR(100) NOT NULL,
@@ -156,7 +159,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Create Ingredients table
                 if (!TableExists(connection, "Ingredients"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[Ingredients] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [IngredientsName] NVARCHAR(100) NOT NULL,
@@ -172,7 +175,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Create CourseTypes table
                 if (!TableExists(connection, "CourseTypes"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[CourseTypes] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [Name] NVARCHAR(50) NOT NULL,
@@ -185,7 +188,7 @@ namespace RestaurantManagementSystem.Middleware
                         Console.WriteLine("Created CourseTypes table.");
                         
                         // Insert default course types
-                        using (var insertCommand = new SqlCommand(
+                        using (var insertCommand = new Microsoft.Data.SqlClient.SqlCommand(
                             @"INSERT INTO [CourseTypes] ([Name], [DisplayOrder])
                             VALUES 
                                 ('Appetizer', 1),
@@ -203,7 +206,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Create MenuItems table (depends on Categories)
                 if (!TableExists(connection, "MenuItems") && TableExists(connection, "Categories"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[MenuItems] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [Name] NVARCHAR(100) NOT NULL,
@@ -226,7 +229,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Create Tables table
                 if (!TableExists(connection, "Tables"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[Tables] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [TableNumber] NVARCHAR(10) NOT NULL,
@@ -243,7 +246,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Create Reservations table
                 if (!TableExists(connection, "Reservations"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[Reservations] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [GuestName] NVARCHAR(100) NOT NULL,
@@ -271,7 +274,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Create Users table
                 if (!TableExists(connection, "Users"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[Users] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [Username] NVARCHAR(50) NOT NULL,
@@ -295,7 +298,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Create TableTurnovers table (depends on Tables)
                 if (!TableExists(connection, "TableTurnovers") && TableExists(connection, "Tables"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[TableTurnovers] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [TableId] INT NOT NULL,
@@ -317,7 +320,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Create Orders table (depends on TableTurnovers and Users)
                 if (!TableExists(connection, "Orders") && TableExists(connection, "TableTurnovers") && TableExists(connection, "Users"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[Orders] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [OrderNumber] NVARCHAR(20) NOT NULL,
@@ -349,7 +352,7 @@ namespace RestaurantManagementSystem.Middleware
                 if (!TableExists(connection, "OrderItems") && TableExists(connection, "Orders") && 
                     TableExists(connection, "MenuItems") && TableExists(connection, "CourseTypes"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         @"CREATE TABLE [dbo].[OrderItems] (
                             [Id] INT IDENTITY(1,1) PRIMARY KEY,
                             [OrderId] INT NOT NULL,
@@ -383,7 +386,7 @@ namespace RestaurantManagementSystem.Middleware
             }
         }
         
-        private void FixExistingTableColumns(SqlConnection connection)
+        private void FixExistingTableColumns(Microsoft.Data.SqlClient.SqlConnection connection)
         {
             try
             {
@@ -398,7 +401,7 @@ namespace RestaurantManagementSystem.Middleware
                     {
                         try 
                         {
-                            using (var command = new SqlCommand(
+                            using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                                 "ALTER TABLE [dbo].[Categories] DROP COLUMN [CategoryName]", connection))
                             {
                                 command.ExecuteNonQuery();
@@ -415,7 +418,7 @@ namespace RestaurantManagementSystem.Middleware
                     if (!ColumnExists(connection, "Categories", "Name"))
                     {
                         Console.WriteLine("Categories table is missing the Name column, adding it...");
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE [dbo].[Categories] ADD [Name] NVARCHAR(100) NOT NULL DEFAULT ''", connection))
                         {
                             command.ExecuteNonQuery();
@@ -427,7 +430,7 @@ namespace RestaurantManagementSystem.Middleware
                     if (!ColumnExists(connection, "Categories", "IsActive"))
                     {
                         Console.WriteLine("Adding IsActive column to Categories table...");
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE [dbo].[Categories] ADD [IsActive] BIT NOT NULL DEFAULT 1", connection))
                         {
                             command.ExecuteNonQuery();
@@ -445,7 +448,7 @@ namespace RestaurantManagementSystem.Middleware
                     if (ColumnExists(connection, "Ingredients", "Name") && !ColumnExists(connection, "Ingredients", "IngredientsName"))
                     {
                         Console.WriteLine("Converting Name to IngredientsName in Ingredients table...");
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             @"
                             BEGIN TRANSACTION;
                             
@@ -469,7 +472,7 @@ namespace RestaurantManagementSystem.Middleware
                     if (!ColumnExists(connection, "Ingredients", "DisplayName"))
                     {
                         Console.WriteLine("Adding DisplayName column to Ingredients table...");
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE [dbo].[Ingredients] ADD [DisplayName] NVARCHAR(100) NULL", connection))
                         {
                             command.ExecuteNonQuery();
@@ -481,7 +484,7 @@ namespace RestaurantManagementSystem.Middleware
                     if (!ColumnExists(connection, "Ingredients", "Code"))
                     {
                         Console.WriteLine("Adding Code column to Ingredients table...");
-                        using (var command = new SqlCommand(
+                        using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                             "ALTER TABLE [dbo].[Ingredients] ADD [Code] NVARCHAR(20) NULL", connection))
                         {
                             command.ExecuteNonQuery();
@@ -496,7 +499,7 @@ namespace RestaurantManagementSystem.Middleware
             }
         }
 
-        private void FixMenuItemColumns(SqlConnection connection)
+        private void FixMenuItemColumns(Microsoft.Data.SqlClient.SqlConnection connection)
         {
             try
             {
@@ -510,7 +513,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Check and add PreparationTimeMinutes column
                 if (!ColumnExists(connection, "MenuItems", "PreparationTimeMinutes"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         "ALTER TABLE MenuItems ADD PreparationTimeMinutes INT NOT NULL DEFAULT 15", 
                         connection))
                     {
@@ -522,7 +525,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Check and add KitchenStationId column
                 if (!ColumnExists(connection, "MenuItems", "KitchenStationId"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         "ALTER TABLE MenuItems ADD KitchenStationId INT NULL", 
                         connection))
                     {
@@ -534,7 +537,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Check and add CalorieCount column
                 if (!ColumnExists(connection, "MenuItems", "CalorieCount"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         "ALTER TABLE MenuItems ADD CalorieCount INT NULL", 
                         connection))
                     {
@@ -546,7 +549,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Check and add IsFeatured column
                 if (!ColumnExists(connection, "MenuItems", "IsFeatured"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         "ALTER TABLE MenuItems ADD IsFeatured BIT NOT NULL DEFAULT 0", 
                         connection))
                     {
@@ -558,7 +561,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Check and add IsSpecial column
                 if (!ColumnExists(connection, "MenuItems", "IsSpecial"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         "ALTER TABLE MenuItems ADD IsSpecial BIT NOT NULL DEFAULT 0", 
                         connection))
                     {
@@ -570,7 +573,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Check and add DiscountPercentage column
                 if (!ColumnExists(connection, "MenuItems", "DiscountPercentage"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         "ALTER TABLE MenuItems ADD DiscountPercentage DECIMAL(5,2) NULL", 
                         connection))
                     {
@@ -582,7 +585,7 @@ namespace RestaurantManagementSystem.Middleware
                 // Check and add PLUCode column if it doesn't exist
                 if (!ColumnExists(connection, "MenuItems", "PLUCode"))
                 {
-                    using (var command = new SqlCommand(
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(
                         "ALTER TABLE MenuItems ADD PLUCode NVARCHAR(20) NULL", 
                         connection))
                     {

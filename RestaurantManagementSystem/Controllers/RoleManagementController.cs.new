@@ -1,0 +1,236 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using RestaurantManagementSystem.Models;
+using RestaurantManagementSystem.Services;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace RestaurantManagementSystem.Controllers
+{
+    [Authorize(Roles = "Administrator")]
+    public class RoleManagementController : Controller
+    {
+        private readonly UserRoleService _userRoleService;
+        
+        public RoleManagementController(UserRoleService userRoleService)
+        {
+            _userRoleService = userRoleService;
+        }
+        
+        // GET: /RoleManagement/
+        public async Task<IActionResult> Index()
+        {
+            var roles = await _userRoleService.GetAllRolesAsync();
+            return View(roles);
+        }
+        
+        // GET: /RoleManagement/Create
+        public IActionResult Create()
+        {
+            return View(new Role());
+        }
+        
+        // POST: /RoleManagement/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(Role role)
+        {
+            if (ModelState.IsValid)
+            {
+                var (success, message) = await _userRoleService.CreateRoleAsync(role);
+                
+                if (success)
+                {
+                    TempData["SuccessMessage"] = "Role created successfully";
+                    return RedirectToAction(nameof(Index));
+                }
+                else
+                {
+                    ModelState.AddModelError("", message);
+                }
+            }
+            
+            return View(role);
+        }
+        
+        // GET: /RoleManagement/Edit/5
+        public async Task<IActionResult> Edit(int id)
+        {
+            var (success, message, role) = await _userRoleService.GetRoleByIdAsync(id);
+            
+            if (!success || role == null)
+            {
+                TempData["ErrorMessage"] = message;
+                return RedirectToAction(nameof(Index));
+            }
+            
+            if (role.IsSystemRole)
+            {
+                TempData["WarningMessage"] = "System roles can only be edited with caution";
+            }
+            
+            return View(role);
+        }
+        
+        // POST: /RoleManagement/Edit/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, Role role)
+        {
+            if (id != role.Id)
+            {
+                return NotFound();
+            }
+            
+            if (ModelState.IsValid)
+            {
+                var (success, message, existingRole) = await _userRoleService.GetRoleByIdAsync(id);
+                
+                if (!success || existingRole == null)
+                {
+                    TempData["ErrorMessage"] = message;
+                    return RedirectToAction(nameof(Index));
+                }
+                
+                if (existingRole.IsSystemRole && existingRole.Name != role.Name)
+                {
+                    ModelState.AddModelError("Name", "Cannot change the name of a system role");
+                    return View(role);
+                }
+                
+                var result = await _userRoleService.UpdateRoleAsync(role);
+                
+                if (result.Success)
+                {
+                    TempData["SuccessMessage"] = "Role updated successfully";
+                    return RedirectToAction(nameof(Index));
+                }
+                else
+                {
+                    ModelState.AddModelError("", result.Message);
+                }
+            }
+            
+            return View(role);
+        }
+        
+        // GET: /RoleManagement/Details/5
+        public async Task<IActionResult> Details(int id)
+        {
+            var (success, message, role) = await _userRoleService.GetRoleByIdAsync(id);
+            var users = await _userRoleService.GetAllUsersWithRoleStatusAsync(id);
+            
+            if (!success || role == null)
+            {
+                TempData["ErrorMessage"] = message;
+                return RedirectToAction(nameof(Index));
+            }
+            
+            ViewBag.Users = users.Where(u => u.HasRole).ToList();
+            
+            return View(role);
+        }
+        
+        // GET: /RoleManagement/ConfirmDelete/5
+        public async Task<IActionResult> ConfirmDelete(int id)
+        {
+            var (success, message, role) = await _userRoleService.GetRoleByIdAsync(id);
+            var users = await _userRoleService.GetAllUsersWithRoleStatusAsync(id);
+            
+            if (!success || role == null)
+            {
+                TempData["ErrorMessage"] = message;
+                return RedirectToAction(nameof(Index));
+            }
+            
+            if (role.IsSystemRole)
+            {
+                TempData["ErrorMessage"] = "System roles cannot be deleted";
+                return RedirectToAction(nameof(Index));
+            }
+            
+            ViewBag.UsersCount = users.Count(u => u.HasRole);
+            
+            return View(role);
+        }
+        
+        // POST: /RoleManagement/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            var (success, message, role) = await _userRoleService.GetRoleByIdAsync(id);
+            
+            if (!success || role == null)
+            {
+                TempData["ErrorMessage"] = message;
+                return RedirectToAction(nameof(Index));
+            }
+            
+            if (role.IsSystemRole)
+            {
+                TempData["ErrorMessage"] = "System roles cannot be deleted";
+                return RedirectToAction(nameof(Index));
+            }
+            
+            var result = await _userRoleService.DeleteRoleAsync(id);
+            
+            if (result.Success)
+            {
+                TempData["SuccessMessage"] = "Role deleted successfully";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = result.Message;
+            }
+            
+            return RedirectToAction(nameof(Index));
+        }
+        
+        // GET: /RoleManagement/AssignUsers/5
+        public async Task<IActionResult> AssignUsers(int id)
+        {
+            var (success, message, role) = await _userRoleService.GetRoleByIdAsync(id);
+            var allUsers = await _userRoleService.GetAllUsersWithRoleStatusAsync(id);
+            
+            if (!success || role == null)
+            {
+                TempData["ErrorMessage"] = message;
+                return RedirectToAction(nameof(Index));
+            }
+            
+            ViewBag.Users = allUsers;
+            
+            return View(role);
+        }
+        
+        // POST: /RoleManagement/AssignUsers/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AssignUsers(int id, int[] selectedUsers)
+        {
+            var (success, message, role) = await _userRoleService.GetRoleByIdAsync(id);
+            
+            if (!success || role == null)
+            {
+                TempData["ErrorMessage"] = message;
+                return RedirectToAction(nameof(Index));
+            }
+            
+            // Convert to List<int> as required by the method
+            var userIdList = selectedUsers?.ToList() ?? new System.Collections.Generic.List<int>();
+            var result = await _userRoleService.SetUsersForRoleAsync(id, userIdList);
+            
+            if (result.Success)
+            {
+                TempData["SuccessMessage"] = "User assignments updated successfully";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = result.Message;
+            }
+            
+            return RedirectToAction(nameof(Details), new { id });
+        }
+    }
+}

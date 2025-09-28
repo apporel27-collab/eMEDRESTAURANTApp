@@ -23,11 +23,11 @@ namespace RestaurantManagementSystem.Controllers
                 string script = System.IO.File.ReadAllText(scriptPath);
                 
                 // Execute the script
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
-                    using (var command = new SqlCommand(script, connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(script, connection))
                     {
                         command.ExecuteNonQuery();
                     }

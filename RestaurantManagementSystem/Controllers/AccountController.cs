@@ -3,10 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Data;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using RestaurantManagementSystem.Models;
 using RestaurantManagementSystem.Services;
 using RestaurantManagementSystem.ViewModels;
@@ -15,15 +21,19 @@ namespace RestaurantManagementSystem.Controllers
 {
     public class AccountController : Controller
     {
-        private readonly AuthService _authService;
+        private readonly IAuthService _authService;
+        private readonly UserRoleService _userRoleService;
+        private readonly ILogger<AccountController> _logger;
         
-        public AccountController(AuthService authService)
+        public AccountController(IAuthService authService, UserRoleService userRoleService, ILogger<AccountController> logger)
         {
             _authService = authService;
+            _userRoleService = userRoleService;
+            _logger = logger;
         }
         
-        [HttpGet]
-        [AllowAnonymous]
+        [HttpGetAttribute]
+        [AllowAnonymousAttribute]
         public IActionResult Login(string returnUrl = null)
         {
             // If user is already authenticated, redirect to home
@@ -36,24 +46,25 @@ namespace RestaurantManagementSystem.Controllers
             return View(new LoginViewModel { ReturnUrl = returnUrl });
         }
         
+        [HttpPostAttribute]
         [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
+        [AllowAnonymousAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public async Task<IActionResult> Login(LoginViewModel model)
         {
             if (ModelState.IsValid)
             {
-                var (success, message, user) = await _authService.AuthenticateUserAsync(model.Username, model.Password);
+                var (success, message, principal) = await _authService.AuthenticateUserAsync(model.Username, model.Password);
                 
-                if (success && user != null)
+                if (success && principal != null)
                 {
                     // Check if MFA is required
-                    if (user.RequiresMFA)
+                    if (principal.HasClaim(c => c.Type == "RequiresMFA" && c.Value == "true"))
                     {
                         // Redirect to MFA verification
                         // In a real application, you would generate and send an MFA code here
                         // For now, we'll simulate MFA by just showing the MFA view
-                        TempData["Username"] = user.Username;
+                        TempData["Username"] = principal.Identity.Name;
                         TempData["RememberMe"] = model.RememberMe;
                         TempData["ReturnUrl"] = model.ReturnUrl;
                         
@@ -61,7 +72,7 @@ namespace RestaurantManagementSystem.Controllers
                     }
                     
                     // Sign in the user
-                    await _authService.SignInUserAsync(user, model.RememberMe);
+                    await _authService.SignInUserAsync(principal, model.RememberMe);
                     
                     // Redirect to returnUrl or home page
                     if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
@@ -78,8 +89,8 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpGet]
-        [AllowAnonymous]
+        [HttpGetAttribute]
+        [AllowAnonymousAttribute]
         public IActionResult VerifyMFA()
         {
             // Check if we have the necessary TempData
@@ -103,9 +114,9 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [AllowAnonymousAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public async Task<IActionResult> VerifyMFA(MFAViewModel model)
         {
             if (ModelState.IsValid)
@@ -145,16 +156,16 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public async Task<IActionResult> Logout()
         {
             await _authService.SignOutUserAsync();
             return RedirectToAction("Login");
         }
         
-        [HttpGet]
-        [AllowAnonymous]
+        [HttpGetAttribute]
+        [AllowAnonymousAttribute]
         public IActionResult Register()
         {
             // If user is already authenticated, redirect to home
@@ -166,14 +177,31 @@ namespace RestaurantManagementSystem.Controllers
             return View();
         }
         
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [AllowAnonymousAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public async Task<IActionResult> Register(RegisterViewModel model)
         {
             if (ModelState.IsValid)
             {
-                var result = await _authService.RegisterUserAsync(model);
+                // Convert RegisterViewModel to User model
+                var user = new User
+                {
+                    Username = model.Username,
+                    Password = model.Password,
+                    FirstName = model.FirstName,
+                    LastName = model.LastName,
+                    Email = model.Email,
+                    Phone = model.PhoneNumber,
+                    IsActive = true,
+                    RequiresMFA = false,
+                    SelectedRoleIds = new List<int> { 2 } // Default to regular user role
+                };
+                
+                // Set default role to Staff
+                string roleName = "Staff";
+                
+                var result = await _authService.RegisterUserAsync(user, user.Password, roleName);
                 
                 if (result.success)
                 {
@@ -188,16 +216,16 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpGet]
-        [Authorize]
+        [HttpGetAttribute]
+        [AuthorizeAttribute]
         public IActionResult ChangePassword()
         {
             return View();
         }
         
-        [HttpPost]
-        [Authorize]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [AuthorizeAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
         {
             if (ModelState.IsValid)
@@ -225,7 +253,7 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpGet]
+        [HttpGetAttribute]
         [Authorize(Roles = "Administrator")]
         public async Task<IActionResult> UserList()
         {
@@ -244,7 +272,7 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpGet]
+        [HttpGetAttribute]
         [Authorize(Roles = "Administrator")]
         public async Task<IActionResult> EditUser(int id)
         {
@@ -258,27 +286,21 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
+        [HttpPostAttribute]
         [Authorize(Roles = "Administrator")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditUser(UserEditViewModel model)
+        [ValidateAntiForgeryTokenAttribute]
+        public async Task<IActionResult> EditUser(User model)
         {
             if (ModelState.IsValid)
             {
-                // Convert UserEditViewModel to EditUserViewModel
-                var editModel = new EditUserViewModel
+                // Get the current user ID for audit
+                int updatedByUserId = 1; // Default to system user
+                if (User.Identity.IsAuthenticated && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int userId))
                 {
-                    Id = model.Id,
-                    Username = model.Username,
-                    FirstName = model.FirstName,
-                    LastName = model.LastName,
-                    Email = model.Email,
-                    Phone = model.PhoneNumber,
-                    IsActive = model.IsActive,
-                    Role = model.SelectedRoles.FirstOrDefault()
-                };
+                    updatedByUserId = userId;
+                }
                 
-                var result = await _authService.UpdateUserAsync(editModel);
+                var result = await _authService.UpdateUserAsync(model, updatedByUserId);
                 
                 if (result.success)
                 {
@@ -289,15 +311,13 @@ namespace RestaurantManagementSystem.Controllers
                 ModelState.AddModelError(string.Empty, result.message);
             }
             
-            // Re-populate the available roles and outlets
-            var refreshedModel = await _authService.GetUserForEditAsync(model.Id);
-            model.AvailableRoles = refreshedModel.AvailableRoles;
-            model.AvailableOutlets = refreshedModel.AvailableOutlets;
+            // Re-populate available roles for the dropdown
+            ViewBag.Roles = await _userRoleService.GetAllRolesAsync();
             
             return View(model);
         }
         
-        [HttpGet]
+        [HttpGetAttribute]
         public IActionResult AccessDenied()
         {
             return View();

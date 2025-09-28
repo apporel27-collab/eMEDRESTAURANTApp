@@ -28,7 +28,7 @@ namespace RestaurantManagementSystem.Controllers
             _webHostEnvironment = webHostEnvironment;
         }
         
-        private bool HasColumn(SqlDataReader reader, string columnName)
+        private bool HasColumn(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             for (int i = 0; i < reader.FieldCount; i++)
             {
@@ -39,7 +39,7 @@ namespace RestaurantManagementSystem.Controllers
         }
         
         // Safe getters for database values
-        private int SafeGetInt(SqlDataReader reader, string columnName)
+        private int SafeGetInt(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             try
             {
@@ -52,7 +52,7 @@ namespace RestaurantManagementSystem.Controllers
             }
         }
         
-        private int? SafeGetNullableInt(SqlDataReader reader, string columnName)
+        private int? SafeGetNullableInt(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             try
             {
@@ -65,7 +65,7 @@ namespace RestaurantManagementSystem.Controllers
             }
         }
         
-        private string SafeGetString(SqlDataReader reader, string columnName)
+        private string SafeGetString(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             try
             {
@@ -78,7 +78,7 @@ namespace RestaurantManagementSystem.Controllers
             }
         }
         
-        private decimal SafeGetDecimal(SqlDataReader reader, string columnName)
+        private decimal SafeGetDecimal(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             try
             {
@@ -91,7 +91,7 @@ namespace RestaurantManagementSystem.Controllers
             }
         }
         
-        private decimal? SafeGetNullableDecimal(SqlDataReader reader, string columnName)
+        private decimal? SafeGetNullableDecimal(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             try
             {
@@ -104,7 +104,7 @@ namespace RestaurantManagementSystem.Controllers
             }
         }
         
-        private bool SafeGetBoolean(SqlDataReader reader, string columnName)
+        private bool SafeGetBoolean(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             try
             {
@@ -141,7 +141,7 @@ namespace RestaurantManagementSystem.Controllers
         {
             ViewBag.Categories = GetCategorySelectList();
             ViewBag.Allergens = GetAllAllergens();
-            ViewBag.Ingredients = GetIngredientSelectList();
+            // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
             ViewBag.KitchenStations = GetKitchenStationSelectList();
             
@@ -149,8 +149,8 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Menu/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult Create(MenuItemViewModel model)
         {
             if (ModelState.IsValid)
@@ -186,12 +186,7 @@ namespace RestaurantManagementSystem.Controllers
                         AddMenuItemAllergens(menuItemId, model.SelectedAllergens);
                     }
 
-                    // Add ingredients
-                    if (model.Ingredients != null && model.Ingredients.Any())
-                    {
-                        var modelIngredients = ConvertIngredientsViewModelToModel(model.Ingredients);
-                        AddMenuItemIngredients(menuItemId, modelIngredients);
-                    }
+                    // Ingredients feature removed
 
                     // Add modifiers
                     if (model.SelectedModifiers != null && model.SelectedModifiers.Any())
@@ -211,7 +206,7 @@ namespace RestaurantManagementSystem.Controllers
             // If we got this far, something failed, redisplay form
             ViewBag.Categories = GetCategorySelectList();
             ViewBag.Allergens = GetAllAllergens();
-            ViewBag.Ingredients = GetIngredientSelectList();
+            // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
             ViewBag.KitchenStations = GetKitchenStationSelectList();
             
@@ -245,14 +240,7 @@ namespace RestaurantManagementSystem.Controllers
                 DiscountPercentage = menuItem.DiscountPercentage,
                 KitchenStationId = menuItem.KitchenStationId,
                 SelectedAllergens = menuItem.Allergens?.Select(a => a.AllergenId).ToList() ?? new List<int>(),
-                Ingredients = menuItem.Ingredients?.Select(i => new ViewModelsMenuItemIngredientViewModel
-                {
-                    IngredientId = i.IngredientId,
-                    Quantity = i.Quantity,
-                    Unit = i.Unit,
-                    IsOptional = i.IsOptional,
-                    Instructions = i.Instructions
-                }).ToList() ?? new List<ViewModelsMenuItemIngredientViewModel>(),
+                // Ingredients feature removed from Edit view model mapping
                 SelectedModifiers = menuItem.Modifiers?.Select(m => m.ModifierId).ToList() ?? new List<int>(),
                 ModifierPrices = menuItem.Modifiers?.ToDictionary(m => m.ModifierId, m => m.PriceAdjustment) 
                     ?? new Dictionary<int, decimal>()
@@ -260,7 +248,7 @@ namespace RestaurantManagementSystem.Controllers
 
             ViewBag.Categories = GetCategorySelectList();
             ViewBag.Allergens = GetAllAllergens();
-            ViewBag.Ingredients = GetIngredientSelectList();
+            // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
             ViewBag.KitchenStations = GetKitchenStationSelectList();
             
@@ -268,8 +256,8 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Menu/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult Edit(int id, MenuItemViewModel model)
         {
             if (id != model.Id)
@@ -321,14 +309,7 @@ namespace RestaurantManagementSystem.Controllers
                         AddMenuItemAllergens(id, model.SelectedAllergens);
                     }
 
-                    // Update ingredients (remove all and add selected)
-                    RemoveMenuItemIngredients(id);
-                    if (model.Ingredients != null && model.Ingredients.Any())
-                    {
-                        // Convert from ViewModels.MenuItemIngredientViewModel to Models.MenuItemIngredientViewModel
-                        var modelIngredients = ConvertIngredientsViewModelToModel(model.Ingredients);
-                        AddMenuItemIngredients(id, modelIngredients);
-                    }
+                    // Ingredients feature removed
 
                     // Update modifiers (remove all and add selected)
                     RemoveMenuItemModifiers(id);
@@ -349,7 +330,7 @@ namespace RestaurantManagementSystem.Controllers
             // If we got this far, something failed, redisplay form
             ViewBag.Categories = GetCategorySelectList();
             ViewBag.Allergens = GetAllAllergens();
-            ViewBag.Ingredients = GetIngredientSelectList();
+            // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
             ViewBag.KitchenStations = GetKitchenStationSelectList();
             
@@ -370,7 +351,7 @@ namespace RestaurantManagementSystem.Controllers
 
         // POST: Menu/Delete/5
         [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult DeleteConfirmed(int id)
         {
             try
@@ -448,8 +429,8 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Menu/Recipe/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult Recipe(RecipeViewModel model)
         {
             if (ModelState.IsValid)
@@ -521,13 +502,13 @@ namespace RestaurantManagementSystem.Controllers
         {
             var menuItems = new List<MenuItem>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Instead of using the stored procedure which may not have all columns,
                 // let's directly query the tables to ensure we get all columns
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     -- First, let's check if ItemType column exists
                     DECLARE @ItemTypeExists INT = 0;
                     
@@ -576,7 +557,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     try
                     {
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
@@ -602,7 +583,7 @@ namespace RestaurantManagementSystem.Controllers
                                         TargetGP = SafeGetNullableDecimal(reader, "TargetGP"),
                                         ItemType = HasColumn(reader, "ItemType") ? SafeGetString(reader, "ItemType") : null,
                                         Allergens = new List<MenuItemAllergen>(),
-                                        Ingredients = new List<MenuItemIngredient>(),
+                                        // Ingredients list is no longer loaded
                                         Modifiers = new List<MenuItemModifier>()
                                     };
                                     
@@ -631,11 +612,11 @@ namespace RestaurantManagementSystem.Controllers
         {
             MenuItem menuItem = null;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         m.[Id], 
                         m.[PLUCode], 
@@ -659,7 +640,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@Id", id);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -682,7 +663,7 @@ namespace RestaurantManagementSystem.Controllers
                                 KitchenStationId = SafeGetNullableInt(reader, "KitchenStationId"),
                                 TargetGP = SafeGetNullableDecimal(reader, "TargetGP"),
                                 Allergens = new List<MenuItemAllergen>(),
-                                Ingredients = new List<MenuItemIngredient>(),
+                                // Ingredients list is no longer loaded
                                 Modifiers = new List<MenuItemModifier>()
                             };
                         }
@@ -693,7 +674,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     // Get allergens
                     try {
-                        using (SqlCommand command = new SqlCommand(@"
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                             SELECT mia.Id, mia.AllergenId, a.Name, mia.SeverityLevel
                             FROM MenuItemAllergens mia
                             JOIN Allergens a ON mia.AllergenId = a.Id
@@ -701,7 +682,7 @@ namespace RestaurantManagementSystem.Controllers
                         {
                             command.Parameters.AddWithValue("@MenuItemId", id);
                             
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
                                 while (reader.Read())
                                 {
@@ -720,41 +701,11 @@ namespace RestaurantManagementSystem.Controllers
                         Console.WriteLine($"Error getting allergens: {ex.Message}");
                     }
                     
-                    // Get ingredients
-                    try {
-                        using (SqlCommand command = new SqlCommand(@"
-                            SELECT mii.Id, mii.IngredientId, i.IngredientsName as Name, mii.Quantity, mii.Unit, mii.IsOptional, mii.Instructions
-                            FROM MenuItemIngredients mii
-                            JOIN Ingredients i ON mii.IngredientId = i.Id
-                            WHERE mii.MenuItemId = @MenuItemId", connection))
-                        {
-                            command.Parameters.AddWithValue("@MenuItemId", id);
-                            
-                            using (SqlDataReader reader = command.ExecuteReader())
-                            {
-                                while (reader.Read())
-                                {
-                                    menuItem.Ingredients.Add(new MenuItemIngredient
-                                    {
-                                        Id = SafeGetInt(reader, "Id"),
-                                        MenuItemId = id,
-                                        IngredientId = SafeGetInt(reader, "IngredientId"),
-                                        Ingredient = new Ingredients { IngredientsName = SafeGetString(reader, "Name") },
-                                        Quantity = SafeGetDecimal(reader, "Quantity"),
-                                        Unit = SafeGetString(reader, "Unit") ?? "",
-                                        IsOptional = SafeGetBoolean(reader, "IsOptional"),
-                                        Instructions = SafeGetString(reader, "Instructions")
-                                    });
-                                }
-                            }
-                        }
-                    } catch (Exception ex) {
-                        Console.WriteLine($"Error getting ingredients: {ex.Message}");
-                    }
+                    // Skip ingredients loading intentionally
                     
                     // Get modifiers
                     try {
-                        using (SqlCommand command = new SqlCommand(@"
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                             SELECT mim.Id, mim.ModifierId, m.Name, mim.PriceAdjustment, mim.IsDefault, mim.MaxAllowed
                             FROM MenuItemModifiers mim
                             JOIN Modifiers m ON mim.ModifierId = m.Id
@@ -762,7 +713,7 @@ namespace RestaurantManagementSystem.Controllers
                         {
                             command.Parameters.AddWithValue("@MenuItemId", id);
                             
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
                                 while (reader.Read())
                                 {
@@ -792,11 +743,11 @@ namespace RestaurantManagementSystem.Controllers
         {
             int menuItemId = 0;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
                                           IsAvailable, PrepTime, CalorieCount, 
                                           IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId)
@@ -847,11 +798,11 @@ namespace RestaurantManagementSystem.Controllers
 
         private void UpdateMenuItem(MenuItemViewModel model)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     UPDATE MenuItems
                     SET Name = @Name,
                         PLUCode = @PLUCode,
@@ -908,7 +859,7 @@ namespace RestaurantManagementSystem.Controllers
 
         private void DeleteMenuItem(int id)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -916,29 +867,43 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     try
                     {
-                        // Delete allergens
-                        using (SqlCommand command = new SqlCommand("DELETE FROM MenuItemAllergens WHERE MenuItemId = @MenuItemId", connection, transaction))
+                        // Resolve relationship tables (underscore/no-underscore)
+                        string allergensTable = GetMenuItemRelationshipTableName(connection, transaction, "Allergens");
+                        string ingredientsTable = GetMenuItemRelationshipTableName(connection, transaction, "Ingredients");
+                        string modifiersTable = GetMenuItemRelationshipTableName(connection, transaction, "Modifiers");
+
+                        // Delete allergens if table exists
+                        if (TableExists(connection, transaction, allergensTable))
                         {
-                            command.Parameters.AddWithValue("@MenuItemId", id);
-                            command.ExecuteNonQuery();
+                            using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand($"DELETE FROM {allergensTable} WHERE MenuItemId = @MenuItemId", connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@MenuItemId", id);
+                                command.ExecuteNonQuery();
+                            }
                         }
 
-                        // Delete ingredients
-                        using (SqlCommand command = new SqlCommand("DELETE FROM MenuItemIngredients WHERE MenuItemId = @MenuItemId", connection, transaction))
+                        // Delete ingredients if table exists
+                        if (TableExists(connection, transaction, ingredientsTable))
                         {
-                            command.Parameters.AddWithValue("@MenuItemId", id);
-                            command.ExecuteNonQuery();
+                            using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand($"DELETE FROM {ingredientsTable} WHERE MenuItemId = @MenuItemId", connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@MenuItemId", id);
+                                command.ExecuteNonQuery();
+                            }
                         }
 
-                        // Delete modifiers
-                        using (SqlCommand command = new SqlCommand("DELETE FROM MenuItemModifiers WHERE MenuItemId = @MenuItemId", connection, transaction))
+                        // Delete modifiers if table exists
+                        if (TableExists(connection, transaction, modifiersTable))
                         {
-                            command.Parameters.AddWithValue("@MenuItemId", id);
-                            command.ExecuteNonQuery();
+                            using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand($"DELETE FROM {modifiersTable} WHERE MenuItemId = @MenuItemId", connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@MenuItemId", id);
+                                command.ExecuteNonQuery();
+                            }
                         }
 
                         // Delete menu item
-                        using (SqlCommand command = new SqlCommand("DELETE FROM MenuItems WHERE Id = @Id", connection, transaction))
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("DELETE FROM MenuItems WHERE Id = @Id", connection, transaction))
                         {
                             command.Parameters.AddWithValue("@Id", id);
                             command.ExecuteNonQuery();
@@ -960,13 +925,13 @@ namespace RestaurantManagementSystem.Controllers
             if (allergenIds == null || !allergenIds.Any())
                 return;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 foreach (var allergenId in allergenIds)
                 {
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         INSERT INTO MenuItemAllergens (MenuItemId, AllergenId, SeverityLevel)
                         VALUES (@MenuItemId, @AllergenId, @SeverityLevel)", connection))
                     {
@@ -981,11 +946,11 @@ namespace RestaurantManagementSystem.Controllers
 
         private void RemoveMenuItemAllergens(int menuItemId)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     DELETE FROM MenuItemAllergens WHERE MenuItemId = @MenuItemId", connection))
                 {
                     command.Parameters.AddWithValue("@MenuItemId", menuItemId);
@@ -999,13 +964,13 @@ namespace RestaurantManagementSystem.Controllers
             if (ingredients == null || !ingredients.Any())
                 return;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 foreach (var ingredient in ingredients)
                 {
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         INSERT INTO MenuItemIngredients (MenuItemId, IngredientId, Quantity, Unit, IsOptional, Instructions)
                         VALUES (@MenuItemId, @IngredientId, @Quantity, @Unit, @IsOptional, @Instructions)", connection))
                     {
@@ -1028,15 +993,19 @@ namespace RestaurantManagementSystem.Controllers
 
         private void RemoveMenuItemIngredients(int menuItemId)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
-                    DELETE FROM MenuItemIngredients WHERE MenuItemId = @MenuItemId", connection))
+                // Resolve correct table name and delete only if it exists
+                string ingredientsTable = GetMenuItemRelationshipTableName(connection, null, "Ingredients");
+                if (TableExists(connection, null, ingredientsTable))
                 {
-                    command.Parameters.AddWithValue("@MenuItemId", menuItemId);
-                    command.ExecuteNonQuery();
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand($"DELETE FROM {ingredientsTable} WHERE MenuItemId = @MenuItemId", connection))
+                    {
+                        command.Parameters.AddWithValue("@MenuItemId", menuItemId);
+                        command.ExecuteNonQuery();
+                    }
                 }
             }
         }
@@ -1046,13 +1015,13 @@ namespace RestaurantManagementSystem.Controllers
             if (modifierIds == null || !modifierIds.Any())
                 return;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 foreach (var modifierId in modifierIds)
                 {
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         INSERT INTO MenuItemModifiers (MenuItemId, ModifierId, PriceAdjustment, IsDefault, MaxAllowed)
                         VALUES (@MenuItemId, @ModifierId, @PriceAdjustment, @IsDefault, @MaxAllowed)", connection))
                     {
@@ -1077,38 +1046,69 @@ namespace RestaurantManagementSystem.Controllers
 
         private void RemoveMenuItemModifiers(int menuItemId)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
-                    DELETE FROM MenuItemModifiers WHERE MenuItemId = @MenuItemId", connection))
+                string modifiersTable = GetMenuItemRelationshipTableName(connection, null, "Modifiers");
+                if (TableExists(connection, null, modifiersTable))
                 {
-                    command.Parameters.AddWithValue("@MenuItemId", menuItemId);
-                    command.ExecuteNonQuery();
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand($"DELETE FROM {modifiersTable} WHERE MenuItemId = @MenuItemId", connection))
+                    {
+                        command.Parameters.AddWithValue("@MenuItemId", menuItemId);
+                        command.ExecuteNonQuery();
+                    }
                 }
             }
+        }
+
+        // Helpers: schema resilience for relationship tables
+        private bool TableExists(Microsoft.Data.SqlClient.SqlConnection connection, Microsoft.Data.SqlClient.SqlTransaction? transaction, string tableName)
+        {
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlCommand cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT CASE WHEN OBJECT_ID(@t, 'U') IS NOT NULL THEN 1 ELSE 0 END", connection, transaction))
+                {
+                    cmd.Parameters.AddWithValue("@t", tableName);
+                    return Convert.ToBoolean(cmd.ExecuteScalar());
+                }
+            }
+            catch { return false; }
+        }
+
+        private string GetMenuItemRelationshipTableName(Microsoft.Data.SqlClient.SqlConnection connection, Microsoft.Data.SqlClient.SqlTransaction? transaction, string relationship)
+        {
+            // Prefer underscore version if it exists, else fallback to non-underscore
+            string withUnderscore = $"MenuItem_{relationship}";
+            string withoutUnderscore = $"MenuItem{relationship}";
+
+            if (TableExists(connection, transaction, withUnderscore))
+                return withUnderscore;
+            if (TableExists(connection, transaction, withoutUnderscore))
+                return withoutUnderscore;
+            // Default to non-underscore so callers can still build SQL safely if created later
+            return withoutUnderscore;
         }
 
         private Recipe GetRecipeByMenuItemId(int menuItemId)
         {
             Recipe recipe = null;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 try
                 {
                     // First try with stored procedure
-                    using (SqlCommand command = new SqlCommand("sp_GetRecipeByMenuItemId", connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("sp_GetRecipeByMenuItemId", connection))
                     {
                         command.CommandType = System.Data.CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@MenuItemId", menuItemId);
                         
                         try
                         {
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
                                 if (reader.Read())
                                 {
@@ -1146,7 +1146,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Direct SQL query as fallback
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         r.[Id], 
                         r.[Title], 
@@ -1167,7 +1167,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@MenuItemId", menuItemId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -1196,7 +1196,7 @@ namespace RestaurantManagementSystem.Controllers
                 if (recipe != null)
                 {
                     // Get recipe steps
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT 
                             rs.[Id],
                             rs.[RecipeId],
@@ -1213,7 +1213,7 @@ namespace RestaurantManagementSystem.Controllers
                     {
                         command.Parameters.AddWithValue("@RecipeId", recipe.Id);
                         
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
@@ -1242,11 +1242,11 @@ namespace RestaurantManagementSystem.Controllers
         {
             int recipeId = 0;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     INSERT INTO Recipes (Title, MenuItemId, PreparationInstructions, CookingInstructions,
                                          PlatingInstructions, Yield, YieldPercentage, PreparationTimeMinutes, CookingTimeMinutes,
                                          Notes, IsArchived, Version, CreatedById, LastUpdated)
@@ -1295,11 +1295,11 @@ namespace RestaurantManagementSystem.Controllers
 
         private void UpdateRecipe(RecipeViewModel model)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     UPDATE Recipes
                     SET Title = @Title,
                         PreparationInstructions = @PreparationInstructions,
@@ -1349,13 +1349,13 @@ namespace RestaurantManagementSystem.Controllers
             if (steps == null || !steps.Any())
                 return;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 foreach (var step in steps)
                 {
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         INSERT INTO RecipeSteps (RecipeId, StepNumber, Description, TimeRequiredMinutes,
                                                Temperature, SpecialEquipment, Tips, ImagePath)
                         VALUES (@RecipeId, @StepNumber, @Description, @TimeRequiredMinutes,
@@ -1398,11 +1398,11 @@ namespace RestaurantManagementSystem.Controllers
 
         private void RemoveRecipeSteps(int recipeId)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     DELETE FROM RecipeSteps WHERE RecipeId = @RecipeId", connection))
                 {
                     command.Parameters.AddWithValue("@RecipeId", recipeId);
@@ -1414,16 +1414,16 @@ namespace RestaurantManagementSystem.Controllers
         {
             var categories = new List<SelectListItem>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name
                     FROM Categories
                     ORDER BY Name", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1444,16 +1444,16 @@ namespace RestaurantManagementSystem.Controllers
         {
             var allergens = new List<Allergen>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name, Description
                     FROM Allergens
                     ORDER BY Name", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1475,16 +1475,16 @@ namespace RestaurantManagementSystem.Controllers
         {
             var ingredients = new List<SelectListItem>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, IngredientsName, DisplayName
                     FROM Ingredients
                     ORDER BY IngredientsName", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1509,16 +1509,16 @@ namespace RestaurantManagementSystem.Controllers
             
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT Id, Name, Description
                         FROM Modifiers
                         ORDER BY Name", connection))
                     {
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
@@ -1547,16 +1547,16 @@ namespace RestaurantManagementSystem.Controllers
             
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
-                    using (SqlCommand command = new SqlCommand(@"
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         SELECT Id, Name
                         FROM KitchenStations
                         ORDER BY Name", connection))
                     {
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {

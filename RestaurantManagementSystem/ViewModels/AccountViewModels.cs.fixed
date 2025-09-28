@@ -1,0 +1,175 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.Rendering;
+
+namespace RestaurantManagementSystem.ViewModels
+{
+    public class LoginViewModel
+    {
+        [Required]
+        [Display(Name = "Username")]
+        public string Username { get; set; }
+        
+        [Required]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; }
+        
+        [Display(Name = "Remember me")]
+        public bool RememberMe { get; set; }
+        
+        public string ReturnUrl { get; set; }
+    }
+    
+    public class RegisterViewModel
+    {
+        [Required]
+        [StringLength(50, ErrorMessage = "Username must be between {2} and {1} characters", MinimumLength = 3)]
+        [Display(Name = "Username")]
+        public string Username { get; set; }
+        
+        [Required]
+        [StringLength(100, ErrorMessage = "Password must be between {2} and {1} characters", MinimumLength = 8)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; }
+        
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "First Name")]
+        public string FirstName { get; set; }
+        
+        [StringLength(50)]
+        [Display(Name = "Last Name")]
+        public string LastName { get; set; }
+        
+        [EmailAddress]
+        [StringLength(100)]
+        [Display(Name = "Email")]
+        public string Email { get; set; }
+    }
+    
+    public class MFAViewModel
+    {
+        [Required]
+        public string UserId { get; set; }
+        
+        [Required]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "Verification code must be 6 digits")]
+        [Display(Name = "Verification Code")]
+        public string VerificationCode { get; set; }
+        
+        public string FactorType { get; set; } = "Email";
+        
+        public string ReturnUrl { get; set; }
+    }
+    
+    public class ChangePasswordViewModel
+    {
+        [Required]
+        [DataType(DataType.Password)]
+        [Display(Name = "Current password")]
+        public string CurrentPassword { get; set; }
+        
+        [Required]
+        [StringLength(100, ErrorMessage = "Password must be between {2} and {1} characters", MinimumLength = 8)]
+        [DataType(DataType.Password)]
+        [Display(Name = "New password")]
+        public string NewPassword { get; set; }
+        
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm new password")]
+        [Compare("NewPassword", ErrorMessage = "The new password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; }
+    }
+    
+    public class UserListViewModel
+    {
+        public List<RestaurantManagementSystem.Models.User> Users { get; set; }
+        public PaginationViewModel Pagination { get; set; }
+    }
+    
+    public class PaginationViewModel
+    {
+        public int CurrentPage { get; set; }
+        public int TotalPages => (int)Math.Ceiling(TotalItems / (double)ItemsPerPage);
+        public int TotalItems { get; set; }
+        public int ItemsPerPage { get; set; }
+        public bool HasPreviousPage => CurrentPage > 1;
+        public bool HasNextPage => CurrentPage < TotalPages;
+    }
+    
+    public class UserEditViewModel
+    {
+        public int Id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Username")]
+        public string Username { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "First Name")]
+        public string FirstName { get; set; }
+        
+        [StringLength(50)]
+        [Display(Name = "Last Name")]
+        public string LastName { get; set; }
+        
+        [EmailAddress]
+        [StringLength(100)]
+        [Display(Name = "Email")]
+        public string Email { get; set; }
+        
+        [Phone]
+        [StringLength(20)]
+        [Display(Name = "Phone Number")]
+        public string PhoneNumber { get; set; }
+        
+        [Display(Name = "Active")]
+        public bool IsActive { get; set; } = true;
+        
+        [Display(Name = "Roles")]
+        public List<int> SelectedRoles { get; set; } = new List<int>();
+        
+        public List<SelectListItem> AvailableRoles { get; set; } = new List<SelectListItem>();
+        
+        public List<SelectListItem> AvailableOutlets { get; set; } = new List<SelectListItem>();
+    }
+    
+    public class EditUserViewModel
+    {
+        public int Id { get; set; }
+        
+        [Required(ErrorMessage = "Username is required")]
+        [StringLength(50, ErrorMessage = "Username cannot be longer than 50 characters")]
+        public string Username { get; set; }
+        
+        [Required(ErrorMessage = "First Name is required")]
+        [StringLength(50, ErrorMessage = "First Name cannot be longer than 50 characters")]
+        public string FirstName { get; set; }
+        
+        [StringLength(50, ErrorMessage = "Last Name cannot be longer than 50 characters")]
+        public string LastName { get; set; }
+        
+        [EmailAddress(ErrorMessage = "Invalid Email Address")]
+        [StringLength(100, ErrorMessage = "Email cannot be longer than 100 characters")]
+        public string Email { get; set; }
+        
+        [Phone(ErrorMessage = "Invalid Phone Number")]
+        [StringLength(20, ErrorMessage = "Phone cannot be longer than 20 characters")]
+        public string Phone { get; set; }
+        
+        // Updated for new role-based system
+        public int? Role { get; set; }
+        
+        public bool IsActive { get; set; } = true;
+    }
+}

@@ -28,7 +28,7 @@ namespace RestaurantManagementSystem.Controllers
         {
             var viewModel = new KitchenDashboardViewModel();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -66,7 +66,7 @@ namespace RestaurantManagementSystem.Controllers
                 Filter = filter ?? new KitchenStationFilterViewModel()
             };
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -88,12 +88,12 @@ namespace RestaurantManagementSystem.Controllers
         {
             var viewModel = new KitchenTicketDetailsViewModel();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get ticket details
-                using (var command = new SqlCommand("GetKitchenTicketDetails", connection))
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand("GetKitchenTicketDetails", connection))
                 {
                     command.CommandType = CommandType.StoredProcedure;
                     command.Parameters.AddWithValue("@TicketId", id);
@@ -188,14 +188,14 @@ namespace RestaurantManagementSystem.Controllers
         }
         
         // POST: Kitchen/UpdateTicketStatus
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult UpdateTicketStatus(KitchenStatusUpdateModel model)
         {
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (var command = new SqlCommand("UpdateKitchenTicketStatus", connection))
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand("UpdateKitchenTicketStatus", connection))
                 {
                     command.CommandType = CommandType.StoredProcedure;
                     command.Parameters.AddWithValue("@TicketId", model.TicketId);
@@ -209,14 +209,14 @@ namespace RestaurantManagementSystem.Controllers
         }
         
         // POST: Kitchen/UpdateItemStatus
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult UpdateItemStatus(KitchenItemStatusUpdateModel model, int ticketId)
         {
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (var command = new SqlCommand("UpdateKitchenTicketItemStatus", connection))
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand("UpdateKitchenTicketItemStatus", connection))
                 {
                     command.CommandType = CommandType.StoredProcedure;
                     command.Parameters.AddWithValue("@ItemId", model.ItemId);
@@ -234,7 +234,7 @@ namespace RestaurantManagementSystem.Controllers
         {
             var stations = new List<KitchenStation>();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 stations = GetKitchenStations(connection);
@@ -248,14 +248,14 @@ namespace RestaurantManagementSystem.Controllers
         {
             var viewModel = new KitchenStationViewModel();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 if (id.HasValue && id.Value > 0)
                 {
                     // Edit existing station
-                    using (var command = new SqlCommand("GetKitchenStationById", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("GetKitchenStationById", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@StationId", id.Value);
@@ -283,7 +283,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get all menu items for assignment
-                using (var command = new SqlCommand("GetAllMenuItems", connection))
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand("GetAllMenuItems", connection))
                 {
                     command.CommandType = CommandType.StoredProcedure;
                     
@@ -310,17 +310,17 @@ namespace RestaurantManagementSystem.Controllers
         }
         
         // POST: Kitchen/SaveStation
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult SaveStation(KitchenStationViewModel model)
         {
             if (!ModelState.IsValid)
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
                     // Get all menu items again to repopulate the form
-                    using (var command = new SqlCommand("GetAllMenuItems", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("GetAllMenuItems", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         
@@ -346,7 +346,7 @@ namespace RestaurantManagementSystem.Controllers
                 return View("StationForm", model);
             }
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -359,7 +359,7 @@ namespace RestaurantManagementSystem.Controllers
                         if (model.Id > 0)
                         {
                             // Update existing station
-                            using (var command = new SqlCommand("UpdateKitchenStation", connection, transaction))
+                            using (var command = new Microsoft.Data.SqlClient.SqlCommand("UpdateKitchenStation", connection, transaction))
                             {
                                 command.CommandType = CommandType.StoredProcedure;
                                 command.Parameters.AddWithValue("@StationId", model.Id);
@@ -372,7 +372,7 @@ namespace RestaurantManagementSystem.Controllers
                             }
                             
                             // Delete existing menu item assignments
-                            using (var command = new SqlCommand("DeleteKitchenStationMenuItems", connection, transaction))
+                            using (var command = new Microsoft.Data.SqlClient.SqlCommand("DeleteKitchenStationMenuItems", connection, transaction))
                             {
                                 command.CommandType = CommandType.StoredProcedure;
                                 command.Parameters.AddWithValue("@StationId", stationId);
@@ -383,14 +383,14 @@ namespace RestaurantManagementSystem.Controllers
                         else
                         {
                             // Create new station
-                            using (var command = new SqlCommand("CreateKitchenStation", connection, transaction))
+                            using (var command = new Microsoft.Data.SqlClient.SqlCommand("CreateKitchenStation", connection, transaction))
                             {
                                 command.CommandType = CommandType.StoredProcedure;
                                 command.Parameters.AddWithValue("@Name", model.Name);
                                 command.Parameters.AddWithValue("@Description", model.Description ?? (object)DBNull.Value);
                                 command.Parameters.AddWithValue("@IsActive", model.IsActive);
                                 
-                                var stationIdParam = new SqlParameter("@StationId", SqlDbType.Int)
+                                var stationIdParam = new Microsoft.Data.SqlClient.SqlParameter("@StationId", SqlDbType.Int)
                                 {
                                     Direction = ParameterDirection.Output
                                 };
@@ -406,7 +406,7 @@ namespace RestaurantManagementSystem.Controllers
                         {
                             foreach (var menuItemId in model.AssignedMenuItemIds)
                             {
-                                using (var command = new SqlCommand("AssignMenuItemToKitchenStation", connection, transaction))
+                                using (var command = new Microsoft.Data.SqlClient.SqlCommand("AssignMenuItemToKitchenStation", connection, transaction))
                                 {
                                     command.CommandType = CommandType.StoredProcedure;
                                     command.Parameters.AddWithValue("@StationId", stationId);
@@ -432,14 +432,14 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Kitchen/DeleteStation/{id}
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult DeleteStation(int id)
         {
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (var command = new SqlCommand("DeleteKitchenStation", connection))
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand("DeleteKitchenStation", connection))
                 {
                     command.CommandType = CommandType.StoredProcedure;
                     command.Parameters.AddWithValue("@StationId", id);
@@ -454,11 +454,11 @@ namespace RestaurantManagementSystem.Controllers
         // GET: Kitchen/MarkAllReady/{stationId?}
         public IActionResult MarkAllReady(int? stationId)
         {
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (var command = new SqlCommand("MarkAllTicketsReady", connection))
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand("MarkAllTicketsReady", connection))
                 {
                     command.CommandType = CommandType.StoredProcedure;
                     
@@ -479,11 +479,11 @@ namespace RestaurantManagementSystem.Controllers
         }
         
         // Private helper methods
-        private List<KitchenStation> GetKitchenStations(SqlConnection connection)
+        private List<KitchenStation> GetKitchenStations(Microsoft.Data.SqlClient.SqlConnection connection)
         {
             var stations = new List<KitchenStation>();
             
-            using (var command = new SqlCommand("GetAllKitchenStations", connection))
+            using (var command = new Microsoft.Data.SqlClient.SqlCommand("GetAllKitchenStations", connection))
             {
                 command.CommandType = CommandType.StoredProcedure;
                 
@@ -507,11 +507,11 @@ namespace RestaurantManagementSystem.Controllers
             return stations;
         }
         
-        private List<KitchenTicket> GetTicketsByStatus(SqlConnection connection, int status, int? stationId)
+        private List<KitchenTicket> GetTicketsByStatus(Microsoft.Data.SqlClient.SqlConnection connection, int status, int? stationId)
         {
             var tickets = new List<KitchenTicket>();
             
-            using (var command = new SqlCommand("GetKitchenTicketsByStatus", connection))
+            using (var command = new Microsoft.Data.SqlClient.SqlCommand("GetKitchenTicketsByStatus", connection))
             {
                 command.CommandType = CommandType.StoredProcedure;
                 command.Parameters.AddWithValue("@Status", status);
@@ -550,11 +550,11 @@ namespace RestaurantManagementSystem.Controllers
             return tickets;
         }
         
-        private List<KitchenTicket> GetFilteredTickets(SqlConnection connection, KitchenStationFilterViewModel filter)
+        private List<KitchenTicket> GetFilteredTickets(Microsoft.Data.SqlClient.SqlConnection connection, KitchenStationFilterViewModel filter)
         {
             var tickets = new List<KitchenTicket>();
             
-            using (var command = new SqlCommand("GetFilteredKitchenTickets", connection))
+            using (var command = new Microsoft.Data.SqlClient.SqlCommand("GetFilteredKitchenTickets", connection))
             {
                 command.CommandType = CommandType.StoredProcedure;
                 
@@ -619,11 +619,11 @@ namespace RestaurantManagementSystem.Controllers
             return tickets;
         }
         
-        private KitchenDashboardStats GetKitchenStats(SqlConnection connection, int? stationId)
+        private KitchenDashboardStats GetKitchenStats(Microsoft.Data.SqlClient.SqlConnection connection, int? stationId)
         {
             var stats = new KitchenDashboardStats();
             
-            using (var command = new SqlCommand("GetKitchenDashboardStats", connection))
+            using (var command = new Microsoft.Data.SqlClient.SqlCommand("GetKitchenDashboardStats", connection))
             {
                 command.CommandType = CommandType.StoredProcedure;
                 

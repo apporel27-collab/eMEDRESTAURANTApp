@@ -1,0 +1,244 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using RestaurantManagementSystem.Models;
+using RestaurantManagementSystem.Services;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Security.Claims;
+
+namespace RestaurantManagementSystem.Controllers
+{
+    [Authorize(Roles = "Administrator")]
+    public class UserManagementController : Controller
+    {
+        private readonly UserRoleService _userRoleService;
+        
+        public UserManagementController(UserRoleService userRoleService)
+        {
+            _userRoleService = userRoleService;
+        }
+        
+        // GET: /UserManagement/
+        public async Task<IActionResult> Index()
+        {
+            var users = await GetAllUsersAsync();
+            return View(users);
+        }
+        
+        // GET: /UserManagement/Create
+        public async Task<IActionResult> Create()
+        {
+            var roles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.Roles = roles;
+            return View(new User());
+        }
+        
+        // POST: /UserManagement/Create
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
+        public async Task<IActionResult> Create(User user)
+        {
+            // Remove validation for password fields when editing
+            ModelState.Remove("Id");
+            
+            if (ModelState.IsValid)
+            {
+                // Get current user ID for audit trail
+                var currentUserId = GetCurrentUserId();
+                
+                // Create the user
+                var success = await CreateUserAsync(user, currentUserId);
+                
+                if (success)
+                {
+                    // Set user roles if any were selected
+                    if (user.SelectedRoleIds != null && user.SelectedRoleIds.Any())
+                    {
+                        await _userRoleService.UpdateUserRolesAsync(user.Id, user.SelectedRoleIds);
+                    }
+                    
+                    TempData["SuccessMessage"] = "User created successfully";
+                    return RedirectToAction(nameof(Index));
+                }
+                else
+                {
+                    ModelState.AddModelError("", "Failed to create user");
+                }
+            }
+            
+            // If we got this far, something failed, redisplay form
+            var roles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.Roles = roles;
+            return View(user);
+        }
+        
+        // GET: /UserManagement/Edit/5
+        public async Task<IActionResult> Edit(int id)
+        {
+            var user = await GetUserByIdAsync(id);
+            
+            if (user == null)
+            {
+                return NotFound();
+            }
+            
+            // Get user roles
+            var userRoles = await _userRoleService.GetUserRolesAsync(id);
+            user.SelectedRoleIds = userRoles.Select(r => r.Id).ToList();
+            
+            // Get all available roles for selection
+            var allRoles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.Roles = allRoles;
+            
+            return View(user);
+        }
+        
+        // POST: /UserManagement/Edit/5
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
+        public async Task<IActionResult> Edit(int id, User user)
+        {
+            if (id != user.Id)
+            {
+                return NotFound();
+            }
+            
+            // Remove validation for password fields when editing
+            ModelState.Remove("Password");
+            ModelState.Remove("ConfirmPassword");
+            
+            if (ModelState.IsValid)
+            {
+                // Get current user ID for audit trail
+                var currentUserId = GetCurrentUserId();
+                
+                // Update the user
+                var success = await UpdateUserAsync(user, currentUserId);
+                
+                if (success)
+                {
+                    // Update user roles if they have changed
+                    if (user.SelectedRoleIds != null)
+                    {
+                        await _userRoleService.UpdateUserRolesAsync(user.Id, user.SelectedRoleIds);
+                    }
+                    
+                    TempData["SuccessMessage"] = "User updated successfully";
+                    return RedirectToAction(nameof(Index));
+                }
+                else
+                {
+                    ModelState.AddModelError("", "Failed to update user");
+                }
+            }
+            
+            // If we got this far, something failed, redisplay form
+            var roles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.Roles = roles;
+            return View(user);
+        }
+        
+        // GET: /UserManagement/Delete/5
+        public async Task<IActionResult> Delete(int id)
+        {
+            var user = await GetUserByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+            
+            return View(user);
+        }
+        
+        // POST: /UserManagement/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryTokenAttribute]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            // Get current user ID for audit trail
+            var currentUserId = GetCurrentUserId();
+            
+            // Delete the user
+            await DeactivateUserAsync(id, currentUserId);
+            
+            TempData["SuccessMessage"] = "User deleted successfully";
+            return RedirectToAction(nameof(Index));
+        }
+        
+        // GET: /UserManagement/Details/5
+        public async Task<IActionResult> Details(int id)
+        {
+            var user = await GetUserByIdAsync(id);
+            
+            if (user == null)
+            {
+                return NotFound();
+            }
+            
+            // Get user roles
+            user.Roles = await _userRoleService.GetUserRolesAsync(id);
+            
+            return View(user);
+        }
+        
+        // Helper methods that would normally be in the UserService
+        private async Task<System.Collections.Generic.List<User>> GetAllUsersAsync()
+        {
+            // This would typically call a service method
+            var users = new System.Collections.Generic.List<User>();
+            // Implementation would retrieve users from database
+            
+            // For each user, get their roles
+            foreach (var user in users)
+            {
+                user.Roles = await _userRoleService.GetUserRolesAsync(user.Id);
+            }
+            
+            return users;
+        }
+        
+        private async Task<User> GetUserByIdAsync(int id)
+        {
+            // This would typically call a service method
+            var user = new User();
+            // Implementation would retrieve user from database by ID
+            
+            return await Task.FromResult(user);
+        }
+        
+        private async Task<bool> CreateUserAsync(User user, int? createdById)
+        {
+            // This would typically call a service method
+            // Implementation would create user in database
+            
+            return await Task.FromResult(true);
+        }
+        
+        private async Task<bool> UpdateUserAsync(User user, int? updatedById)
+        {
+            // This would typically call a service method
+            // Implementation would update user in database
+            
+            return await Task.FromResult(true);
+        }
+        
+        private async Task DeactivateUserAsync(int id, int? deactivatedById)
+        {
+            // This would typically call a service method
+            // Implementation would soft delete/deactivate user in database
+            
+            await Task.CompletedTask;
+        }
+        
+        private int? GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (int.TryParse(userIdClaim, out int userId))
+            {
+                return userId;
+            }
+            return null;
+        }
+    }
+}

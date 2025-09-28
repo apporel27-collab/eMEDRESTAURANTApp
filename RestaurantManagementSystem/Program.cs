@@ -5,6 +5,7 @@ using RestaurantManagementSystem.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using RestaurantManagementSystem.Utilities;
 
 namespace RestaurantManagementSystem
 {
@@ -41,7 +42,11 @@ namespace RestaurantManagementSystem
             });
 
             // Register custom services
-            builder.Services.AddScoped<AuthService>();
+            builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<UserService>();
+            builder.Services.AddScoped<UserRoleService>();
+            builder.Services.AddScoped<AdminSetupService>();
+            builder.Services.AddScoped<PasswordResetTool>();
 
             // Configure SQL Server database connection using connection string from appsettings.json
             builder.Services.AddDbContext<RestaurantDbContext>(options =>
@@ -55,6 +60,11 @@ namespace RestaurantManagementSystem
                 app.UseExceptionHandler("/Home/Error");
                 app.UseHsts();
             }
+            else
+            {
+                // In development, enable detailed error pages
+                app.UseDeveloperExceptionPage();
+            }
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
@@ -66,6 +76,29 @@ namespace RestaurantManagementSystem
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
+
+            // Ensure admin user exists on startup
+            using (var scope = app.Services.CreateScope())
+            {
+                var adminSetupService = scope.ServiceProvider.GetRequiredService<AdminSetupService>();
+                adminSetupService.EnsureAdminUserAsync().GetAwaiter().GetResult();
+                
+                // Reset admin password with BCrypt hash
+                if (app.Environment.IsDevelopment())
+                {
+                    try
+                    {
+                        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                        logger.LogInformation("Resetting admin password for development environment");
+                        Utilities.AdminPasswordReset.ResetAdminPassword(scope.ServiceProvider).GetAwaiter().GetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                        logger.LogError(ex, "Error resetting admin password");
+                    }
+                }
+            }
 
             app.Run();
         }

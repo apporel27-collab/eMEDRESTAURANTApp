@@ -76,22 +76,40 @@ namespace RestaurantManagementSystem.Models
         public string ServerName { get; set; }
         public string CustomerName { get; set; }
         public string CustomerPhone { get; set; }
-        public decimal Subtotal { get; set; }
+        private decimal? _subtotal;
+        public decimal Subtotal {
+            get {
+                if (_subtotal.HasValue) return _subtotal.Value;
+                if (Items != null && Items.Count > 0)
+                    return Items.Where(i => i.Status != 5).Sum(i => i.Subtotal);
+                return 0;
+            }
+            set { _subtotal = value; }
+        }
         public decimal TaxAmount { get; set; }
         public decimal TipAmount { get; set; }
         public decimal DiscountAmount { get; set; }
-        public decimal TotalAmount { get; set; }
+        private decimal? _totalAmount;
+        public decimal TotalAmount {
+            get {
+                if (_totalAmount.HasValue) return _totalAmount.Value;
+                return Subtotal + TaxAmount + TipAmount - DiscountAmount;
+            }
+            set { _totalAmount = value; }
+        }
         public string SpecialInstructions { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
-        
+
         public List<OrderItemViewModel> Items { get; set; } = new List<OrderItemViewModel>();
         public List<KitchenTicketViewModel> KitchenTickets { get; set; } = new List<KitchenTicketViewModel>();
-        
+
         // Properties for adding new items
         public List<MenuCategoryViewModel> MenuCategories { get; set; } = new List<MenuCategoryViewModel>();
         public List<CourseType> AvailableCourses { get; set; } = new List<CourseType>();
+        public List<MenuItem> AvailableMenuItems { get; set; } = new List<MenuItem>();
+    }
     }
     
     public class OrderItemViewModel
@@ -233,4 +251,4 @@ namespace RestaurantManagementSystem.Models
         public int Status { get; set; }
         public string StatusDisplay { get; set; }
     }
-}
+// removed extra closing brace

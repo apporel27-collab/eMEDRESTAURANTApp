@@ -14,7 +14,7 @@ using Newtonsoft.Json;
 
 namespace RestaurantManagementSystem.Controllers
 {
-    [Authorize]
+    [AuthorizeAttribute]
     public class OnlineOrderController : Controller
     {
         private readonly string _connectionString;
@@ -32,7 +32,7 @@ namespace RestaurantManagementSystem.Controllers
         {
             var viewModel = new OnlineOrderDashboardViewModel();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -149,7 +149,7 @@ namespace RestaurantManagementSystem.Controllers
                 model = new OnlineOrderListViewModel();
             }
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -193,7 +193,7 @@ namespace RestaurantManagementSystem.Controllers
         {
             var viewModel = new OnlineOrderDetailsViewModel();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -241,13 +241,13 @@ namespace RestaurantManagementSystem.Controllers
         /// </summary>
         /// <param name="model">Status update data</param>
         /// <returns>Redirect to order details</returns>
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult UpdateStatus(UpdateOrderStatusViewModel model)
         {
             if (ModelState.IsValid)
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
@@ -272,13 +272,13 @@ namespace RestaurantManagementSystem.Controllers
         /// </summary>
         /// <param name="id">Online order ID</param>
         /// <returns>Redirect to order details</returns>
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult SyncOrder(int id)
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
@@ -311,7 +311,7 @@ namespace RestaurantManagementSystem.Controllers
         {
             var orderSources = new List<OrderSourceViewModel>();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -334,7 +334,7 @@ namespace RestaurantManagementSystem.Controllers
         {
             var viewModel = new OrderSourceDetailsViewModel();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -390,7 +390,7 @@ namespace RestaurantManagementSystem.Controllers
             
             if (id.HasValue)
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
@@ -424,13 +424,13 @@ namespace RestaurantManagementSystem.Controllers
         /// </summary>
         /// <param name="model">Order source data</param>
         /// <returns>Redirect to order sources list</returns>
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult SaveOrderSource(OrderSourceDetailsViewModel model)
         {
             if (ModelState.IsValid)
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
@@ -498,7 +498,7 @@ namespace RestaurantManagementSystem.Controllers
                 model = new MenuItemMappingsViewModel();
             }
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -546,7 +546,7 @@ namespace RestaurantManagementSystem.Controllers
         {
             var viewModel = new ExternalMenuItemMappingViewModel();
             
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -602,15 +602,15 @@ namespace RestaurantManagementSystem.Controllers
         /// </summary>
         /// <param name="model">Menu item mapping data</param>
         /// <returns>Redirect to menu item mappings list</returns>
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult SaveMenuItemMapping(ExternalMenuItemMappingViewModel model)
         {
             if (ModelState.IsValid)
             {
                 try
                 {
-                    using (var connection = new SqlConnection(_connectionString))
+                    using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
@@ -637,7 +637,7 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             // If there's an error, reload the dropdown data
-            using (var connection = new SqlConnection(_connectionString))
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
@@ -666,9 +666,9 @@ namespace RestaurantManagementSystem.Controllers
         /// </summary>
         /// <param name="source">Source identifier</param>
         /// <returns>Status code result</returns>
-        [HttpPost]
-        [AllowAnonymous]
-        [Route("api/webhook/{source}")]
+        [HttpPostAttribute]
+        [AllowAnonymousAttribute]
+        [RouteAttribute("api/webhook/{source}")]
         public async Task<IActionResult> ReceiveWebhook(string source)
         {
             try
@@ -682,7 +682,7 @@ namespace RestaurantManagementSystem.Controllers
                 
                 // Get order source by identifier
                 int orderSourceId;
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
@@ -710,7 +710,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Log webhook event
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     

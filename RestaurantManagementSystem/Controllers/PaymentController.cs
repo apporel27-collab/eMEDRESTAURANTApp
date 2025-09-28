@@ -43,12 +43,12 @@ namespace RestaurantManagementSystem.Controllers
                 OrderId = orderId
             };
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get order details
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         o.OrderNumber, 
                         o.TotalAmount, 
@@ -60,7 +60,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", orderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -77,13 +77,13 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get available payment methods
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name, DisplayName, RequiresCardInfo
                     FROM PaymentMethods
                     WHERE IsActive = 1
                     ORDER BY DisplayName", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -100,8 +100,8 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult ProcessPayment(ProcessPaymentViewModel model)
         {
             if (ModelState.IsValid)
@@ -111,11 +111,11 @@ namespace RestaurantManagementSystem.Controllers
                     // Validate payment method requires card info
                     bool requiresCardInfo = false;
                     
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
-                        using (SqlCommand command = new SqlCommand(@"
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                             SELECT RequiresCardInfo FROM PaymentMethods WHERE Id = @PaymentMethodId", connection))
                         {
                             command.Parameters.AddWithValue("@PaymentMethodId", model.PaymentMethodId);
@@ -139,11 +139,11 @@ namespace RestaurantManagementSystem.Controllers
                         }
                     }
                     
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
-                        using (SqlCommand command = new SqlCommand("usp_ProcessPayment", connection))
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_ProcessPayment", connection))
                         {
                             command.CommandType = CommandType.StoredProcedure;
                             
@@ -159,7 +159,7 @@ namespace RestaurantManagementSystem.Controllers
                             command.Parameters.AddWithValue("@ProcessedBy", GetCurrentUserId());
                             command.Parameters.AddWithValue("@ProcessedByName", GetCurrentUserName());
                             
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
                                 if (reader.Read())
                                 {
@@ -199,12 +199,12 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             // If we get here, something went wrong - repopulate the model
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get order details again
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         o.OrderNumber, 
                         o.TotalAmount, 
@@ -216,7 +216,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", model.OrderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -228,7 +228,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get available payment methods
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, Name, DisplayName, RequiresCardInfo
                     FROM PaymentMethods
                     WHERE IsActive = 1
@@ -236,7 +236,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     model.AvailablePaymentMethods.Clear();
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -267,11 +267,11 @@ namespace RestaurantManagementSystem.Controllers
                 PaymentId = id
             };
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         p.Id,
                         p.OrderId,
@@ -291,7 +291,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@PaymentId", id);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -313,19 +313,19 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult VoidPayment(VoidPaymentViewModel model)
         {
             if (ModelState.IsValid)
             {
                 try
                 {
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
-                        using (SqlCommand command = new SqlCommand("usp_VoidPayment", connection))
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_VoidPayment", connection))
                         {
                             command.CommandType = CommandType.StoredProcedure;
                             
@@ -334,7 +334,7 @@ namespace RestaurantManagementSystem.Controllers
                             command.Parameters.AddWithValue("@ProcessedBy", GetCurrentUserId());
                             command.Parameters.AddWithValue("@ProcessedByName", GetCurrentUserName());
                             
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
                                 if (reader.Read())
                                 {
@@ -376,12 +376,12 @@ namespace RestaurantManagementSystem.Controllers
                 OrderId = orderId
             };
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get order details
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         o.OrderNumber, 
                         o.Subtotal,
@@ -392,7 +392,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", orderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -409,7 +409,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get order items that are not fully split yet
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         oi.Id,
                         mi.Name,
@@ -435,7 +435,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", orderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -469,8 +469,8 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult SplitBill(CreateSplitBillViewModel model, int[] selectedItems, int[] itemQuantities)
         {
             if (ModelState.IsValid)
@@ -513,11 +513,11 @@ namespace RestaurantManagementSystem.Controllers
                         itemsString = itemsString.Substring(0, itemsString.Length - 1);
                     }
                     
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
+                    using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
-                        using (SqlCommand command = new SqlCommand("usp_CreateSplitBill", connection))
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_CreateSplitBill", connection))
                         {
                             command.CommandType = CommandType.StoredProcedure;
                             
@@ -527,7 +527,7 @@ namespace RestaurantManagementSystem.Controllers
                             command.Parameters.AddWithValue("@CreatedBy", GetCurrentUserId());
                             command.Parameters.AddWithValue("@CreatedByName", GetCurrentUserName());
                             
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
                                 if (reader.Read())
                                 {
@@ -562,12 +562,12 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             // If we get here, repopulate the model
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get order details
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         o.OrderNumber, 
                         o.Subtotal,
@@ -578,7 +578,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", model.OrderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -591,7 +591,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get order items that are not fully split yet
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         oi.Id,
                         mi.Name,
@@ -618,7 +618,7 @@ namespace RestaurantManagementSystem.Controllers
                     command.Parameters.AddWithValue("@OrderId", model.OrderId);
                     model.AvailableItems.Clear();
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -670,16 +670,16 @@ namespace RestaurantManagementSystem.Controllers
                 OrderId = orderId
             };
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
-                using (SqlCommand command = new SqlCommand("usp_GetOrderPaymentInfo", connection))
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_GetOrderPaymentInfo", connection))
                 {
                     command.CommandType = CommandType.StoredProcedure;
                     command.Parameters.AddWithValue("@OrderId", orderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         // First result set: Order details
                         if (reader.Read())
@@ -768,7 +768,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get split bills
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         sb.Id,
                         sb.Amount,
@@ -783,7 +783,7 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     command.Parameters.AddWithValue("@OrderId", orderId);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {

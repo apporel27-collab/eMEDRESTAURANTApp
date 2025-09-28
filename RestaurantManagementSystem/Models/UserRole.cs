@@ -1,8 +1,32 @@
 using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RestaurantManagementSystem.Models
 {
-    public enum UserRole
+    public class UserRole
+    {
+        public int Id { get; set; }
+        
+        [Required]
+        public int UserId { get; set; }
+        
+        [Required]
+        public int RoleId { get; set; }
+        
+        [Display(Name = "Created At")]
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        
+        // Navigation properties
+        [ForeignKey("UserId")]
+        public User User { get; set; }
+        
+        [ForeignKey("RoleId")]
+        public Role Role { get; set; }
+    }
+    
+    // Keep the enum for backward compatibility during transition
+    public enum RoleType
     {
         Guest,                  // Guest/Customer
         Host,                   // Manages seating and reservations

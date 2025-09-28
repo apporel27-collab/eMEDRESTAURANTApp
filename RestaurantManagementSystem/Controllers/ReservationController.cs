@@ -117,7 +117,7 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Save Reservation
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult SaveReservation(Reservation model)
         {
             if (!ModelState.IsValid)
@@ -127,14 +127,14 @@ namespace RestaurantManagementSystem.Controllers
             }
 
             string resultMessage = "";
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
                 
                 // Check if updating and Id exists
                 if (model.Id > 0)
                 {
-                    using (var checkCmd = new SqlCommand("SELECT COUNT(*) FROM Reservations WHERE Id = @Id", con))
+                    using (var checkCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT COUNT(*) FROM Reservations WHERE Id = @Id", con))
                     {
                         checkCmd.Parameters.AddWithValue("@Id", model.Id);
                         int count = (int)checkCmd.ExecuteScalar();
@@ -146,7 +146,7 @@ namespace RestaurantManagementSystem.Controllers
                     }
                 }
 
-                using (var cmd = new SqlCommand("usp_UpsertReservation", con))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("usp_UpsertReservation", con))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Id", model.Id == 0 ? 0 : model.Id);
@@ -173,7 +173,7 @@ namespace RestaurantManagementSystem.Controllers
                 // If a table is assigned, update the table status
                 if (model.TableId.HasValue && model.Status == ReservationStatus.Confirmed)
                 {
-                    using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
                     {
                         cmd.Parameters.AddWithValue("@Status", (int)TableStatus.Reserved);
                         cmd.Parameters.AddWithValue("@Id", model.TableId.Value);
@@ -187,7 +187,7 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Change Reservation Status
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult ChangeStatus(int id, ReservationStatus status)
         {
             var reservation = GetReservationById(id);
@@ -197,10 +197,10 @@ namespace RestaurantManagementSystem.Controllers
                 return RedirectToAction("List");
             }
 
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
-                using (var cmd = new SqlCommand("UPDATE Reservations SET Status = @Status, UpdatedAt = @UpdatedAt WHERE Id = @Id", con))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Reservations SET Status = @Status, UpdatedAt = @UpdatedAt WHERE Id = @Id", con))
                 {
                     cmd.Parameters.AddWithValue("@Status", (int)status);
                     cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now);
@@ -220,7 +220,7 @@ namespace RestaurantManagementSystem.Controllers
                         _ => TableStatus.Reserved
                     };
 
-                    using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
                     {
                         cmd.Parameters.AddWithValue("@Status", (int)tableStatus);
                         cmd.Parameters.AddWithValue("@Id", reservation.TableId.Value);
@@ -230,7 +230,7 @@ namespace RestaurantManagementSystem.Controllers
                     // If the reservation is marked as seated, update the LastOccupiedAt timestamp
                     if (status == ReservationStatus.Seated)
                     {
-                        using (var cmd = new SqlCommand("UPDATE Tables SET LastOccupiedAt = @LastOccupiedAt WHERE Id = @Id", con))
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Tables SET LastOccupiedAt = @LastOccupiedAt WHERE Id = @Id", con))
                         {
                             cmd.Parameters.AddWithValue("@LastOccupiedAt", DateTime.Now);
                             cmd.Parameters.AddWithValue("@Id", reservation.TableId.Value);
@@ -242,7 +242,7 @@ namespace RestaurantManagementSystem.Controllers
                 // If the reservation is marked as NoShow, update the NoShow flag
                 if (status == ReservationStatus.NoShow)
                 {
-                    using (var cmd = new SqlCommand("UPDATE Reservations SET NoShow = 1 WHERE Id = @Id", con))
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Reservations SET NoShow = 1 WHERE Id = @Id", con))
                     {
                         cmd.Parameters.AddWithValue("@Id", id);
                         cmd.ExecuteNonQuery();
@@ -268,7 +268,7 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Delete Reservation
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult Delete(int id)
         {
             var reservation = GetReservationById(id);
@@ -278,14 +278,14 @@ namespace RestaurantManagementSystem.Controllers
                 return RedirectToAction("List");
             }
 
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
                 
                 // Free up the table if the reservation had one assigned
                 if (reservation.TableId.HasValue && reservation.Status == ReservationStatus.Confirmed)
                 {
-                    using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
                     {
                         cmd.Parameters.AddWithValue("@Status", (int)TableStatus.Available);
                         cmd.Parameters.AddWithValue("@Id", reservation.TableId.Value);
@@ -294,7 +294,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Delete the reservation
-                using (var cmd = new SqlCommand("DELETE FROM Reservations WHERE Id = @Id", con))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("DELETE FROM Reservations WHERE Id = @Id", con))
                 {
                     cmd.Parameters.AddWithValue("@Id", id);
                     cmd.ExecuteNonQuery();
@@ -348,7 +348,7 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Save Waitlist Entry
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult SaveWaitlist(WaitlistEntry model)
         {
             if (!ModelState.IsValid)
@@ -357,11 +357,11 @@ namespace RestaurantManagementSystem.Controllers
             }
 
             string resultMessage = "";
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
                 
-                using (var cmd = new SqlCommand("usp_UpsertWaitlist", con))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("usp_UpsertWaitlist", con))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Id", model.Id == 0 ? 0 : model.Id);
@@ -388,13 +388,13 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Update Waitlist Status
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult UpdateWaitlistStatus(int id, WaitlistStatus status)
         {
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
-                using (var cmd = new SqlCommand("UPDATE Waitlist SET Status = @Status WHERE Id = @Id", con))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Waitlist SET Status = @Status WHERE Id = @Id", con))
                 {
                     cmd.Parameters.AddWithValue("@Status", (int)status);
                     cmd.Parameters.AddWithValue("@Id", id);
@@ -404,7 +404,7 @@ namespace RestaurantManagementSystem.Controllers
                 // If notifying the guest, update the NotifiedAt timestamp
                 if (status == WaitlistStatus.Notified)
                 {
-                    using (var cmd = new SqlCommand("UPDATE Waitlist SET NotifiedAt = @NotifiedAt WHERE Id = @Id", con))
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Waitlist SET NotifiedAt = @NotifiedAt WHERE Id = @Id", con))
                     {
                         cmd.Parameters.AddWithValue("@NotifiedAt", DateTime.Now);
                         cmd.Parameters.AddWithValue("@Id", id);
@@ -415,7 +415,7 @@ namespace RestaurantManagementSystem.Controllers
                 // If seating the guest, update the SeatedAt timestamp
                 if (status == WaitlistStatus.Seated)
                 {
-                    using (var cmd = new SqlCommand("UPDATE Waitlist SET SeatedAt = @SeatedAt WHERE Id = @Id", con))
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Waitlist SET SeatedAt = @SeatedAt WHERE Id = @Id", con))
                     {
                         cmd.Parameters.AddWithValue("@SeatedAt", DateTime.Now);
                         cmd.Parameters.AddWithValue("@Id", id);
@@ -429,7 +429,7 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Assign Table to Waitlist Entry
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult AssignTableToWaitlist(int waitlistId, int tableId)
         {
             var waitlistEntry = GetWaitlistEntryById(waitlistId);
@@ -441,7 +441,7 @@ namespace RestaurantManagementSystem.Controllers
                 return RedirectToAction("Waitlist");
             }
 
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
                 using (var transaction = con.BeginTransaction())
@@ -449,7 +449,7 @@ namespace RestaurantManagementSystem.Controllers
                     try
                     {
                         // Update waitlist entry
-                        using (var cmd = new SqlCommand("UPDATE Waitlist SET Status = @Status, TableId = @TableId, SeatedAt = @SeatedAt WHERE Id = @Id", con, transaction))
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Waitlist SET Status = @Status, TableId = @TableId, SeatedAt = @SeatedAt WHERE Id = @Id", con, transaction))
                         {
                             cmd.Parameters.AddWithValue("@Status", (int)WaitlistStatus.Seated);
                             cmd.Parameters.AddWithValue("@TableId", tableId);
@@ -459,7 +459,7 @@ namespace RestaurantManagementSystem.Controllers
                         }
 
                         // Update table status
-                        using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status, LastOccupiedAt = @LastOccupiedAt WHERE Id = @Id", con, transaction))
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Tables SET Status = @Status, LastOccupiedAt = @LastOccupiedAt WHERE Id = @Id", con, transaction))
                         {
                             cmd.Parameters.AddWithValue("@Status", (int)TableStatus.Occupied);
                             cmd.Parameters.AddWithValue("@LastOccupiedAt", DateTime.Now);
@@ -483,13 +483,13 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Remove from Waitlist
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult RemoveFromWaitlist(int id)
         {
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
-                using (var cmd = new SqlCommand("DELETE FROM Waitlist WHERE Id = @Id", con))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("DELETE FROM Waitlist WHERE Id = @Id", con))
                 {
                     cmd.Parameters.AddWithValue("@Id", id);
                     cmd.ExecuteNonQuery();
@@ -530,7 +530,7 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Save Table
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult SaveTable(Table model)
         {
             if (!ModelState.IsValid)
@@ -539,14 +539,14 @@ namespace RestaurantManagementSystem.Controllers
             }
 
             string resultMessage = "";
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
                 
                 // Check if updating and Id exists
                 if (model.Id > 0)
                 {
-                    using (var checkCmd = new SqlCommand("SELECT COUNT(*) FROM Tables WHERE Id = @Id", con))
+                    using (var checkCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT COUNT(*) FROM Tables WHERE Id = @Id", con))
                     {
                         checkCmd.Parameters.AddWithValue("@Id", model.Id);
                         int count = (int)checkCmd.ExecuteScalar();
@@ -558,7 +558,7 @@ namespace RestaurantManagementSystem.Controllers
                     }
                 }
 
-                using (var cmd = new SqlCommand("usp_UpsertTable", con))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("usp_UpsertTable", con))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Id", model.Id == 0 ? 0 : model.Id);
@@ -584,13 +584,13 @@ namespace RestaurantManagementSystem.Controllers
         }
 
         // POST: Update Table Status
-        [HttpPost]
+        [HttpPostAttribute]
         public IActionResult UpdateTableStatus(int id, TableStatus status)
         {
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
-                using (var cmd = new SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("UPDATE Tables SET Status = @Status WHERE Id = @Id", con))
                 {
                     cmd.Parameters.AddWithValue("@Status", (int)status);
                     cmd.Parameters.AddWithValue("@Id", id);
@@ -609,14 +609,14 @@ namespace RestaurantManagementSystem.Controllers
         private List<Reservation> GetReservationsByDate(DateTime date)
         {
             var reservations = new List<Reservation>();
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 try
                 {
                     con.Open();
                     
                     // First check if the table exists
-                    using (var checkCmd = new SqlCommand(
+                    using (var checkCmd = new Microsoft.Data.SqlClient.SqlCommand(
                         @"IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Reservations')
                           SELECT 1 ELSE SELECT 0", con))
                     {
@@ -629,7 +629,7 @@ namespace RestaurantManagementSystem.Controllers
                     }
                     
                     // Check if required columns exist
-                    using (var checkColumnsCmd = new SqlCommand(
+                    using (var checkColumnsCmd = new Microsoft.Data.SqlClient.SqlCommand(
                         @"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
                           WHERE TABLE_NAME = 'Reservations' 
                           AND COLUMN_NAME IN ('Id', 'GuestName', 'PhoneNumber', 'EmailAddress', 
@@ -644,7 +644,7 @@ namespace RestaurantManagementSystem.Controllers
                     }
                     
                     // Revised query to get reservations with more resilient column access
-                    using (var cmd = new SqlCommand(
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                         @"SELECT r.*, t.TableNumber
                         FROM Reservations r
                         LEFT JOIN Tables t ON r.TableId = t.Id
@@ -716,7 +716,7 @@ namespace RestaurantManagementSystem.Controllers
         }
         
         // Safe helper methods for data access
-        private bool HasColumn(SqlDataReader reader, string columnName)
+        private bool HasColumn(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             for (int i = 0; i < reader.FieldCount; i++)
             {
@@ -726,37 +726,37 @@ namespace RestaurantManagementSystem.Controllers
             return false;
         }
         
-        private int GetIntSafe(SqlDataReader reader, string columnName)
+        private int GetIntSafe(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             int ordinal = reader.GetOrdinal(columnName);
             return reader.IsDBNull(ordinal) ? 0 : reader.GetInt32(ordinal);
         }
         
-        private int? GetNullableIntSafe(SqlDataReader reader, string columnName)
+        private int? GetNullableIntSafe(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             int ordinal = reader.GetOrdinal(columnName);
             return reader.IsDBNull(ordinal) ? null : (int?)reader.GetInt32(ordinal);
         }
         
-        private string GetStringSafe(SqlDataReader reader, string columnName)
+        private string GetStringSafe(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             int ordinal = reader.GetOrdinal(columnName);
             return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
         }
         
-        private string? GetNullableStringSafe(SqlDataReader reader, string columnName)
+        private string? GetNullableStringSafe(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             int ordinal = reader.GetOrdinal(columnName);
             return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
         }
         
-        private DateTime GetDateTimeSafe(SqlDataReader reader, string columnName)
+        private DateTime GetDateTimeSafe(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             int ordinal = reader.GetOrdinal(columnName);
             return reader.IsDBNull(ordinal) ? DateTime.Now : reader.GetDateTime(ordinal);
         }
         
-        private bool GetBooleanSafe(SqlDataReader reader, string columnName)
+        private bool GetBooleanSafe(Microsoft.Data.SqlClient.SqlDataReader reader, string columnName)
         {
             int ordinal = reader.GetOrdinal(columnName);
             return reader.IsDBNull(ordinal) ? false : reader.GetBoolean(ordinal);
@@ -765,10 +765,10 @@ namespace RestaurantManagementSystem.Controllers
         private Reservation GetReservationById(int id)
         {
             Reservation reservation = null;
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
-                using (var cmd = new SqlCommand(
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                     @"SELECT r.Id, r.GuestName, r.PhoneNumber, r.EmailAddress, r.PartySize, 
                     r.ReservationDate, r.ReservationTime, r.SpecialRequests, r.Notes, 
                     r.TableId, r.Status, r.CreatedAt, r.UpdatedAt, r.ReminderSent, r.NoShow,
@@ -812,7 +812,7 @@ namespace RestaurantManagementSystem.Controllers
             var waitlist = new List<WaitlistEntry>();
             try
             {
-                using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+                using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
                 {
                     // Add timeout to connection open
                     var connectionTimeout = 60; // seconds
@@ -822,7 +822,7 @@ namespace RestaurantManagementSystem.Controllers
                         throw new TimeoutException($"Connection timeout after {connectionTimeout} seconds");
                     }
                     
-                    using (var cmd = new SqlCommand(
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                         @"SELECT w.Id, w.GuestName, w.PhoneNumber, w.PartySize, w.AddedAt, 
                         w.QuotedWaitTime, w.NotifyWhenReady, w.Notes, w.Status, w.NotifiedAt, 
                         w.SeatedAt, w.TableId,
@@ -929,10 +929,10 @@ namespace RestaurantManagementSystem.Controllers
         private WaitlistEntry GetWaitlistEntryById(int id)
         {
             WaitlistEntry entry = null;
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
-                using (var cmd = new SqlCommand(
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                     @"SELECT w.Id, w.GuestName, w.PhoneNumber, w.PartySize, w.AddedAt, 
                     w.QuotedWaitTime, w.NotifyWhenReady, w.Notes, w.Status, w.NotifiedAt, 
                     w.SeatedAt, w.TableId,
@@ -973,7 +973,7 @@ namespace RestaurantManagementSystem.Controllers
             var tables = new List<Table>();
             try
             {
-                using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+                using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
                 {
                     // Add timeout to connection open
                     var connectionTimeout = 60; // seconds
@@ -983,7 +983,7 @@ namespace RestaurantManagementSystem.Controllers
                         throw new TimeoutException($"Connection timeout after {connectionTimeout} seconds");
                     }
                     
-                    using (var cmd = new SqlCommand(
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                         @"SELECT Id, TableNumber, Capacity, Section, IsAvailable, Status, 
                         MinPartySize, LastOccupiedAt, IsActive 
                         FROM Tables 
@@ -1039,10 +1039,10 @@ namespace RestaurantManagementSystem.Controllers
         private Table GetTableById(int id)
         {
             Table table = null;
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
-                using (var cmd = new SqlCommand(
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                     @"SELECT Id, TableNumber, Capacity, Section, IsAvailable, Status, 
                     MinPartySize, LastOccupiedAt, IsActive 
                     FROM Tables 
@@ -1075,10 +1075,10 @@ namespace RestaurantManagementSystem.Controllers
         private List<Table> GetAvailableTables(DateTime reservationDateTime, int partySize, int? currentTableId = null)
         {
             var tables = new List<Table>();
-            using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+            using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
             {
                 con.Open();
-                using (var cmd = new SqlCommand(
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                     @"SELECT t.Id, t.TableNumber, t.Capacity, t.Section, t.IsAvailable, t.Status, 
                     t.MinPartySize, t.LastOccupiedAt, t.IsActive 
                     FROM Tables t

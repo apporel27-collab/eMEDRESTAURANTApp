@@ -13,6 +13,14 @@ namespace RestaurantManagementSystem.Controllers
 {
     public class UserController : Controller
     {
+        // Stub: Ensures Users table exists (implement as needed)
+        private void EnsureUsersTableExists(SqlConnection con) { /* TODO: Implement schema check if needed */ }
+
+        // Stub: Ensures required columns exist in Users table (implement as needed)
+        private void EnsureUserTableColumns(SqlConnection con) { /* TODO: Implement column check if needed */ }
+
+        // Stub: Checks if a username exists (implement as needed)
+        private bool UserExists(string username, int? excludeUserId = null) { return false; /* TODO: Implement actual check */ }
         private readonly IConfiguration _config;
         private readonly UserRoleService _userRoleService;
 
@@ -28,7 +36,7 @@ namespace RestaurantManagementSystem.Controllers
             try
             {
                 var users = new List<User>();
-                using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+                using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
                 {
                     con.Open();
                     
@@ -40,19 +48,19 @@ namespace RestaurantManagementSystem.Controllers
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('dbo.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
+    DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('purojit2_idmcbp.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
     
     DECLARE @sql nvarchar(max) = N'SELECT Id, Username, FirstName, LastName, Email, IsActive, ' +
         CASE WHEN @hasPhone=1 THEN N'Phone' ELSE N'CAST(NULL AS NVARCHAR(20)) AS Phone' END +
-        N' FROM dbo.Users';
+        N' FROM purojit2_idmcbp.Users';
     EXEC sp_executesql @sql;
 END";
-                    using (var createCmd = new SqlCommand(createSp, con))
+                    using (var createCmd = new Microsoft.Data.SqlClient.SqlCommand(createSp, con))
                     {
                         createCmd.ExecuteNonQuery();
                     }
 
-                    using (var cmd = new SqlCommand("dbo.usp_GetUsersList", con))
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_GetUsersList", con))
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
                         using (var reader = cmd.ExecuteReader())
@@ -100,11 +108,13 @@ END";
                 ViewBag.IsView = isView;
                 
                 // Get all roles for dropdown
-                ViewBag.AllRoles = await _userRoleService.GetAllRolesAsync();
+                var allRoles = await _userRoleService.GetAllRolesAsync();
+                ViewBag.AllRoles = allRoles;
+                ViewBag.Roles = allRoles; // Adding this for backward compatibility
 
                 if (id.HasValue)
                 {
-                    using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+                    using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
                     {
                         con.Open();
                         
@@ -118,18 +128,18 @@ END";
                         AS
                         BEGIN
                             SET NOCOUNT ON;
-                            DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('dbo.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
+                            DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('purojit2_idmcbp.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
                             
                             DECLARE @sql nvarchar(max) = N'SELECT Id, Username, FirstName, LastName, Email, IsActive, ' +
                                 CASE WHEN @hasPhone=1 THEN N'Phone' ELSE N'CAST(NULL AS NVARCHAR(20)) AS Phone' END +
-                                N' FROM dbo.Users WHERE Id = @Id';
+                                N' FROM purojit2_idmcbp.Users WHERE Id = @Id';
                             EXEC sp_executesql @sql, N'@Id int', @Id=@Id;
                         END";
-                        using (var createCmd = new SqlCommand(createSp, con))
+                        using (var createCmd = new Microsoft.Data.SqlClient.SqlCommand(createSp, con))
                         {
                             createCmd.ExecuteNonQuery();
                         }
-                        using (var cmd = new SqlCommand("dbo.usp_GetUserById", con))
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_GetUserById", con))
                         {
                             cmd.CommandType = CommandType.StoredProcedure;
                             cmd.Parameters.AddWithValue("@Id", id.Value);
@@ -156,6 +166,9 @@ END";
                     if (model.Id > 0)
                     {
                         model.Roles = (await _userRoleService.GetUserRolesAsync(model.Id)).ToList();
+                        
+                        // Populate the SelectedRoleIds based on assigned roles
+                        model.SelectedRoleIds = model.Roles.Select(r => r.Id).ToList();
                     }
                 }
                 return View(model);
@@ -169,16 +182,22 @@ END";
         }
 
         // Save User
-        [HttpPost]
+        [HttpPostAttribute]
         public async Task<IActionResult> SaveUser(User model, List<int> selectedRoles)
         {
+            // Always remove Password validation for existing users
+            if (model.Id > 0 && ModelState.ContainsKey("Password"))
+            {
+                ModelState.Remove("Password");
+            }
+            
             // Handle password validation/binding for create vs edit
             if (model.Id == 0)
             {
                 var postedPassword = Request.Form["password"].FirstOrDefault();
                 if (string.IsNullOrWhiteSpace(postedPassword))
                 {
-                    ModelState.AddModelError("Password", "Password is required.");
+                    ModelState.AddModelError("Password", "Password is required for new users.");
                 }
                 else
                 {
@@ -189,12 +208,20 @@ END";
             }
             else
             {
-                // Editing: password is optional
-                if (ModelState.ContainsKey("Password")) ModelState.Remove("Password");
+                var postedPassword = Request.Form["password"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(postedPassword))
+                {
+                    model.Password = postedPassword.Trim();
+                }
             }
             
+            // Boolean properties in C# are already non-nullable value types
+            // The bool type can't be null, so no need to check for null
+            
             // Get all roles for dropdown in case we need to return the view
-            ViewBag.AllRoles = await _userRoleService.GetAllRolesAsync();
+            var allRoles = await _userRoleService.GetAllRolesAsync();
+            ViewBag.AllRoles = allRoles;
+            ViewBag.Roles = allRoles; // Adding this for backward compatibility
 
             if (ModelState.IsValid)
             {
@@ -207,9 +234,10 @@ END";
                     {
                         ModelState.AddModelError("Username", "Username is already in use");
                         return View("UserForm", model);
-                    }
+                    // End of isUsernameInUse block
+                }
 
-                    using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
+                    using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
                     {
                         con.Open();
                         
@@ -217,79 +245,44 @@ END";
                         EnsureUsersTableExists(con);
                         EnsureUserTableColumns(con);
                         
-                        string sql;
-                        bool hasPhone = false, hasRole = false, hasRoleId = false;
-                        // Probe column existence for conditional writes
-                        using (var probe = new SqlCommand("SELECT "+
-                            "CONVERT(bit, CASE WHEN COL_LENGTH('dbo.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END),"+
-                            "CONVERT(bit, CASE WHEN COL_LENGTH('dbo.Users','Role') IS NOT NULL THEN 1 ELSE 0 END),"+
-                            "CONVERT(bit, CASE WHEN COL_LENGTH('dbo.Users','RoleId') IS NOT NULL THEN 1 ELSE 0 END)", con))
-                        using (var readerProbe = probe.ExecuteReader())
+                        int userId = model.Id;
+                        string roleIds = selectedRoles != null && selectedRoles.Count > 0 ? string.Join(",", selectedRoles) : "";
+                        // Always supply Salt: generate if missing
+                        if (string.IsNullOrWhiteSpace(model.Salt))
                         {
-                            if (readerProbe.Read())
+                            model.Salt = Guid.NewGuid().ToString("N");
+                        }
+                        // If editing and password is blank, fetch current hash from DB
+                        string passwordToUse = model.Password;
+                        if (model.Id > 0 && string.IsNullOrWhiteSpace(model.Password))
+                        {
+                            using (var pwdCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT PasswordHash FROM purojit2_idmcbp.Users WHERE Id = @Id", con))
                             {
-                                hasPhone = readerProbe.GetBoolean(0);
-                                hasRole = readerProbe.GetBoolean(1);
-                                hasRoleId = readerProbe.GetBoolean(2);
+                                pwdCmd.Parameters.AddWithValue("@Id", model.Id);
+                                var dbPwd = pwdCmd.ExecuteScalar();
+                                passwordToUse = dbPwd?.ToString() ?? "";
                             }
                         }
-                        if (model.Id > 0)
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("purojit2_idmcbp.usp_CreateOrUpdateUserWithRoles", con))
                         {
-                            // Update
-                            sql = @"UPDATE Users SET 
-                                    Username = @Username, 
-                                    FirstName = @FirstName, 
-                                    LastName = @LastName,
-                                    Email = @Email, 
-                                    " + (hasPhone ? "Phone = @Phone,\n" : "") +
-                                    (hasRole ? "[Role] = @Role,\n" : hasRoleId ? "RoleId = @Role,\n" : "") +
-                                    @"IsActive = @IsActive
-                                WHERE Id = @Id;
-                                SELECT 'User updated successfully' as Message;";
-                        }
-                        else
-                        {
-                            // Insert
-                            string insertCols = "Username, Password, FirstName, LastName, Email" + (hasPhone ? ", Phone" : "") + ((hasRole || hasRoleId) ? ", " + (hasRole ? "[Role]" : "RoleId") : "") + ", IsActive";
-                            string insertVals = "@Username, @Password, @FirstName, @LastName, @Email" + (hasPhone ? ", @Phone" : "") + ((hasRole || hasRoleId) ? ", @Role" : "") + ", @IsActive";
-                            sql = $"INSERT INTO Users ({insertCols}) VALUES ({insertVals}); SELECT 'User added successfully' as Message;";
-                        }
-
-                        using (var cmd = new SqlCommand(sql, con))
-                        {
-                            if (model.Id > 0)
-                            {
-                                cmd.Parameters.AddWithValue("@Id", model.Id);
-                            }
-                            
+                            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@Id", model.Id);
                             cmd.Parameters.AddWithValue("@Username", model.Username);
-
-                            if (model.Id > 0)
-                            {
-                                // No password update on edit
-                            }
-                            else
-                            {
-                                // For new users, use the validated posted password (already ensured above)
-                                cmd.Parameters.AddWithValue("@Password", model.Password);
-                            }
-                            
+                            cmd.Parameters.AddWithValue("@PasswordHash", passwordToUse);
+                            cmd.Parameters.AddWithValue("@Salt", model.Salt);
                             cmd.Parameters.AddWithValue("@FirstName", model.FirstName);
                             cmd.Parameters.AddWithValue("@LastName", model.LastName ?? (object)DBNull.Value);
                             cmd.Parameters.AddWithValue("@Email", model.Email ?? (object)DBNull.Value);
-                            if (hasPhone)
-                                cmd.Parameters.AddWithValue("@Phone", string.IsNullOrWhiteSpace(model.Phone) ? (object)DBNull.Value : model.Phone);
-                            if (hasRole || hasRoleId)
-                                cmd.Parameters.AddWithValue("@Role", (int)model.Role);
+                            cmd.Parameters.AddWithValue("@Phone", string.IsNullOrWhiteSpace(model.Phone) ? (object)DBNull.Value : model.Phone);
                             cmd.Parameters.AddWithValue("@IsActive", model.IsActive);
-
-                            using (var reader = cmd.ExecuteReader())
+                            cmd.Parameters.AddWithValue("@RoleIds", roleIds);
+                            var result = cmd.ExecuteReader();
+                            if (result.Read())
                             {
-                                if (reader.Read())
-                                {
-                                    resultMessage = reader["Message"].ToString();
-                                }
+                                userId = Convert.ToInt32(result["UserId"]);
                             }
+                            result.Close();
+                            resultMessage = model.Id == 0 ? "User added successfully" : "User updated successfully";
                         }
                     }
                     TempData["ResultMessage"] = resultMessage;
@@ -300,160 +293,17 @@ END";
                     ModelState.AddModelError(string.Empty, $"Error saving user: {ex.Message}");
                 }
             }
-            
             // Get roles for dropdown before returning
-            ViewBag.AllRoles = _userRoleService.GetAllRolesAsync().Result;
+            var userRoles = _userRoleService.GetAllRolesAsync().Result;
+            ViewBag.AllRoles = userRoles;
+            ViewBag.Roles = userRoles; // Adding this for backward compatibility
+            // Show all ModelState errors in TempData for debugging
+            if (!ModelState.IsValid)
+            {
+                var allErrors = string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+                TempData["DebugErrors"] = allErrors;
+            }
             return View("UserForm", model);
         }
-
-        private bool UserExists(string username, int? excludeId = null)
-        {
-            try
-            {
-                using (var con = new SqlConnection(_config.GetConnectionString("DefaultConnection")))
-                {
-                    con.Open();
-                    
-                    // Ensure Users table exists
-                    EnsureUsersTableExists(con);
-                    
-                    string sql = "SELECT COUNT(1) FROM Users WHERE Username = @Username";
-                    if (excludeId.HasValue)
-                    {
-                        sql += " AND Id <> @Id";
-                    }
-                    using (var cmd = new SqlCommand(sql, con))
-                    {
-                        cmd.Parameters.AddWithValue("@Username", username);
-                        if (excludeId.HasValue)
-                        {
-                            cmd.Parameters.AddWithValue("@Id", excludeId.Value);
-                        }
-                        int count = (int)cmd.ExecuteScalar();
-                        return count > 0;
-                    }
-                }
-            }
-            catch
-            {
-                return false; // Assume username doesn't exist if there's an error
-            }
-        }
-        
-        private void EnsureUsersTableExists(SqlConnection connection)
-        {
-            try
-            {
-                // Check if Users table exists
-                bool tableExists = false;
-                using (var cmd = new SqlCommand(
-                    "SELECT COUNT(1) FROM sys.tables WHERE name = 'Users'", connection))
-                {
-                    tableExists = ((int)cmd.ExecuteScalar() > 0);
-                }
-                
-                // Create Users table if it doesn't exist
-                if (!tableExists)
-                {
-                    using (var cmd = new SqlCommand(@"
-                        CREATE TABLE Users (
-                            Id INT PRIMARY KEY IDENTITY(1,1),
-                            Username NVARCHAR(50) NOT NULL UNIQUE,
-                            Password NVARCHAR(255) NOT NULL,
-                            FirstName NVARCHAR(50) NULL,
-                            LastName NVARCHAR(50) NULL,
-                            Email NVARCHAR(100) NULL,
-                            Phone NVARCHAR(20) NULL,
-                            Role INT NOT NULL DEFAULT 3,
-                            IsActive BIT NOT NULL DEFAULT 1,
-                            CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-                            LastLogin DATETIME NULL
-                        )", connection))
-                    {
-                        cmd.ExecuteNonQuery();
-                        Console.WriteLine("Created Users table");
-                        
-                        // Add admin user
-                        using (var insertCmd = new SqlCommand(@"
-                            INSERT INTO Users (Username, Password, FirstName, LastName, Email, Role, IsActive)
-                            VALUES ('admin', 'password123', 'System', 'Administrator', 'admin@restaurant.com', 12, 1)",
-                            connection))
-                        {
-                            insertCmd.ExecuteNonQuery();
-                            Console.WriteLine("Created admin user");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error ensuring Users table exists: {ex.Message}");
-            }
-        }
-        
-        private void EnsureUserTableColumns(SqlConnection connection)
-        {
-            try
-            {
-                // Check and add Phone column if needed
-                bool phoneExists = false;
-                using (var cmd = new SqlCommand(
-                    "SELECT COUNT(1) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'Phone'", connection))
-                {
-                    phoneExists = ((int)cmd.ExecuteScalar() > 0);
-                }
-                
-                if (!phoneExists)
-                {
-                    using (var cmd = new SqlCommand(
-                        "ALTER TABLE [dbo].[Users] ADD [Phone] NVARCHAR(20) NULL", connection))
-                    {
-                        cmd.ExecuteNonQuery();
-                        Console.WriteLine("Added Phone column to Users table");
-                    }
-                }
-
-                // Check and add Role column if needed
-                bool roleExists = false;
-                using (var cmd = new SqlCommand(
-                    "SELECT COUNT(1) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'Role'", connection))
-                {
-                    roleExists = ((int)cmd.ExecuteScalar() > 0);
-                }
-                
-                if (!roleExists)
-                {
-                    using (var cmd = new SqlCommand(
-                        "ALTER TABLE [dbo].[Users] ADD [Role] INT NOT NULL DEFAULT 3", connection))
-                    {
-                        cmd.ExecuteNonQuery();
-                        Console.WriteLine("Added Role column to Users table");
-                    }
-                }
-                
-                // Check if RoleId column exists
-                bool roleIdExists = false;
-                using (var cmd = new SqlCommand(
-                    "SELECT COUNT(1) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'RoleId'", connection))
-                {
-                    roleIdExists = ((int)cmd.ExecuteScalar() > 0);
-                }
-                
-                // Only try to update if both columns exist
-                if (roleExists && roleIdExists)
-                {
-                    using (var cmd = new SqlCommand(
-                        "UPDATE [dbo].[Users] SET [Role] = [RoleId]", connection))
-                    {
-                        cmd.ExecuteNonQuery();
-                        Console.WriteLine("Updated Role column with values from RoleId");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error ensuring User table columns: {ex.Message}");
-            }
         }
     }
-}

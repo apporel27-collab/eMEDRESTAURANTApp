@@ -3,53 +3,44 @@
     ViewData["Title"] = "Order Details";
 }
 
-<div class="container-fluid p-3">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>@ViewData["Title"] - @Model.OrderNumber</h1>
-        <div>
-            <a asp-action="Dashboard" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Dashboard
+<div class="container-fluid p-2">
+    <div class="row g-2 align-items-center mb-2">
+        <div class="col-md-8 d-flex flex-wrap align-items-center gap-2">
+            <form asp-action="QuickAddMenuItem" method="post" class="d-flex flex-row align-items-center gap-2 mb-0 p-0">
+                <input type="hidden" name="orderId" value="@Model.Id" />
+                <label for="menuItemInput" class="form-label mb-0">Add Menu Item:</label>
+                <input list="menuItems" id="menuItemInput" name="menuItemNameOrId" class="form-control form-control-sm w-auto" style="min-width:200px;" placeholder="Type to search..." autocomplete="off" required />
+                <datalist id="menuItems">
+                    @foreach (var item in Model.AvailableMenuItems)
+                    {
+                        <option value="@item.Name" data-id="@item.Id">@item.Name (₹@item.Price.ToString("F2"))</option>
+                    }
+                </datalist>
+                <input type="number" name="quantity" min="1" value="1" class="form-control form-control-sm w-auto" style="max-width:70px;" required />
+                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-plus"></i> Add</button>
+            </form>
+            <button type="button" class="btn btn-sm btn-warning ms-2" data-bs-toggle="modal" data-bs-target="#fireItemsModal">
+                <i class="fas fa-fire"></i> Fire to Kitchen
+            </button>
+            <a asp-action="Dashboard" class="btn btn-outline-secondary btn-sm ms-2">
+                <i class="fas fa-arrow-left"></i> Back
             </a>
-            <a asp-action="BrowseMenu" asp-route-id="@Model.Id" class="btn btn-primary">
-                <i class="fas fa-utensils"></i> Add Items
+            <!-- Removed Add Items button as requested -->
+            <a asp-controller="Payment" asp-action="Index" asp-route-id="@Model.Id" class="btn btn-success btn-sm ms-2">
+                <i class="fas fa-credit-card"></i> Payment
             </a>
-            <a asp-controller="Payment" asp-action="Index" asp-route-id="@Model.Id" class="btn btn-success">
-                <i class="fas fa-credit-card"></i> Process Payment
-            </a>
+        </div>
+        <div class="col-md-4 text-end">
+            <span class="fs-5 fw-bold">Order #: @Model.OrderNumber</span>
         </div>
     </div>
-
-    @if (TempData["SuccessMessage"] != null)
-    {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            @TempData["SuccessMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
-
-    @if (TempData["ErrorMessage"] != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            @TempData["ErrorMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
-
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Order Items</h5>
-                    @if (Model.Status < 3) 
-                    { @* Not Completed *@
-                        <div class="btn-group">
-                            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#fireItemsModal">
-                                <i class="fas fa-fire"></i> Fire to Kitchen
-                            </button>
-                        </div>
-                    }
+    <div class="row g-2">
+        <div class="col-lg-8">
+            <div class="card mb-2 shadow-sm">
+                <div class="card-header py-2 px-3 bg-light d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Order Items</h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-2">
                     @if (Model.Items.Any())
                     {
                         <div class="table-responsive">
@@ -79,8 +70,8 @@
                                         }
                                         <tr>
                                             <td>
-                                                @if (item.Status == 0) 
-                                                { @* New *@
+                                                @if (item.Status == 0)
+                                                {
                                                     <input type="checkbox" class="fireItem" value="@item.Id" form="fireItemsForm" name="SelectedItems" />
                                                     <form asp-action="CancelOrderItem" method="post" class="d-inline-block ms-1" onsubmit="return confirm('Are you sure you want to cancel this item?');">
                                                         <input type="hidden" name="orderId" value="@Model.Id" />
@@ -106,15 +97,17 @@
                                                         }
                                                     </div>
                                                 }
-                                                @if (!string.IsNullOrEmpty(item.SpecialInstructions))
-                                                {
-                                                    <div class="text-danger small"><i>@item.SpecialInstructions</i></div>
-                                                }
+                                                <form asp-action="UpdateOrderItemQty" method="post" class="d-flex align-items-center gap-2 mt-1">
+                                                    <input type="hidden" name="orderId" value="@Model.Id" />
+                                                    <input type="hidden" name="orderItemId" value="@item.Id" />
+                                                    <input type="number" name="quantity" value="@item.Quantity" min="1" class="form-control form-control-sm w-auto" style="max-width:60px;" onchange="this.form.submit();" />
+                                                    <input type="text" name="specialInstructions" value="@item.SpecialInstructions" placeholder="Note" class="form-control form-control-sm w-auto" style="max-width:120px;" onchange="this.form.submit();" />
+                                                </form>
                                             </td>
-                                            <td>@item.Quantity</td>
-                                            <td>$@item.UnitPrice.ToString("F2")</td>
-                                            <td>$@item.Subtotal.ToString("F2")</td>
-                                            <td>
+                                            <td class="align-middle">@item.Quantity</td>
+                                            <td class="align-middle">₹@item.UnitPrice.ToString("F2")</td>
+                                            <td class="align-middle">₹@item.Subtotal.ToString("F2")</td>
+                                            <td class="align-middle">
                                                 @{
                                                     var badgeClass = item.Status switch
                                                     {
@@ -139,29 +132,37 @@
                                 <tfoot>
                                     <tr class="table-light">
                                         <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
-                                        <td colspan="2"><strong>$@Model.Subtotal.ToString("F2")</strong></td>
+                                        <td colspan="2">
+                                            <strong>
+                                                ₹@((Model.Items.Where(i => i.Status != 5).Sum(i => i.Subtotal)).ToString("F2"))
+                                            </strong>
+                                        </td>
                                     </tr>
                                     <tr class="table-light">
                                         <td colspan="4" class="text-end">Tax:</td>
-                                        <td colspan="2">$@Model.TaxAmount.ToString("F2")</td>
+                                        <td colspan="2">₹@(Model.TaxAmount.ToString("F2"))</td>
                                     </tr>
                                     @if (Model.DiscountAmount > 0)
                                     {
                                         <tr class="table-light">
                                             <td colspan="4" class="text-end">Discount:</td>
-                                            <td colspan="2">-$@Model.DiscountAmount.ToString("F2")</td>
+                                            <td colspan="2">-₹@(Model.DiscountAmount.ToString("F2"))</td>
                                         </tr>
                                     }
                                     @if (Model.TipAmount > 0)
                                     {
                                         <tr class="table-light">
                                             <td colspan="4" class="text-end">Tip:</td>
-                                            <td colspan="2">$@Model.TipAmount.ToString("F2")</td>
+                                            <td colspan="2">₹@(Model.TipAmount.ToString("F2"))</td>
                                         </tr>
                                     }
                                     <tr class="table-light">
                                         <td colspan="4" class="text-end"><strong>Total:</strong></td>
-                                        <td colspan="2"><strong>$@Model.TotalAmount.ToString("F2")</strong></td>
+                                        <td colspan="2">
+                                            <strong>
+                                                ₹@((Model.Items.Where(i => i.Status != 5).Sum(i => i.Subtotal) + Model.TaxAmount + Model.TipAmount - Model.DiscountAmount).ToString("F2"))
+                                            </strong>
+                                        </td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -229,98 +230,91 @@
             }
         </div>
         
-        <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">Order Information</h5>
+        <div class="col-lg-4">
+            <div class="card mb-2 shadow-sm">
+                <div class="card-header py-2 px-3 bg-light">
+                    <h6 class="mb-0">Order Info</h6>
                 </div>
-                <div class="card-body">
-                    <div class="mb-3 row">
-                        <label class="col-sm-4 col-form-label">Order #:</label>
-                        <div class="col-sm-8">
-                            <p class="form-control-plaintext">@Model.OrderNumber</p>
-                        </div>
-                    </div>
-                    <div class="mb-3 row">
-                        <label class="col-sm-4 col-form-label">Type:</label>
-                        <div class="col-sm-8">
-                            <p class="form-control-plaintext">@Model.OrderTypeDisplay</p>
-                        </div>
-                    </div>
-                    <div class="mb-3 row">
-                        <label class="col-sm-4 col-form-label">Status:</label>
-                        <div class="col-sm-8">
-                            <p class="form-control-plaintext">
-                                @{
-                                    var statusBadgeClass = Model.Status switch
-                                    {
-                                        0 => "bg-primary",
-                                        1 => "bg-warning text-dark",
-                                        2 => "bg-success",
-                                        3 => "bg-dark",
-                                        4 => "bg-danger",
-                                        _ => "bg-secondary"
-                                    };
-                                }
-                                <span class="badge @statusBadgeClass">@Model.StatusDisplay</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="mb-3 row">
-                        <label class="col-sm-4 col-form-label">Created:</label>
-                        <div class="col-sm-8">
-                            <p class="form-control-plaintext">@Model.CreatedAt.ToString("g")</p>
-                        </div>
-                    </div>
-                    <div class="mb-3 row">
-                        <label class="col-sm-4 col-form-label">Server:</label>
-                        <div class="col-sm-8">
-                            <p class="form-control-plaintext">@(Model.ServerName ?? "Unassigned")</p>
-                        </div>
-                    </div>
-                    
-                    @if (Model.OrderType == 0) 
-                    { @* Dine-In *@
-                        <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label">Table:</label>
-                            <div class="col-sm-8">
-                                <p class="form-control-plaintext">@(Model.TableName ?? "No Table")</p>
-                            </div>
-                        </div>
-                        <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label">Guest:</label>
-                            <div class="col-sm-8">
-                                <p class="form-control-plaintext">@(Model.GuestName ?? "No Name")</p>
-                            </div>
-                        </div>
+                <div class="card-body p-2">
+                    <div class="row mb-1"><div class="col-5 text-muted">Type:</div><div class="col-7">@Model.OrderTypeDisplay</div></div>
+                    <div class="row mb-1"><div class="col-5 text-muted">Status:</div><div class="col-7">
+                        @{
+                            var statusBadgeClass = Model.Status switch
+                            {
+                                0 => "bg-primary",
+                                1 => "bg-warning text-dark",
+                                2 => "bg-success",
+                                3 => "bg-dark",
+                                4 => "bg-danger",
+                                _ => "bg-secondary"
+                            };
+                        }
+                        <span class="badge @statusBadgeClass">@Model.StatusDisplay</span>
+                    </div></div>
+                    <div class="row mb-1"><div class="col-5 text-muted">Created:</div><div class="col-7">@Model.CreatedAt.ToString("g")</div></div>
+                    <div class="row mb-1"><div class="col-5 text-muted">Server:</div><div class="col-7">@(Model.ServerName ?? "Unassigned")</div></div>
+                    @if (Model.OrderType == 0)
+                    {
+                        <div class="row mb-1"><div class="col-5 text-muted">Table:</div><div class="col-7">@(Model.TableName ?? "No Table")</div></div>
+                        <div class="row mb-1"><div class="col-5 text-muted">Guest:</div><div class="col-7">@(Model.GuestName ?? "No Name")</div></div>
                     }
                     else
                     {
-                        <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label">Customer:</label>
-                            <div class="col-sm-8">
-                                <p class="form-control-plaintext">@(Model.CustomerName ?? "No Name")</p>
-                            </div>
-                        </div>
-                        <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label">Phone:</label>
-                            <div class="col-sm-8">
-                                <p class="form-control-plaintext">@(Model.CustomerPhone ?? "No Phone")</p>
-                            </div>
-                        </div>
+                        <div class="row mb-1"><div class="col-5 text-muted">Customer:</div><div class="col-7">@(Model.CustomerName ?? "No Name")</div></div>
+                        <div class="row mb-1"><div class="col-5 text-muted">Phone:</div><div class="col-7">@(Model.CustomerPhone ?? "No Phone")</div></div>
                     }
-                    
                     @if (!string.IsNullOrEmpty(Model.SpecialInstructions))
                     {
-                        <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label">Notes:</label>
-                            <div class="col-sm-8">
-                                <p class="form-control-plaintext">@Model.SpecialInstructions</p>
-                            </div>
-                        </div>
+                        <div class="row mb-1"><div class="col-5 text-muted">Notes:</div><div class="col-7">@Model.SpecialInstructions</div></div>
                     }
                 </div>
             </div>
+            @if (Model.KitchenTickets.Any())
+            {
+                <div class="card mb-2 shadow-sm">
+                    <div class="card-header py-2 px-3 bg-light">
+                        <h6 class="mb-0">Kitchen Tickets</h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Ticket #</th>
+                                    <th>Items</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Completed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in Model.KitchenTickets)
+                                {
+                                    <tr>
+                                        <td>@ticket.TicketNumber</td>
+                                        <td>@ticket.Items.Count</td>
+                                        <td>
+                                            @{
+                                                var badgeClass = ticket.Status switch
+                                                {
+                                                    0 => "bg-primary",
+                                                    1 => "bg-warning text-dark",
+                                                    2 => "bg-success",
+                                                    3 => "bg-dark",
+                                                    4 => "bg-danger",
+                                                    _ => "bg-secondary"
+                                                };
+                                            }
+                                            <span class="badge @badgeClass">@ticket.StatusDisplay</span>
+                                        </td>
+                                        <td>@ticket.CreatedAt.ToString("HH:mm")</td>
+                                        <td>@(ticket.CompletedAt.HasValue ? ticket.CompletedAt.Value.ToString("HH:mm") : "-")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>

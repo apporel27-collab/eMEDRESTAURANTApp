@@ -22,13 +22,13 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
                     // Check if OrderItemModifiers table exists
                     bool orderItemModifiersExists = false;
-                    using (SqlCommand checkCommand = new SqlCommand(
+                    using (Microsoft.Data.SqlClient.SqlCommand checkCommand = new Microsoft.Data.SqlClient.SqlCommand(
                         "SELECT CASE WHEN OBJECT_ID('OrderItemModifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", 
                         connection))
                     {
@@ -37,7 +37,7 @@ namespace RestaurantManagementSystem.Controllers
                     
                     // Check if OrderItem_Modifiers table exists
                     bool orderItemModifiersWithUnderscoreExists = false;
-                    using (SqlCommand checkCommand = new SqlCommand(
+                    using (Microsoft.Data.SqlClient.SqlCommand checkCommand = new Microsoft.Data.SqlClient.SqlCommand(
                         "SELECT CASE WHEN OBJECT_ID('OrderItem_Modifiers', 'U') IS NOT NULL THEN 1 ELSE 0 END", 
                         connection))
                     {
@@ -47,7 +47,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Create OrderItemModifiers table if it doesn't exist
                     if (!orderItemModifiersExists)
                     {
-                        using (SqlCommand createCommand = new SqlCommand(@"
+                        using (Microsoft.Data.SqlClient.SqlCommand createCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                             CREATE TABLE [dbo].[OrderItemModifiers] (
                                 [Id] INT IDENTITY(1,1) PRIMARY KEY,
                                 [OrderItemId] INT NOT NULL,
@@ -72,7 +72,7 @@ namespace RestaurantManagementSystem.Controllers
                     // Create OrderItem_Modifiers table if it doesn't exist
                     if (!orderItemModifiersWithUnderscoreExists)
                     {
-                        using (SqlCommand createCommand = new SqlCommand(@"
+                        using (Microsoft.Data.SqlClient.SqlCommand createCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                             CREATE TABLE [dbo].[OrderItem_Modifiers] (
                                 [Id] INT IDENTITY(1,1) PRIMARY KEY,
                                 [OrderItemId] INT NOT NULL,

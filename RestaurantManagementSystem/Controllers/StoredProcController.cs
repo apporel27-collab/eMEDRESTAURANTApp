@@ -53,11 +53,11 @@ namespace RestaurantManagementSystem.Controllers
                 END";
                 
                 // Execute the SQL
-                using (var connection = new SqlConnection(_connectionString))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
                     
-                    using (var command = new SqlCommand(sql, connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
                     {
                         command.ExecuteNonQuery();
                     }

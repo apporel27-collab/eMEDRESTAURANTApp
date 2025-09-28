@@ -1,13 +1,16 @@
+using System;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using RestaurantManagementSystem.Models;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 
 namespace RestaurantManagementSystem.Controllers
 {
-    [Authorize]
+    [AuthorizeAttribute]
     public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
@@ -92,7 +95,7 @@ namespace RestaurantManagementSystem.Controllers
             return View();
         }
 
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        [ResponseCacheAttribute(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });

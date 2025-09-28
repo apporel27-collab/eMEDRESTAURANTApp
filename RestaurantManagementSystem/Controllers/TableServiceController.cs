@@ -67,8 +67,8 @@ namespace RestaurantManagementSystem.Controllers
             return View(model);
         }
         
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult SeatGuest(SeatGuestViewModel model)
         {
             if (ModelState.IsValid)
@@ -126,8 +126,8 @@ namespace RestaurantManagementSystem.Controllers
         }
         
         // Update Table Status
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPostAttribute]
+        [ValidateAntiForgeryTokenAttribute]
         public IActionResult UpdateTableStatus(int turnoverId, int newStatus)
         {
             try
@@ -164,19 +164,19 @@ namespace RestaurantManagementSystem.Controllers
                 CurrentTurnovers = new List<ActiveTableViewModel>()
             };
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
                 
                 // Get table counts
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT
                         SUM(CASE WHEN Status = 0 THEN 1 ELSE 0 END) AS AvailableCount,
                         SUM(CASE WHEN Status = 2 THEN 1 ELSE 0 END) AS OccupiedCount,
                         SUM(CASE WHEN Status = 3 THEN 1 ELSE 0 END) AS DirtyCount
                     FROM Tables", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -188,7 +188,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get today's pending reservation count
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT COUNT(*)
                     FROM Reservations
                     WHERE CAST(ReservationTime AS DATE) = CAST(GETDATE() AS DATE)
@@ -198,7 +198,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get active waitlist count
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT COUNT(*)
                     FROM Waitlist
                     WHERE Status = 0", connection)) // 0 = Waiting
@@ -207,7 +207,7 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Get current active turnovers
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT TOP 5
                         t.Id,
                         tb.Id AS TableId,
@@ -225,7 +225,7 @@ namespace RestaurantManagementSystem.Controllers
                     WHERE t.Status < 5 -- Not departed
                     ORDER BY t.SeatedAt DESC", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -253,16 +253,16 @@ namespace RestaurantManagementSystem.Controllers
         {
             var tables = new List<SelectListItem>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, TableName, Capacity, Status
                     FROM Tables
                     WHERE Status = 0 -- Available
                     ORDER BY TableName", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -282,47 +282,177 @@ namespace RestaurantManagementSystem.Controllers
     private List<SelectListItem> GetAvailableServers()
     {
         var servers = new List<SelectListItem>();
-        
-        using (SqlConnection connection = new SqlConnection(_connectionString))
+        try
         {
-            connection.Open();
-            using (SqlCommand command = new SqlCommand(@"
-                SELECT Id, FirstName + ' ' + ISNULL(LastName, '') AS FullName
-                FROM Users
-                WHERE Role = 2 -- Server role
-                AND IsActive = 1
-                ORDER BY FirstName, LastName", connection))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
-                using (SqlDataReader reader = command.ExecuteReader())
+                connection.Open();
+
+                // Determine role filter based on available schema
+                int serverRoleId = ResolveServerRoleId(connection);
+
+                string selectName = "COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName,'')))), ''), u.Username, u.Email, 'User ' + CAST(u.Id AS NVARCHAR(10))) AS FullName";
+
+                string sql = null;
+                bool hasRole = false, hasRoleId = false, hasUserRoles = false, hasRoles = false;
+                try { hasRole = ColumnExists(connection, "Users", "Role"); } catch { hasRole = false; }
+                try { hasRoleId = ColumnExists(connection, "Users", "RoleId"); } catch { hasRoleId = false; }
+                try { hasUserRoles = TableExists(connection, "UserRoles"); } catch { hasUserRoles = false; }
+                try { hasRoles = TableExists(connection, "Roles"); } catch { hasRoles = false; }
+
+                if (hasRole)
                 {
-                    while (reader.Read())
+                    sql = $@"SELECT u.Id, {selectName}
+                             FROM Users u
+                             WHERE u.IsActive = 1 AND u.Role = @ServerRoleId
+                             ORDER BY 2";
+                }
+                else if (hasRoleId)
+                {
+                    sql = $@"SELECT u.Id, {selectName}
+                             FROM Users u
+                             WHERE u.IsActive = 1 AND u.RoleId = @ServerRoleId
+                             ORDER BY 2";
+                }
+                else if (hasUserRoles && hasRoles)
+                {
+                    sql = $@"SELECT u.Id, {selectName}
+                             FROM Users u
+                             INNER JOIN UserRoles ur ON u.Id = ur.UserId
+                             INNER JOIN Roles r ON ur.RoleId = r.RoleId
+                             WHERE u.IsActive = 1 AND r.RoleId = @ServerRoleId
+                             ORDER BY 2";
+                }
+                else
+                {
+                    // Fallback: no role info available — list all active users
+                    sql = $@"SELECT u.Id, {selectName}
+                             FROM Users u
+                             WHERE u.IsActive = 1
+                             ORDER BY 2";
+                }
+
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
+                {
+                    if (sql.Contains("@ServerRoleId"))
                     {
-                        servers.Add(new SelectListItem
+                        command.Parameters.AddWithValue("@ServerRoleId", serverRoleId);
+                    }
+
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
                         {
-                            Value = reader.GetInt32(0).ToString(),
-                            Text = reader.GetString(1)
-                        });
+                            servers.Add(new SelectListItem
+                            {
+                                Value = reader.GetInt32(0).ToString(),
+                                Text = reader.GetString(1)
+                            });
+                        }
                     }
                 }
             }
         }
-        
+        catch (Exception ex)
+        {
+            // If any error occurs (e.g., invalid column), fallback to all active users
+            servers.Clear();
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    string selectName = "COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName,'')))), ''), u.Username, u.Email, 'User ' + CAST(u.Id AS NVARCHAR(10))) AS FullName";
+                    string sql = $@"SELECT u.Id, {selectName} FROM Users u WHERE u.IsActive = 1 ORDER BY 2";
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            servers.Add(new SelectListItem
+                            {
+                                Value = reader.GetInt32(0).ToString(),
+                                Text = reader.GetString(1)
+                            });
+                        }
+                    }
+                }
+            }
+            catch { /* swallow all errors, return empty list if all else fails */ }
+        }
         return servers;
-    }        private Reservation GetReservationById(int id)
+    }
+
+    // Determine an appropriate Server role id, if the Roles table exists; defaults to 2
+    private int ResolveServerRoleId(Microsoft.Data.SqlClient.SqlConnection connection)
+    {
+        try
+        {
+            if (TableExists(connection, "Roles"))
+            {
+                // Try common server role names
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT TOP 1 RoleId FROM Roles WHERE RoleName IN ('Server','Waiter','Waitress','Server Staff') ORDER BY RoleId", connection))
+                {
+                    var result = cmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        return Convert.ToInt32(result);
+                    }
+                }
+                // Fallback: smallest RoleId as a heuristic for staff
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT MIN(RoleId) FROM Roles", connection))
+                {
+                    var result = cmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // ignore and fallback
+        }
+        return 2; // default role id for Server if unknown
+    }
+
+    private bool ColumnExists(Microsoft.Data.SqlClient.SqlConnection connection, string tableName, string columnName)
+    {
+        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT COUNT(1) FROM sys.columns WHERE object_id = OBJECT_ID(@t) AND name = @c", connection))
+        {
+            cmd.Parameters.AddWithValue("@t", "dbo." + tableName);
+            cmd.Parameters.AddWithValue("@c", columnName);
+            var result = (int)cmd.ExecuteScalar();
+            return result > 0;
+        }
+    }
+
+    private bool TableExists(Microsoft.Data.SqlClient.SqlConnection connection, string tableName)
+    {
+        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT COUNT(1) FROM sys.tables WHERE name = @t", connection))
+        {
+            cmd.Parameters.AddWithValue("@t", tableName);
+            var result = (int)cmd.ExecuteScalar();
+            return result > 0;
+        }
+    }
+
+        private Reservation GetReservationById(int id)
         {
             Reservation reservation = null;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, CustomerName, PhoneNumber, Email, PartySize, ReservationTime, SpecialRequests, Status
                     FROM Reservations
                     WHERE Id = @Id", connection))
                 {
                     command.Parameters.AddWithValue("@Id", id);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -349,17 +479,17 @@ namespace RestaurantManagementSystem.Controllers
         {
             WaitlistEntry waitlist = null;
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT Id, CustomerName, PhoneNumber, PartySize, CheckInTime, EstimatedWaitMinutes, SpecialRequests, Status
                     FROM Waitlist
                     WHERE Id = @Id", connection))
                 {
                     command.Parameters.AddWithValue("@Id", id);
                     
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -386,10 +516,10 @@ namespace RestaurantManagementSystem.Controllers
         {
             var activeTables = new List<ActiveTableViewModel>();
             
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
-                using (SqlCommand command = new SqlCommand(@"
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT
                         t.Id AS TurnoverId,
                         tb.Id AS TableId,
@@ -411,7 +541,7 @@ namespace RestaurantManagementSystem.Controllers
                     WHERE t.Status < 5 -- Not departed
                     ORDER BY tb.TableName", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -443,10 +573,10 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
-                    using (SqlCommand command = new SqlCommand("usp_StartTableTurnover", connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_StartTableTurnover", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@TableId", tableId);
@@ -457,7 +587,7 @@ namespace RestaurantManagementSystem.Controllers
                         command.Parameters.AddWithValue("@Notes", string.IsNullOrEmpty(notes) ? (object)DBNull.Value : notes);
                         command.Parameters.AddWithValue("@TargetTurnTimeMinutes", targetTurnTime);
                         
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             if (reader.Read())
                             {
@@ -484,17 +614,17 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
-                    using (SqlCommand command = new SqlCommand("usp_AssignServerToTable", connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_AssignServerToTable", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@TableId", tableId);
                         command.Parameters.AddWithValue("@ServerId", serverId);
                         command.Parameters.AddWithValue("@AssignedById", assignedById);
                         
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             if (reader.Read())
                             {
@@ -523,16 +653,16 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
-                    using (SqlCommand command = new SqlCommand("usp_UpdateTableTurnoverStatus", connection))
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_UpdateTableTurnoverStatus", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         command.Parameters.AddWithValue("@TurnoverId", turnoverId);
                         command.Parameters.AddWithValue("@NewStatus", newStatus);
                         
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
                             if (reader.Read())
                             {
