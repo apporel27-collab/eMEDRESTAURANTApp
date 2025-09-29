@@ -19,6 +19,8 @@ html {
 
 body {
   margin-bottom: 60px;
+  background-color: #f8f9fa;
+  color: #212529;
 }
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
@@ -28,4 +30,81 @@ body {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
+}
+
+/* Payment page styling */
+.card {
+  border: none;
+  transition: all 0.2s;
+}
+
+.card-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.card-header h5 {
+  color: #343a40;
+}
+
+.shadow-sm {
+  box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .075) !important;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+}
+
+.badge.rounded-pill {
+  font-weight: 500;
+}
+
+/* Print styles */
+@media print {
+    body {
+        font-size: 12pt;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .navbar, .footer, .btn, .d-print-none, header, footer, .sidebar, .no-print {
+        display: none !important;
+    }
+    
+    .container, .container-fluid {
+        width: 100%;
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .card {
+        border: none;
+    }
+    
+    .card-header {
+        background-color: transparent;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .table {
+        width: 100%;
+    }
+    
+    .table th, .table td {
+        padding: 0.25rem 0.5rem;
+    }
+    
+    a {
+        text-decoration: none !important;
+        color: black !important;
+    }
+    
+    .page-break {
+        page-break-before: always;
+    }
 }

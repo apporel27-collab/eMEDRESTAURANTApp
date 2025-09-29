@@ -817,5 +817,27 @@ namespace RestaurantManagementSystem.Controllers
             // In a real app, this would come from authentication
             return "System Admin";
         }
+        
+        // GET: Payment/PrintBill
+        public IActionResult PrintBill(int orderId)
+        {
+            try
+            {
+                var model = GetPaymentViewModel(orderId);
+                
+                if (model == null)
+                {
+                    TempData["ErrorMessage"] = "Order not found.";
+                    return RedirectToAction("Index", "Order");
+                }
+                
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error loading bill for printing: {ex.Message}";
+                return RedirectToAction("Index", new { id = orderId });
+            }
+        }
     }
 }

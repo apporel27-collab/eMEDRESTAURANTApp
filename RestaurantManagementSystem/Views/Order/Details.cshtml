@@ -6,20 +6,21 @@
 <div class="container-fluid p-2">
     <div class="row g-2 align-items-center mb-2">
         <div class="col-md-8 d-flex flex-wrap align-items-center gap-2">
-            <form asp-action="QuickAddMenuItem" method="post" class="d-flex flex-row align-items-center gap-2 mb-0 p-0">
-                <input type="hidden" name="orderId" value="@Model.Id" />
+            <div id="quickAddForm" class="d-flex flex-row align-items-center gap-2 mb-0 p-0">
+                <input type="hidden" id="orderId" value="@Model.Id" />
                 <label for="menuItemInput" class="form-label mb-0">Add Menu Item:</label>
-                <input list="menuItems" id="menuItemInput" name="menuItemNameOrId" class="form-control form-control-sm w-auto" style="min-width:200px;" placeholder="Type to search..." autocomplete="off" required />
+                <input list="menuItems" id="menuItemInput" class="form-control form-control-sm w-auto" style="min-width:200px;" placeholder="Type to search..." autocomplete="off" required />
                 <datalist id="menuItems">
                     @foreach (var item in Model.AvailableMenuItems)
                     {
-                        <option value="@item.Name" data-id="@item.Id">@item.Name (₹@item.Price.ToString("F2"))</option>
+                        <option value="@item.Name" data-id="@item.Id" data-price="@item.Price.ToString("F2")">@item.Name (₹@item.Price.ToString("F2"))</option>
                     }
                 </datalist>
-                <input type="number" name="quantity" min="1" value="1" class="form-control form-control-sm w-auto" style="max-width:70px;" required />
-                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-plus"></i> Add</button>
-            </form>
-            <button type="button" class="btn btn-sm btn-warning ms-2" data-bs-toggle="modal" data-bs-target="#fireItemsModal">
+                <input type="number" id="quantity" min="1" value="1" class="form-control form-control-sm w-auto" style="max-width:70px;" required />
+                <button type="button" id="quickAddButton" class="btn btn-success btn-sm"><i class="fas fa-plus"></i> Add</button>
+            </div>
+            <button type="button" class="btn btn-sm btn-warning ms-2" data-bs-toggle="modal" data-bs-target="#fireItemsModal" 
+                    title="Send selected items to the kitchen for preparation" data-bs-toggle="tooltip">
                 <i class="fas fa-fire"></i> Fire to Kitchen
             </button>
             <a asp-action="Dashboard" class="btn btn-outline-secondary btn-sm ms-2">
@@ -35,6 +36,41 @@
         </div>
     </div>
     <div class="row g-2">
+        <!-- Add anti-forgery token for AJAX calls -->
+        @Html.AntiForgeryToken()
+        
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="col-12">
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            </div>
+        }
+        
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="col-12">
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @TempData["ErrorMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            </div>
+        }
+        
+        <!-- Information about button functionality -->
+        <div class="col-12">
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <h6><i class="fas fa-info-circle"></i> About Order Actions:</h6>
+                <ul class="mb-0">
+                    <li><strong>Save Order Details</strong> - Updates quantities, notes, prices, and totals in the database</li>
+                    <li><strong>Fire to Kitchen</strong> - Sends selected items to the kitchen for preparation</li>
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+        
         <div class="col-lg-8">
             <div class="card mb-2 shadow-sm">
                 <div class="card-header py-2 px-3 bg-light d-flex justify-content-between align-items-center">
@@ -97,11 +133,20 @@
                                                         }
                                                     </div>
                                                 }
-                                                <form asp-action="UpdateOrderItemQty" method="post" class="d-flex align-items-center gap-2 mt-1">
+                                                <form class="d-flex align-items-center gap-2 mt-1 order-item-edit-form">
                                                     <input type="hidden" name="orderId" value="@Model.Id" />
                                                     <input type="hidden" name="orderItemId" value="@item.Id" />
-                                                    <input type="number" name="quantity" value="@item.Quantity" min="1" class="form-control form-control-sm w-auto" style="max-width:60px;" onchange="this.form.submit();" />
-                                                    <input type="text" name="specialInstructions" value="@item.SpecialInstructions" placeholder="Note" class="form-control form-control-sm w-auto" style="max-width:120px;" onchange="this.form.submit();" />
+                                                    <input type="number" name="quantity" value="@item.Quantity" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" readonly disabled />
+                                                    <input type="text" name="specialInstructions" value="@item.SpecialInstructions" placeholder="Note" class="form-control form-control-sm w-auto item-note" style="max-width:120px;" readonly disabled />
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm edit-item-btn" onclick="enableEdit(this)">
+                                                        <i class="fas fa-edit"></i> Edit
+                                                    </button>
+                                                    <button type="button" class="btn btn-success btn-sm save-item-btn d-none" onclick="saveEdit(this)">
+                                                        <i class="fas fa-save"></i> Save
+                                                    </button>
+                                                    <button type="button" class="btn btn-secondary btn-sm cancel-edit-btn d-none" onclick="cancelEdit(this)">
+                                                        <i class="fas fa-times"></i> Cancel
+                                                    </button>
                                                 </form>
                                             </td>
                                             <td class="align-middle">@item.Quantity</td>
@@ -130,6 +175,21 @@
                                     }
                                 </tbody>
                                 <tfoot>
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            <form id="submitOrderForm" action="/Order/SubmitOrder" method="post" style="display:inline;">
+                                                <input type="hidden" name="orderId" value="@Model.Id" />
+                                                <!-- Adding anti-forgery token explicitly -->
+                                                @Html.AntiForgeryToken()
+                                                <button type="button" class="btn btn-primary btn-lg" onclick="submitOrderWithEdits()" 
+                                                        data-bs-toggle="tooltip" title="Save all order details, quantities, prices, and recalculate totals">
+                                                    <i class="fas fa-save"></i> Save Order Details
+                                                </button>
+                                                <!-- Hidden direct submit button for testing -->
+                                                <button type="submit" class="d-none">Direct Submit</button>
+                                            </form>
+                                        </td>
+                                    </tr>
                                     <tr class="table-light">
                                         <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
                                         <td colspan="2">
@@ -370,8 +430,27 @@
 </div>
 
 @section Scripts {
+    <style>
+        /* Styling for edit mode */
+        .item-edit-active {
+            background-color: rgba(255, 248, 220, 0.5) !important; /* Light yellow background */
+            transition: background-color 0.3s ease;
+        }
+        
+        .item-qty:focus, .item-note:focus {
+            border-color: #ffc107;
+            box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25);
+        }
+    </style>
+    
     <script>
         $(document).ready(function () {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            });
+            
             // Handle FireAll checkbox
             $('#fireAll').change(function () {
                 if ($(this).is(':checked')) {
@@ -395,6 +474,451 @@
                 // No new items to fire
                 $('.btn[data-bs-target="#fireItemsModal"]').addClass('disabled');
             }
+            
+            // Display TempData messages with toastr if they exist
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <text>toastr.success('@TempData["SuccessMessage"]');</text>
+            }
+            
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <text>toastr.error('@TempData["ErrorMessage"]');</text>
+            }
+            
+            // Track new items that haven't been saved to database yet
+            window.newOrderItems = [];
+            window.nextTempId = -1;  // Use negative IDs for unsaved items
+            
+            // Handle quick add button click
+            $('#quickAddButton').click(function() {
+                addMenuItemToTable();
+            });
+            
+            // Also add on Enter key in the input
+            $('#menuItemInput, #quantity').keypress(function(e) {
+                if(e.which == 13) {
+                    e.preventDefault();
+                    addMenuItemToTable();
+                }
+            });
         });
+        
+        // Function to add a menu item to the table without saving to database
+        function addMenuItemToTable() {
+            var menuItemInput = $('#menuItemInput').val();
+            var quantity = parseInt($('#quantity').val()) || 1;
+            
+            if (!menuItemInput) {
+                toastr.error('Please select a menu item');
+                return;
+            }
+            
+            if (quantity < 1) {
+                toastr.error('Quantity must be at least 1');
+                return;
+            }
+            
+            // Find the selected menu item from datalist
+            var menuItemId = null;
+            var menuItemPrice = null;
+            var menuItemName = null;
+            
+            // Check if it's a direct ID input
+            if (!isNaN(parseInt(menuItemInput))) {
+                menuItemId = parseInt(menuItemInput);
+                // Find the option with this ID
+                $('#menuItems option').each(function() {
+                    if ($(this).data('id') == menuItemId) {
+                        menuItemName = $(this).val();
+                        menuItemPrice = parseFloat($(this).data('price'));
+                        return false; // break the loop
+                    }
+                });
+            } else {
+                // Find by name
+                $('#menuItems option').each(function() {
+                    if ($(this).val() === menuItemInput) {
+                        menuItemId = $(this).data('id');
+                        menuItemName = $(this).val();
+                        menuItemPrice = parseFloat($(this).data('price'));
+                        return false; // break the loop
+                    }
+                });
+            }
+            
+            if (!menuItemId || !menuItemPrice || !menuItemName) {
+                toastr.error('Menu item not found');
+                return;
+            }
+            
+            // Calculate subtotal
+            var subtotal = (quantity * menuItemPrice).toFixed(2);
+            
+            // Create a new row in the table
+            var tempId = window.nextTempId--;
+            var newRow = `
+                <tr class="new-item-row" data-temp-id="${tempId}">
+                    <td>
+                        <input type="checkbox" class="fireItem" value="${tempId}" form="fireItemsForm" name="SelectedItems" />
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Remove Item" onclick="removeNewItem(${tempId})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </td>
+                    <td>
+                        <div><strong>${menuItemName}</strong></div>
+                        <form class="d-flex align-items-center gap-2 mt-1 order-item-edit-form new-item-form">
+                            <input type="hidden" name="orderId" value="${$('#orderId').val()}" />
+                            <input type="hidden" name="orderItemId" value="${tempId}" />
+                            <input type="hidden" name="menuItemId" value="${menuItemId}" />
+                            <input type="hidden" name="menuItemName" value="${menuItemName}" />
+                            <input type="hidden" name="unitPrice" value="${menuItemPrice}" />
+                            <input type="number" name="quantity" value="${quantity}" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" />
+                            <input type="text" name="specialInstructions" value="" placeholder="Note" class="form-control form-control-sm w-auto item-note" style="max-width:120px;" />
+                        </form>
+                    </td>
+                    <td class="align-middle">${quantity}</td>
+                    <td class="align-middle">₹${menuItemPrice.toFixed(2)}</td>
+                    <td class="align-middle">₹${subtotal}</td>
+                    <td class="align-middle">
+                        <span class="badge bg-info">New (Unsaved)</span>
+                    </td>
+                </tr>
+            `;
+            
+            // Add the row to the table
+            var tbody = $('table tbody');
+            // If there's a table-secondary row at the start (course header), add after it
+            var firstRow = tbody.find('tr').first();
+            if (firstRow.hasClass('table-secondary')) {
+                $(newRow).insertAfter(firstRow);
+            } else {
+                tbody.prepend(newRow);
+            }
+            
+            // Store the new item data
+            window.newOrderItems.push({
+                tempId: tempId,
+                menuItemId: menuItemId,
+                menuItemName: menuItemName,
+                quantity: quantity,
+                unitPrice: menuItemPrice,
+                specialInstructions: '',
+                isNew: true
+            });
+            
+            // Clear the form for next entry
+            $('#menuItemInput').val('').focus();
+            $('#quantity').val(1);
+            
+            // Update subtotal
+            updateOrderTotals();
+            
+            // Show notification
+            toastr.success('Item added. Remember to click "Save Order Details" to save to database.');
+        }
+        
+        // Function to remove a new (unsaved) item
+        function removeNewItem(tempId) {
+            $(`tr[data-temp-id="${tempId}"]`).remove();
+            
+            // Remove from newOrderItems array
+            window.newOrderItems = window.newOrderItems.filter(item => item.tempId !== tempId);
+            
+            // Update subtotal
+            updateOrderTotals();
+        }
+        
+        // Update order totals when items are added/removed
+        function updateOrderTotals() {
+            var subtotal = 0;
+            
+            // Calculate from existing items
+            $('table tbody tr').not('.table-secondary').each(function() {
+                var itemSubtotal = $(this).find('td:nth-child(5)').text().replace('₹', '');
+                if (!isNaN(parseFloat(itemSubtotal))) {
+                    subtotal += parseFloat(itemSubtotal);
+                }
+            });
+            
+            // Update the subtotal display
+            $('table tfoot tr.table-light td:last-child strong').text('₹' + subtotal.toFixed(2));
+        }
+        
+        // Edit/Save/Cancel logic for order items
+        function enableEdit(btn) {
+            // First cancel any other item in edit mode
+            $('.order-item-edit-form').each(function() {
+                if ($(this).find('.save-item-btn').is(':visible')) {
+                    var cancelBtn = $(this).find('.cancel-edit-btn')[0];
+                    cancelEdit(cancelBtn);
+                }
+            });
+            
+            var form = btn.closest('.order-item-edit-form');
+            var row = $(form).closest('tr');
+            
+            // Enable fields
+            form.querySelector('.item-qty').removeAttribute('readonly');
+            form.querySelector('.item-qty').removeAttribute('disabled');
+            form.querySelector('.item-note').removeAttribute('readonly');
+            form.querySelector('.item-note').removeAttribute('disabled');
+            
+            // Show/hide buttons
+            btn.classList.add('d-none');
+            form.querySelector('.save-item-btn').classList.remove('d-none');
+            form.querySelector('.cancel-edit-btn').classList.remove('d-none');
+            
+            // Add visual indication that row is being edited
+            row.addClass('item-edit-active');
+            
+            // Focus on quantity field
+            form.querySelector('.item-qty').focus();
+        }
+        
+        function cancelEdit(btn) {
+            var form = btn.closest('.order-item-edit-form');
+            var row = $(form).closest('tr');
+            
+            // Reset form to original values
+            var orderItemId = form.querySelector('input[name="orderItemId"]').value;
+            var originalQty = $(row).find('td:nth-child(3)').text();
+            
+            // Disable fields and restore original values
+            form.querySelector('.item-qty').value = originalQty;
+            form.querySelector('.item-qty').setAttribute('readonly', 'readonly');
+            form.querySelector('.item-qty').setAttribute('disabled', 'disabled');
+            form.querySelector('.item-note').setAttribute('readonly', 'readonly');
+            form.querySelector('.item-note').setAttribute('disabled', 'disabled');
+            
+            // Show/hide buttons
+            btn.classList.add('d-none');
+            form.querySelector('.save-item-btn').classList.add('d-none');
+            form.querySelector('.edit-item-btn').classList.remove('d-none');
+            
+            // Remove visual indication
+            row.removeClass('item-edit-active');
+        }
+        
+        function saveEdit(btn) {
+            var form = btn.closest('.order-item-edit-form');
+            var row = $(form).closest('tr');
+            var orderId = form.querySelector('input[name="orderId"]').value;
+            var orderItemId = form.querySelector('input[name="orderItemId"]').value;
+            var quantity = form.querySelector('.item-qty').value;
+            var note = form.querySelector('.item-note').value;
+            
+            if (quantity < 1) {
+                toastr.error('Quantity must be at least 1');
+                return;
+            }
+            
+            // Disable form elements and show loading indicator
+            $(btn).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
+            $(btn).prop('disabled', true);
+            $('.item-qty, .item-note, .cancel-edit-btn', form).prop('disabled', true);
+            
+            // Send AJAX request to update the item
+            $.ajax({
+                url: '/Order/UpdateOrderItemQty',
+                type: 'POST',
+                data: {
+                    orderId: orderId,
+                    orderItemId: orderItemId,
+                    quantity: quantity,
+                    specialInstructions: note,
+                    __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Update displayed quantity and subtotal in table
+                        $(row).find('td:nth-child(3)').text(quantity);
+                        
+                        // Calculate new subtotal
+                        var unitPrice = parseFloat($(row).find('td:nth-child(4)').text().replace('₹', ''));
+                        var newSubtotal = (unitPrice * quantity).toFixed(2);
+                        $(row).find('td:nth-child(5)').text('₹' + newSubtotal);
+                        
+                        // Update UI
+                        form.querySelector('.item-qty').setAttribute('readonly', 'readonly');
+                        form.querySelector('.item-qty').setAttribute('disabled', 'disabled');
+                        form.querySelector('.item-note').setAttribute('readonly', 'readonly');
+                        form.querySelector('.item-note').setAttribute('disabled', 'disabled');
+                        btn.classList.add('d-none');
+                        form.querySelector('.cancel-edit-btn').classList.add('d-none');
+                        form.querySelector('.edit-item-btn').classList.remove('d-none');
+                        
+                        // Remove edit mode visual indication
+                        row.removeClass('item-edit-active');
+                        
+                        // Show success message
+                        toastr.success(response.message || 'Item updated successfully');
+                        
+                        // Highlight the updated row briefly to show it was updated
+                        $(row).css('background-color', '#d4edda').delay(1000).queue(function(next) {
+                            $(this).css('background-color', '');
+                            next();
+                        });
+                    } else {
+                        toastr.error(response.message || 'Error updating item');
+                        // Re-enable form elements
+                        $(btn).html('<i class="fas fa-save"></i> Save');
+                        $(btn).prop('disabled', false);
+                        $('.cancel-edit-btn', form).prop('disabled', false);
+                        $('.item-qty, .item-note', form).prop('disabled', false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    toastr.error('Failed to update item: ' + error);
+                    // Re-enable form elements
+                    $(btn).html('<i class="fas fa-save"></i> Save');
+                    $(btn).prop('disabled', false);
+                    $('.cancel-edit-btn', form).prop('disabled', false);
+                    $('.item-qty, .item-note', form).prop('disabled', false);
+                }
+            });
+        }
+        
+        // Submit all edits with order
+        function submitOrderWithEdits() {
+            // First check if any items are currently in edit mode
+            var itemsInEditMode = $('.order-item-edit-form').filter(function() {
+                return $(this).find('.save-item-btn').is(':visible');
+            });
+            
+            if (itemsInEditMode.length > 0) {
+                // Ask user if they want to save changes first
+                if (confirm('You have unsaved changes. Do you want to save them before submitting the order?')) {
+                    // Save each item in edit mode first
+                    itemsInEditMode.each(function() {
+                        var saveBtn = $(this).find('.save-item-btn')[0];
+                        saveEdit(saveBtn);
+                    });
+                    
+                    // Wait a bit to let the saves complete before submitting
+                    setTimeout(function() {
+                        submitOrderToServer();
+                    }, 1000);
+                    return;
+                }
+            }
+            
+            submitOrderToServer();
+        }
+        
+        function submitOrderToServer() {
+            var submitBtn = $('#submitOrderForm button');
+            var originalBtnText = submitBtn.html();
+            
+            // Show loading state
+            submitBtn.html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Submitting...');
+            submitBtn.prop('disabled', true);
+            
+            var forms = document.querySelectorAll('.order-item-edit-form:not(.new-item-form)');
+            var updateItems = [];
+            var orderId = $('#orderId').val();
+            
+            // First add all existing items updates
+            forms.forEach(function(form) {
+                var qty = parseInt(form.querySelector('.item-qty').value);
+                var note = form.querySelector('.item-note').value;
+                var orderItemId = parseInt(form.querySelector('input[name="orderItemId"]').value);
+                
+                updateItems.push({
+                    orderItemId: orderItemId,
+                    quantity: qty,
+                    specialInstructions: note,
+                    isNew: false
+                });
+            });
+            
+            // Now add all new items
+            if (window.newOrderItems && window.newOrderItems.length > 0) {
+                $('.new-item-form').each(function(index) {
+                    var form = $(this)[0];
+                    var tempId = parseInt(form.querySelector('input[name="orderItemId"]').value);
+                    var qty = parseInt(form.querySelector('.item-qty').value);
+                    var note = form.querySelector('.item-note').value;
+                    var menuItemId = parseInt(form.querySelector('input[name="menuItemId"]').value);
+                    
+                    // Update the stored new item data with form values
+                    window.newOrderItems.forEach(function(item) {
+                        if (item.tempId === tempId) {
+                            item.quantity = qty;
+                            item.specialInstructions = note;
+                        }
+                    });
+                    
+                    updateItems.push({
+                        tempId: tempId,
+                        menuItemId: menuItemId,
+                        quantity: qty,
+                        specialInstructions: note,
+                        isNew: true
+                    });
+                });
+            }
+            
+            if (updateItems.length === 0) {
+                console.log("No items to update, submitting form directly");
+                var form = document.getElementById('submitOrderForm');
+                if (form) {
+                    console.log("Form found, submitting to: " + form.action);
+                    form.submit();
+                } else {
+                    console.error("Submit form not found!");
+                    toastr.error("Error: Submit form not found");
+                }
+                return;
+            }
+            
+            // Use the new bulk update API
+            $.ajax({
+                url: '/Order/UpdateMultipleOrderItems?orderId=' + orderId,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(updateItems),
+                headers: {
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success("Items updated. Saving order details...");
+                        // Briefly show confirmation before submitting
+                        setTimeout(function() {
+                            // Make sure to submit the form properly
+                            var form = document.getElementById('submitOrderForm');
+                            if (form) {
+                                console.log("Form found after updates, submitting to: " + form.action);
+                                
+                                // Debug output
+                                console.log("Form details:");
+                                console.log("- Action: " + form.getAttribute('action'));
+                                console.log("- Method: " + form.getAttribute('method'));
+                                console.log("- OrderId: " + form.querySelector('input[name="orderId"]').value);
+                                
+                                form.submit();
+                            } else {
+                                console.error("Submit form not found after updates!");
+                                toastr.error('Submit form not found');
+                                submitBtn.html(originalBtnText);
+                                submitBtn.prop('disabled', false);
+                            }
+                        }, 500);
+                    } else {
+                        toastr.error(response.message);
+                        // Reset button
+                        submitBtn.html(originalBtnText);
+                        submitBtn.prop('disabled', false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    toastr.error('Error updating items: ' + error);
+                    // Reset button
+                    submitBtn.html(originalBtnText);
+                    submitBtn.prop('disabled', false);
+                }
+            });
+        }
     </script>
 }

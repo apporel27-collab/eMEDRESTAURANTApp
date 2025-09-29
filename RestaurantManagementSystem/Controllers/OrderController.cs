@@ -1524,7 +1524,6 @@ namespace RestaurantManagementSystem.Controllers
                     LEFT JOIN Tables t ON tt.TableId = t.Id
                     LEFT JOIN Users u ON o.UserId = u.Id
                     WHERE o.Status < 3 -- Not completed
-                    AND CAST(o.CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
                     ORDER BY o.CreatedAt DESC", connection))
                 {
                     using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
@@ -2352,33 +2351,253 @@ namespace RestaurantManagementSystem.Controllers
         {
             if (quantity < 1)
             {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Quantity must be at least 1." });
+                }
                 TempData["ErrorMessage"] = "Quantity must be at least 1.";
                 return RedirectToAction("Details", new { id = orderId });
             }
-            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+            
+            try
             {
-                connection.Open();
-                // Update quantity, subtotal, and special instructions
-                using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"UPDATE OrderItems SET Quantity = @Quantity, Subtotal = UnitPrice * @Quantity, SpecialInstructions = @SpecialInstructions WHERE Id = @OrderItemId", connection))
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
-                    command.Parameters.AddWithValue("@Quantity", quantity);
-                    command.Parameters.AddWithValue("@OrderItemId", orderItemId);
-                    command.Parameters.AddWithValue("@SpecialInstructions", (object?)specialInstructions ?? DBNull.Value);
-                    command.ExecuteNonQuery();
+                    connection.Open();
+                    // Update quantity, subtotal, and special instructions
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"UPDATE OrderItems SET Quantity = @Quantity, Subtotal = UnitPrice * @Quantity, SpecialInstructions = @SpecialInstructions WHERE Id = @OrderItemId", connection))
+                    {
+                        command.Parameters.AddWithValue("@Quantity", quantity);
+                        command.Parameters.AddWithValue("@OrderItemId", orderItemId);
+                        command.Parameters.AddWithValue("@SpecialInstructions", (object?)specialInstructions ?? DBNull.Value);
+                        command.ExecuteNonQuery();
+                    }
+                    // Recalculate order totals
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Orders
+                        SET Subtotal = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId),
+                            TotalAmount = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId) + ISNULL(TaxAmount,0) + ISNULL(TipAmount,0) - ISNULL(DiscountAmount,0)
+                        WHERE Id = @OrderId", connection))
+                    {
+                        command.Parameters.AddWithValue("@OrderId", orderId);
+                        command.ExecuteNonQuery();
+                    }
                 }
-                // Recalculate order totals
-                using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    UPDATE Orders
-                    SET Subtotal = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId),
-                        TotalAmount = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId) + ISNULL(TaxAmount,0) + ISNULL(TipAmount,0) - ISNULL(DiscountAmount,0)
-                    WHERE Id = @OrderId", connection))
+                
+                // For AJAX requests, return JSON
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 {
-                    command.Parameters.AddWithValue("@OrderId", orderId);
-                    command.ExecuteNonQuery();
+                    return Json(new { success = true, message = "Item updated successfully." });
+                }
+                
+                // For standard requests, redirect with message
+                TempData["SuccessMessage"] = "Item updated.";
+                return RedirectToAction("Details", new { id = orderId });
+            }
+            catch (Exception ex)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return Json(new { success = false, message = "Error updating item: " + ex.Message });
+                }
+                
+                TempData["ErrorMessage"] = "Error updating item: " + ex.Message;
+                return RedirectToAction("Details", new { id = orderId });
+            }
+        }
+        
+        // Model for bulk updates
+        public class OrderItemUpdateModel
+        {
+            public int OrderItemId { get; set; }
+            public int Quantity { get; set; }
+            public string SpecialInstructions { get; set; }
+            public bool IsNew { get; set; }
+            public int? MenuItemId { get; set; }  // For new items
+            public int? TempId { get; set; }      // For tracking new items client-side
+        }
+        
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult UpdateMultipleOrderItems(int orderId, [FromBody] List<OrderItemUpdateModel> items)
+        {
+            if (items == null || !items.Any())
+            {
+                return Json(new { success = false, message = "No items to update." });
+            }
+            
+            try
+            {
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            // First handle existing item updates
+                            var existingItems = items.Where(i => !i.IsNew).ToList();
+                            var newItems = items.Where(i => i.IsNew).ToList();
+                            
+                            // Update each existing item
+                            foreach (var item in existingItems)
+                            {
+                                if (item.Quantity < 1)
+                                {
+                                    transaction.Rollback();
+                                    return Json(new { success = false, message = $"Item #{item.OrderItemId}: Quantity must be at least 1." });
+                                }
+                                
+                                using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                    UPDATE OrderItems 
+                                    SET Quantity = @Quantity, 
+                                        Subtotal = UnitPrice * @Quantity, 
+                                        SpecialInstructions = @SpecialInstructions 
+                                    WHERE Id = @OrderItemId", connection, transaction))
+                                {
+                                    command.Parameters.AddWithValue("@Quantity", item.Quantity);
+                                    command.Parameters.AddWithValue("@OrderItemId", item.OrderItemId);
+                                    command.Parameters.AddWithValue("@SpecialInstructions", 
+                                        string.IsNullOrEmpty(item.SpecialInstructions) ? DBNull.Value : (object)item.SpecialInstructions);
+                                    command.ExecuteNonQuery();
+                                }
+                            }
+                            
+                            // Insert each new item
+                            foreach (var item in newItems)
+                            {
+                                if (item.Quantity < 1 || !item.MenuItemId.HasValue)
+                                {
+                                    transaction.Rollback();
+                                    return Json(new { success = false, message = "Invalid new item data." });
+                                }
+                                
+                                // First get the unit price of the menu item
+                                decimal unitPrice = 0;
+                                using (var command = new Microsoft.Data.SqlClient.SqlCommand(
+                                    "SELECT Price FROM MenuItems WHERE Id = @MenuItemId", connection, transaction))
+                                {
+                                    command.Parameters.AddWithValue("@MenuItemId", item.MenuItemId.Value);
+                                    var result = command.ExecuteScalar();
+                                    if (result != null)
+                                    {
+                                        unitPrice = Convert.ToDecimal(result);
+                                    }
+                                    else
+                                    {
+                                        transaction.Rollback();
+                                        return Json(new { success = false, message = $"Menu item {item.MenuItemId} not found." });
+                                    }
+                                }
+                                
+                                // Insert the new order item
+                                using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                    INSERT INTO OrderItems 
+                                    (OrderId, MenuItemId, Quantity, UnitPrice, Subtotal, Status, SpecialInstructions, CreatedAt) 
+                                    VALUES 
+                                    (@OrderId, @MenuItemId, @Quantity, @UnitPrice, @Subtotal, 0, @SpecialInstructions, GETDATE());
+                                    
+                                    SELECT SCOPE_IDENTITY();", connection, transaction))
+                                {
+                                    command.Parameters.AddWithValue("@OrderId", orderId);
+                                    command.Parameters.AddWithValue("@MenuItemId", item.MenuItemId.Value);
+                                    command.Parameters.AddWithValue("@Quantity", item.Quantity);
+                                    command.Parameters.AddWithValue("@UnitPrice", unitPrice);
+                                    command.Parameters.AddWithValue("@Subtotal", unitPrice * item.Quantity);
+                                    command.Parameters.AddWithValue("@SpecialInstructions", 
+                                        string.IsNullOrEmpty(item.SpecialInstructions) ? DBNull.Value : (object)item.SpecialInstructions);
+                                    
+                                    // Get the new item ID
+                                    var newItemId = Convert.ToInt32(command.ExecuteScalar());
+                                    item.OrderItemId = newItemId; // Update the model with the real ID
+                                }
+                            }
+                            
+                            // Recalculate order totals
+                            using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                UPDATE Orders
+                                SET Subtotal = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId),
+                                    TotalAmount = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId) + ISNULL(TaxAmount,0) + ISNULL(TipAmount,0) - ISNULL(DiscountAmount,0)
+                                WHERE Id = @OrderId", connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@OrderId", orderId);
+                                command.ExecuteNonQuery();
+                            }
+                            
+                            transaction.Commit();
+                            return Json(new { success = true, message = "All items updated successfully." });
+                        }
+                        catch (Exception ex)
+                        {
+                            transaction.Rollback();
+                            return Json(new { success = false, message = "Error updating items: " + ex.Message });
+                        }
+                    }
                 }
             }
-            TempData["SuccessMessage"] = "Item updated.";
-            return RedirectToAction("Details", new { id = orderId });
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error updating items: " + ex.Message });
+            }
+        }
+        
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult SubmitOrder(int orderId)
+        {
+            try
+            {
+                // Only update the order details and calculate totals
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            // Update order items prices and subtotals to ensure they're current
+                            using (var command = new Microsoft.Data.SqlClient.SqlCommand(
+                                @"UPDATE OrderItems 
+                                  SET Subtotal = Quantity * UnitPrice 
+                                  WHERE OrderId = @OrderId", 
+                                connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@OrderId", orderId);
+                                command.ExecuteNonQuery();
+                            }
+                            
+                            // Recalculate order totals based on current items
+                            using (var command = new Microsoft.Data.SqlClient.SqlCommand(
+                                @"UPDATE Orders
+                                  SET Subtotal = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId),
+                                      TotalAmount = (SELECT SUM(Subtotal) FROM OrderItems WHERE OrderId = @OrderId) + 
+                                                    ISNULL(TaxAmount,0) + ISNULL(TipAmount,0) - ISNULL(DiscountAmount,0),
+                                      UpdatedAt = GETDATE()
+                                  WHERE Id = @OrderId", 
+                                connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@OrderId", orderId);
+                                command.ExecuteNonQuery();
+                            }
+                            
+                            transaction.Commit();
+                        }
+                        catch (Exception ex)
+                        {
+                            transaction.Rollback();
+                            throw new Exception("Failed to update order details: " + ex.Message);
+                        }
+                    }
+                }
+                
+                TempData["SuccessMessage"] = "Order details saved successfully.";
+                return RedirectToAction("Details", new { id = orderId });
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error submitting order: " + ex.Message;
+                return RedirectToAction("Details", new { id = orderId });
+            }
         }
     }
 }

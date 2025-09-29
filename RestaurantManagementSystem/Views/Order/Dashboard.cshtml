@@ -86,7 +86,8 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Active Orders</h5>
+                    <h5 class="mb-0">Active Orders (All Pending Orders)</h5>
+                    <small class="text-muted">Shows all orders that are not yet completed or paid</small>
                 </div>
                 <div class="card-body">
                     @if (Model.ActiveOrders.Any())
@@ -100,7 +101,8 @@
                                         <th>Table/Customer</th>
                                         <th>Server</th>
                                         <th>Status</th>
-                                        <th>Time</th>
+                                        <th>Date</th>
+                                        <th>Duration</th>
                                         <th>Items</th>
                                         <th>Total</th>
                                         <th>Actions</th>
@@ -135,6 +137,7 @@
                                                 }
                                                 <span class="badge @badgeClass">@order.StatusDisplay</span>
                                             </td>
+                                            <td>@order.CreatedAt.ToString("dd/MM HH:mm")</td>
                                             <td>@order.Duration.ToString(@"hh\:mm")</td>
                                             <td>@order.ItemCount</td>
                                             <td><strong>$@order.TotalAmount.ToString("F2")</strong></td>
