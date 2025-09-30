@@ -72,40 +72,40 @@
                                 <div class="card-body">
                                     <div class="row mb-2">
                                         <div class="col-6 text-end text-muted">Subtotal:</div>
-                                        <div class="col-6 text-end">$@Model.Subtotal.ToString("F2")</div>
+                                        <div class="col-6 text-end">₹@Model.Subtotal.ToString("F2")</div>
                                     </div>
                                     <div class="row mb-2">
                                         <div class="col-6 text-end text-muted">Tax:</div>
-                                        <div class="col-6 text-end">$@Model.TaxAmount.ToString("F2")</div>
+                                        <div class="col-6 text-end">₹@Model.TaxAmount.ToString("F2")</div>
                                     </div>
                             @if (Model.DiscountAmount > 0)
                             {
                                 <div class="row mb-2">
                                     <div class="col-6 text-end">Discount:</div>
-                                    <div class="col-6 text-end text-danger">-$@Model.DiscountAmount.ToString("F2")</div>
+                                    <div class="col-6 text-end text-danger">-₹@Model.DiscountAmount.ToString("F2")</div>
                                 </div>
                             }
                             @if (Model.TipAmount > 0)
                             {
                                 <div class="row mb-2">
                                     <div class="col-6 text-end text-muted">Tip:</div>
-                                    <div class="col-6 text-end">$@Model.TipAmount.ToString("F2")</div>
+                                    <div class="col-6 text-end">₹@Model.TipAmount.ToString("F2")</div>
                                 </div>
                             }
                             <hr class="my-2">
                             <div class="row mb-2">
                                 <div class="col-6 text-end fw-semibold">Total:</div>
-                                <div class="col-6 text-end fw-semibold">$@Model.TotalAmount.ToString("F2")</div>
+                                <div class="col-6 text-end fw-semibold">₹@Model.TotalAmount.ToString("F2")</div>
                             </div>
                             <div class="row mb-2">
                                 <div class="col-6 text-end text-muted">Paid:</div>
-                                <div class="col-6 text-end text-success">$@Model.PaidAmount.ToString("F2")</div>
+                                <div class="col-6 text-end text-success">₹@Model.PaidAmount.ToString("F2")</div>
                             </div>
                             <hr class="my-2">
                             <div class="row mb-2">
                                 <div class="col-6 text-end fs-5 fw-bold">Remaining:</div>
                                 <div class="col-6 text-end fs-5 fw-bold @(Model.RemainingAmount <= 0 ? "text-success" : "text-danger")">
-                                    $@Model.RemainingAmount.ToString("F2")
+                                    ₹@Model.RemainingAmount.ToString("F2")
                                 </div>
                             </div>
                                 </div>
@@ -178,8 +178,8 @@
                                                     <div class="small text-muted">Ref: @payment.ReferenceNumber</div>
                                                 }
                                             </td>
-                                            <td class="fw-semibold">$@payment.Amount.ToString("F2")</td>
-                                            <td>$@payment.TipAmount.ToString("F2")</td>
+                                            <td class="fw-semibold">₹@payment.Amount.ToString("F2")</td>
+                                            <td>₹@payment.TipAmount.ToString("F2")</td>
                                             <td>
                                                 @{
                                                     var badgeClass = payment.Status switch
@@ -238,9 +238,9 @@
                                                 <div class="fw-semibold">@splitBill.CreatedAt.ToString("MM/dd/yyyy")</div>
                                                 <div class="small text-muted">@splitBill.CreatedAt.ToString("HH:mm")</div>
                                             </td>
-                                            <td>$@splitBill.Amount.ToString("F2")</td>
-                                            <td>$@splitBill.TaxAmount.ToString("F2")</td>
-                                            <td class="fw-semibold">$@(splitBill.Amount + splitBill.TaxAmount).ToString("F2")</td>
+                                            <td>₹@splitBill.Amount.ToString("F2")</td>
+                                            <td>₹@splitBill.TaxAmount.ToString("F2")</td>
+                                            <td class="fw-semibold">₹@(splitBill.Amount + splitBill.TaxAmount).ToString("F2")</td>
                                             <td>
                                                 @{
                                                     var badgeClass = splitBill.Status switch
@@ -276,9 +276,9 @@
                             <li class="list-group-item d-flex justify-content-between align-items-center px-4 py-3">
                                 <div>
                                     <div class="fw-semibold">@item.MenuItemName</div>
-                                    <div class="small text-muted">@item.Quantity x $@item.UnitPrice.ToString("F2")</div>
+                                    <div class="small text-muted">@item.Quantity x ₹@item.UnitPrice.ToString("F2")</div>
                                 </div>
-                                <div class="fw-bold">$@item.Subtotal.ToString("F2")</div>
+                                <div class="fw-bold">₹@item.Subtotal.ToString("F2")</div>
                             </li>
                         }
                     </ul>
