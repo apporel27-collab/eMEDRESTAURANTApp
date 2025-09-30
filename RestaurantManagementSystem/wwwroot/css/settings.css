@@ -1,0 +1,162 @@
+/* Restaurant Settings Page Specific Styles */
+
+/* Main Container */
+.settings-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Cards Styling */
+.settings-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    transition: all 0.2s ease;
+    border: none;
+    margin-bottom: 1.5rem;
+}
+
+.settings-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.settings-card .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    font-weight: 500;
+    padding: 0.75rem 1.25rem;
+}
+
+.settings-card .card-header i {
+    color: #3a7bd5;
+    margin-right: 0.5rem;
+}
+
+/* Content Styling */
+.settings-card .card-body {
+    padding: 1.25rem;
+}
+
+.settings-label {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 0.25rem;
+}
+
+.settings-value {
+    font-weight: 400;
+    margin-bottom: 1rem;
+}
+
+/* Logo Section */
+.logo-container {
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+.logo-placeholder {
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 200px;
+    background-color: #f8f9fa;
+}
+
+.logo-image {
+    max-height: 180px;
+    max-width: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+/* Form Elements */
+.settings-form .form-control {
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #ced4da;
+}
+
+.settings-form .form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.15);
+}
+
+.settings-form .form-group {
+    margin-bottom: 1.25rem;
+}
+
+.settings-form label {
+    font-weight: 500;
+    margin-bottom: 0.35rem;
+    color: #495057;
+}
+
+/* Action Buttons */
+.settings-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #f0f0f0;
+}
+
+.btn-settings {
+    padding: 0.5rem 1.25rem;
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+.btn-settings i {
+    margin-right: 0.5rem;
+}
+
+/* Info sections */
+.info-section dl {
+    margin-bottom: 0;
+}
+
+.info-section dt {
+    font-weight: 500;
+    color: #495057;
+}
+
+.info-section dd {
+    margin-bottom: 0.75rem;
+}
+
+/* Compact design */
+.compact-info dd, .compact-info dt {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+/* Currency Symbol Style */
+.currency-symbol {
+    font-weight: 500;
+}
+
+/* Help text */
+.help-text {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+/* Form validation */
+.field-validation-error {
+    color: #dc3545;
+    font-size: 0.85rem;
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.input-validation-error {
+    border-color: #dc3545;
+}

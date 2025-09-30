@@ -1,0 +1,428 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Extensions.Configuration;
+using RestaurantManagementSystem.Models;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace RestaurantManagementSystem.Controllers
+{
+    public class PaymentController : Controller
+    {
+        private readonly IConfiguration _configuration;
+        private readonly string _connectionString;
+        
+        public PaymentController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+            _connectionString = _configuration.GetConnectionString("DefaultConnection");
+        }
+        
+        // Payment Dashboard
+        public IActionResult Index(int id)
+        {
+            try
+            {
+                var model = GetPaymentViewModel(id);
+                
+                if (model == null)
+                {
+                    return NotFound();
+                }
+                
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error loading payment information: {ex.Message}";
+                return RedirectToAction("Details", "Order", new { id = id });
+            }
+        }
+        
+        // Helper methods
+        private PaymentViewModel GetPaymentViewModel(int orderId)
+        {
+            var model = new PaymentViewModel
+            {
+                OrderId = orderId
+            };
+            
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                
+                // First check if stored procedure exists
+                bool spExists = false;
+                using (var checkCmd = new SqlCommand(
+                    "SELECT COUNT(*) FROM sys.objects WHERE type = 'P' AND name = 'usp_GetOrderPaymentInfo'",
+                    connection))
+                {
+                    spExists = (int)checkCmd.ExecuteScalar() > 0;
+                }
+                
+                if (spExists)
+                {
+                    // Use stored procedure
+                    using (var command = new SqlCommand("usp_GetOrderPaymentInfo", connection))
+                    {
+                        command.CommandType = CommandType.StoredProcedure;
+                        command.Parameters.AddWithValue("@OrderId", orderId);
+                        
+                        using (var reader = command.ExecuteReader())
+                        {
+                            // First result set: Order details
+                            if (reader.Read())
+                            {
+                                model.OrderNumber = reader.GetString(1);
+                                model.Subtotal = reader.GetDecimal(2);
+                                model.TaxAmount = reader.GetDecimal(3);
+                                model.TipAmount = reader.GetDecimal(4);
+                                model.DiscountAmount = reader.GetDecimal(5);
+                                model.TotalAmount = reader.GetDecimal(6);
+                                model.PaidAmount = reader.GetDecimal(7);
+                                model.RemainingAmount = reader.GetDecimal(8);
+                                model.TableName = reader.GetString(9);
+                                model.OrderStatus = reader.GetInt32(10);
+                                model.OrderStatusDisplay = model.OrderStatus switch
+                                {
+                                    0 => "Open",
+                                    1 => "In Progress",
+                                    2 => "Ready",
+                                    3 => "Completed",
+                                    4 => "Cancelled",
+                                    _ => "Unknown"
+                                };
+                            }
+                            else
+                            {
+                                return null; // Order not found
+                            }
+                            
+                            // Move to next result set: Order items
+                            reader.NextResult();
+                            
+                            while (reader.Read())
+                            {
+                                model.OrderItems.Add(new OrderItemViewModel
+                                {
+                                    Id = reader.GetInt32(0),
+                                    MenuItemId = reader.GetInt32(1),
+                                    MenuItemName = reader.GetString(2),
+                                    Quantity = reader.GetInt32(3),
+                                    UnitPrice = reader.GetDecimal(4),
+                                    Subtotal = reader.GetDecimal(5)
+                                });
+                            }
+                            
+                            // Move to next result set: Payments
+                            reader.NextResult();
+                            
+                            while (reader.Read())
+                            {
+                                model.Payments.Add(new Payment
+                                {
+                                    Id = reader.GetInt32(0),
+                                    PaymentMethodId = reader.GetInt32(1),
+                                    PaymentMethodName = reader.GetString(2),
+                                    PaymentMethodDisplay = reader.GetString(3),
+                                    Amount = reader.GetDecimal(4),
+                                    TipAmount = reader.GetDecimal(5),
+                                    Status = reader.GetInt32(6),
+                                    ReferenceNumber = reader.IsDBNull(7) ? null : reader.GetString(7),
+                                    LastFourDigits = reader.IsDBNull(8) ? null : reader.GetString(8),
+                                    CardType = reader.IsDBNull(9) ? null : reader.GetString(9),
+                                    AuthorizationCode = reader.IsDBNull(10) ? null : reader.GetString(10),
+                                    Notes = reader.IsDBNull(11) ? null : reader.GetString(11),
+                                    ProcessedByName = reader.IsDBNull(12) ? null : reader.GetString(12),
+                                    CreatedAt = reader.GetDateTime(13)
+                                });
+                            }
+                            
+                            // Check if there's a fourth result set for payment methods
+                            if (reader.NextResult())
+                            {
+                                while (reader.Read())
+                                {
+                                    model.AvailablePaymentMethods.Add(new PaymentMethodViewModel
+                                    {
+                                        Id = reader.GetInt32(0),
+                                        Name = reader.GetString(1),
+                                        DisplayName = reader.GetString(2),
+                                        RequiresCardInfo = reader.GetBoolean(3),
+                                        RequiresCardPresent = reader.GetBoolean(4),
+                                        RequiresApproval = reader.GetBoolean(5)
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                // Fallback for payment methods if not in stored procedure
+                                LoadPaymentMethodsFallback(connection, model);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Fallback to inline SQL
+                    TempData["WarningMessage"] = "Using fallback payment system. For better performance, please run the stored procedure setup script.";
+                    LoadOrderDetailsFallback(connection, model, orderId);
+                    LoadOrderItemsFallback(connection, model, orderId);
+                    LoadPaymentsFallback(connection, model, orderId);
+                    LoadPaymentMethodsFallback(connection, model);
+                }
+                
+                // Always load split bills separately
+                LoadSplitBillsFallback(connection, model, orderId);
+            }
+            
+            return model;
+        }
+        
+        private void LoadOrderDetailsFallback(SqlConnection connection, PaymentViewModel model, int orderId)
+        {
+            using (var command = new SqlCommand(@"
+                SELECT 
+                    o.Id,
+                    o.OrderNumber,
+                    o.Subtotal,
+                    o.TaxAmount,
+                    o.TipAmount,
+                    o.DiscountAmount,
+                    o.TotalAmount,
+                    ISNULL(SUM(p.Amount + p.TipAmount), 0) AS PaidAmount,
+                    (o.TotalAmount - ISNULL(SUM(p.Amount + p.TipAmount), 0)) AS RemainingAmount,
+                    ISNULL(t.TableName, 'N/A') AS TableName,
+                    o.Status
+                FROM 
+                    Orders o
+                LEFT JOIN 
+                    Payments p ON o.Id = p.OrderId AND p.Status = 1 -- Approved payments only
+                LEFT JOIN 
+                    TableTurnovers tt ON o.TableTurnoverId = tt.Id
+                LEFT JOIN
+                    Tables t ON tt.TableId = t.Id
+                WHERE 
+                    o.Id = @OrderId
+                GROUP BY
+                    o.Id,
+                    o.OrderNumber,
+                    o.Subtotal,
+                    o.TaxAmount,
+                    o.TipAmount,
+                    o.DiscountAmount,
+                    o.TotalAmount,
+                    t.TableName,
+                    o.Status", connection))
+            {
+                command.Parameters.AddWithValue("@OrderId", orderId);
+                
+                using (var reader = command.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        model.OrderNumber = reader.GetString(1);
+                        model.Subtotal = reader.GetDecimal(2);
+                        model.TaxAmount = reader.GetDecimal(3);
+                        model.TipAmount = reader.GetDecimal(4);
+                        model.DiscountAmount = reader.GetDecimal(5);
+                        model.TotalAmount = reader.GetDecimal(6);
+                        model.PaidAmount = reader.GetDecimal(7);
+                        model.RemainingAmount = reader.GetDecimal(8);
+                        model.TableName = reader.GetString(9);
+                        model.OrderStatus = reader.GetInt32(10);
+                        model.OrderStatusDisplay = model.OrderStatus switch
+                        {
+                            0 => "Open",
+                            1 => "In Progress",
+                            2 => "Ready",
+                            3 => "Completed",
+                            4 => "Cancelled",
+                            _ => "Unknown"
+                        };
+                    }
+                }
+            }
+        }
+        
+        private void LoadOrderItemsFallback(SqlConnection connection, PaymentViewModel model, int orderId)
+        {
+            using (var command = new SqlCommand(@"
+                SELECT
+                    oi.Id,
+                    oi.MenuItemId,
+                    mi.Name,
+                    oi.Quantity,
+                    oi.UnitPrice,
+                    oi.Subtotal
+                FROM
+                    OrderItems oi
+                INNER JOIN
+                    MenuItems mi ON oi.MenuItemId = mi.Id
+                WHERE
+                    oi.OrderId = @OrderId
+                    AND oi.Status != 5", connection))
+            {
+                command.Parameters.AddWithValue("@OrderId", orderId);
+                
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        model.OrderItems.Add(new OrderItemViewModel
+                        {
+                            Id = reader.GetInt32(0),
+                            MenuItemId = reader.GetInt32(1),
+                            MenuItemName = reader.GetString(2),
+                            Quantity = reader.GetInt32(3),
+                            UnitPrice = reader.GetDecimal(4),
+                            Subtotal = reader.GetDecimal(5)
+                        });
+                    }
+                }
+            }
+        }
+        
+        private void LoadPaymentsFallback(SqlConnection connection, PaymentViewModel model, int orderId)
+        {
+            using (var command = new SqlCommand(@"
+                SELECT
+                    p.Id,
+                    p.PaymentMethodId,
+                    pm.Name AS PaymentMethod,
+                    pm.DisplayName AS PaymentMethodDisplay,
+                    p.Amount,
+                    p.TipAmount,
+                    p.Status,
+                    p.ReferenceNumber,
+                    p.LastFourDigits,
+                    p.CardType,
+                    p.AuthorizationCode,
+                    p.Notes,
+                    p.ProcessedByName,
+                    p.CreatedAt
+                FROM
+                    Payments p
+                INNER JOIN
+                    PaymentMethods pm ON p.PaymentMethodId = pm.Id
+                WHERE
+                    p.OrderId = @OrderId", connection))
+            {
+                command.Parameters.AddWithValue("@OrderId", orderId);
+                
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        model.Payments.Add(new Payment
+                        {
+                            Id = reader.GetInt32(0),
+                            PaymentMethodId = reader.GetInt32(1),
+                            PaymentMethodName = reader.GetString(2),
+                            PaymentMethodDisplay = reader.GetString(3),
+                            Amount = reader.GetDecimal(4),
+                            TipAmount = reader.GetDecimal(5),
+                            Status = reader.GetInt32(6),
+                            ReferenceNumber = reader.IsDBNull(7) ? null : reader.GetString(7),
+                            LastFourDigits = reader.IsDBNull(8) ? null : reader.GetString(8),
+                            CardType = reader.IsDBNull(9) ? null : reader.GetString(9),
+                            AuthorizationCode = reader.IsDBNull(10) ? null : reader.GetString(10),
+                            Notes = reader.IsDBNull(11) ? null : reader.GetString(11),
+                            ProcessedByName = reader.IsDBNull(12) ? null : reader.GetString(12),
+                            CreatedAt = reader.GetDateTime(13)
+                        });
+                    }
+                }
+            }
+        }
+        
+        private void LoadPaymentMethodsFallback(SqlConnection connection, PaymentViewModel model)
+        {
+            using (var command = new SqlCommand(@"
+                SELECT
+                    pm.Id,
+                    pm.Name,
+                    pm.DisplayName,
+                    pm.RequiresCardInfo,
+                    ISNULL(pm.RequiresCardPresent, 0) as RequiresCardPresent,
+                    ISNULL(pm.RequiresApproval, 0) as RequiresApproval
+                FROM
+                    PaymentMethods pm
+                WHERE
+                    pm.IsActive = 1
+                ORDER BY
+                    ISNULL(pm.DisplayOrder, 999),
+                    pm.DisplayName", connection))
+            {
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        model.AvailablePaymentMethods.Add(new PaymentMethodViewModel
+                        {
+                            Id = reader.GetInt32(0),
+                            Name = reader.GetString(1),
+                            DisplayName = reader.GetString(2),
+                            RequiresCardInfo = reader.GetBoolean(3),
+                            RequiresCardPresent = reader.GetBoolean(4),
+                            RequiresApproval = reader.GetBoolean(5)
+                        });
+                    }
+                }
+            }
+        }
+        
+        private void LoadSplitBillsFallback(SqlConnection connection, PaymentViewModel model, int orderId)
+        {
+            // Check if SplitBills table exists
+            bool splitBillsExists = false;
+            using (var checkCmd = new SqlCommand(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'SplitBills'",
+                connection))
+            {
+                splitBillsExists = (int)checkCmd.ExecuteScalar() > 0;
+            }
+            
+            if (!splitBillsExists)
+                return;
+                
+            using (var command = new SqlCommand(@"
+                SELECT 
+                    sb.Id,
+                    sb.Amount,
+                    sb.TaxAmount,
+                    sb.Status,
+                    sb.Notes,
+                    sb.CreatedByName,
+                    sb.CreatedAt
+                FROM SplitBills sb
+                WHERE sb.OrderId = @OrderId
+                ORDER BY sb.CreatedAt DESC", connection))
+            {
+                command.Parameters.AddWithValue("@OrderId", orderId);
+                
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        model.SplitBills.Add(new SplitBill
+                        {
+                            Id = reader.GetInt32(0),
+                            OrderId = orderId,
+                            Amount = reader.GetDecimal(1),
+                            TaxAmount = reader.GetDecimal(2),
+                            Status = reader.GetInt32(3),
+                            Notes = reader.IsDBNull(4) ? null : reader.GetString(4),
+                            CreatedByName = reader.IsDBNull(5) ? null : reader.GetString(5),
+                            CreatedAt = reader.GetDateTime(6)
+                        });
+                    }
+                }
+            }
+        }
+    }
+}

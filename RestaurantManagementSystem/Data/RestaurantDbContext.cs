@@ -30,6 +30,9 @@ namespace RestaurantManagementSystem.Data
         public DbSet<MenuItemIngredient> MenuItemIngredients { get; set; } = null!;
         public DbSet<Recipe> Recipes { get; set; } = null!;
         public DbSet<RecipeStep> RecipeSteps { get; set; } = null!;
+        
+        // Restaurant Settings
+        public DbSet<RestaurantSettings> RestaurantSettings { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

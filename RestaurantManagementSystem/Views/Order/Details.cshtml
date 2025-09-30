@@ -509,6 +509,8 @@
             var menuItemInput = $('#menuItemInput').val();
             var quantity = parseInt($('#quantity').val()) || 1;
             
+            console.log('Adding menu item: ' + menuItemInput + ' with quantity: ' + quantity);
+            
             if (!menuItemInput) {
                 toastr.error('Please select a menu item');
                 return;
@@ -537,23 +539,49 @@
                 });
             } else {
                 // Find by name
+                var matched = false;
                 $('#menuItems option').each(function() {
-                    if ($(this).val() === menuItemInput) {
+                    // Exact match or starts with the input (partial match)
+                    if ($(this).val() === menuItemInput || $(this).val().toLowerCase().startsWith(menuItemInput.toLowerCase())) {
                         menuItemId = $(this).data('id');
                         menuItemName = $(this).val();
                         menuItemPrice = parseFloat($(this).data('price'));
+                        matched = true;
                         return false; // break the loop
                     }
                 });
+                
+                // If no direct match, try a more flexible approach
+                if (!matched) {
+                    $('#menuItems option').each(function() {
+                        // Check if input text is included in any option
+                        if ($(this).val().toLowerCase().includes(menuItemInput.toLowerCase())) {
+                            menuItemId = $(this).data('id');
+                            menuItemName = $(this).val();
+                            menuItemPrice = parseFloat($(this).data('price'));
+                            matched = true;
+                            return false; // break the loop
+                        }
+                    });
+                }
             }
             
             if (!menuItemId || !menuItemPrice || !menuItemName) {
-                toastr.error('Menu item not found');
+                console.error('Menu item not found in datalist. Input value:', menuItemInput);
+                console.log('Available options:', $('#menuItems option').map(function() { 
+                    return { val: $(this).val(), id: $(this).data('id'), price: $(this).data('price') }; 
+                }).get());
+                toastr.error('Menu item not found. Please select an item from the dropdown list.');
                 return;
             }
             
+            console.log('Menu item found:', { id: menuItemId, name: menuItemName, price: menuItemPrice });
+            
             // Calculate subtotal
             var subtotal = (quantity * menuItemPrice).toFixed(2);
+            
+            // Hide the "no items" message if it exists
+            $('.alert.alert-info:contains("No items added")').hide();
             
             // Create a new row in the table
             var tempId = window.nextTempId--;
@@ -573,28 +601,80 @@
                             <input type="hidden" name="menuItemId" value="${menuItemId}" />
                             <input type="hidden" name="menuItemName" value="${menuItemName}" />
                             <input type="hidden" name="unitPrice" value="${menuItemPrice}" />
-                            <input type="number" name="quantity" value="${quantity}" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" />
+                            <input type="number" name="quantity" value="${quantity}" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" onchange="updateNewItemDetails(${tempId}, this.value, ${menuItemPrice})" />
                             <input type="text" name="specialInstructions" value="" placeholder="Note" class="form-control form-control-sm w-auto item-note" style="max-width:120px;" />
                         </form>
                     </td>
-                    <td class="align-middle">${quantity}</td>
+                    <td class="align-middle qty-display">${quantity}</td>
                     <td class="align-middle">₹${menuItemPrice.toFixed(2)}</td>
-                    <td class="align-middle">₹${subtotal}</td>
+                    <td class="align-middle subtotal-display">₹${subtotal}</td>
                     <td class="align-middle">
                         <span class="badge bg-info">New (Unsaved)</span>
                     </td>
                 </tr>
             `;
             
-            // Add the row to the table
-            var tbody = $('table tbody');
-            // If there's a table-secondary row at the start (course header), add after it
-            var firstRow = tbody.find('tr').first();
-            if (firstRow.hasClass('table-secondary')) {
-                $(newRow).insertAfter(firstRow);
+            // Check if the table exists, if not create it
+            var orderTable = $('table.table-striped');
+            if (orderTable.length === 0) {
+                // Create table if it doesn't exist
+                var tableHtml = `
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 90px">Actions</th>
+                                <th>Item</th>
+                                <th style="width: 80px">Qty</th>
+                                <th style="width: 100px">Unit Price</th>
+                                <th style="width: 100px">Subtotal</th>
+                                <th style="width: 120px">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="6" class="text-center">
+                                    <form id="submitOrderForm" action="/Order/SubmitOrder" method="post" style="display:inline;">
+                                        <input type="hidden" name="orderId" value="${$('#orderId').val()}" />
+                                        <button type="button" class="btn btn-primary btn-lg" onclick="submitOrderWithEdits()" 
+                                                data-bs-toggle="tooltip" title="Save all order details, quantities, prices, and recalculate totals">
+                                            <i class="fas fa-save"></i> Save Order Details
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr class="table-light">
+                                <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
+                                <td colspan="2">
+                                    <strong>₹${subtotal}</strong>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>`;
+                
+                // Replace the alert with the table
+                $('.alert.alert-info:contains("No items added")').replaceWith(tableHtml);
+                
+                // Get the new tbody reference
+                var tbody = $('table tbody');
+                tbody.append(newRow);
             } else {
-                tbody.prepend(newRow);
+                // Add the row to the existing table
+                var tbody = $('table tbody');
+                // If there's a table-secondary row at the start (course header), add after it
+                var firstRow = tbody.find('tr').first();
+                if (firstRow.hasClass('table-secondary')) {
+                    $(newRow).insertAfter(firstRow);
+                } else {
+                    tbody.prepend(newRow);
+                }
             }
+            
+            // Clear input field and reset quantity for next item
+            $('#menuItemInput').val('').focus();
+            $('#quantity').val(1);
             
             // Store the new item data
             window.newOrderItems.push({
@@ -616,6 +696,30 @@
             
             // Show notification
             toastr.success('Item added. Remember to click "Save Order Details" to save to database.');
+        }
+        
+        // Function to update details of a new item when quantity changes
+        function updateNewItemDetails(tempId, newQuantity, unitPrice) {
+            newQuantity = parseInt(newQuantity) || 1;
+            if (newQuantity < 1) newQuantity = 1;
+            
+            // Update quantity display
+            const row = $(`tr[data-temp-id="${tempId}"]`);
+            row.find('.qty-display').text(newQuantity);
+            
+            // Update subtotal
+            const subtotal = (newQuantity * unitPrice).toFixed(2);
+            row.find('.subtotal-display').text('₹' + subtotal);
+            
+            // Update in the newOrderItems array
+            const itemIndex = window.newOrderItems.findIndex(item => item.tempId === tempId);
+            if (itemIndex !== -1) {
+                window.newOrderItems[itemIndex].quantity = newQuantity;
+                window.newOrderItems[itemIndex].subtotal = parseFloat(subtotal);
+            }
+            
+            // Update overall order total
+            updateOrderTotals();
         }
         
         // Function to remove a new (unsaved) item
@@ -864,7 +968,29 @@
                 var form = document.getElementById('submitOrderForm');
                 if (form) {
                     console.log("Form found, submitting to: " + form.action);
-                    form.submit();
+                    
+                    // Ensure anti-forgery token is properly included
+                    var token = $('input[name="__RequestVerificationToken"]').val();
+                    if (!form.querySelector('input[name="__RequestVerificationToken"]')) {
+                        var tokenInput = document.createElement('input');
+                        tokenInput.type = 'hidden';
+                        tokenInput.name = '__RequestVerificationToken';
+                        tokenInput.value = token;
+                        form.appendChild(tokenInput);
+                    }
+                    
+                    // Log form data for debugging
+                    console.log("Form data ready for submission:");
+                    console.log("- Antiforgery token present:", !!form.querySelector('input[name="__RequestVerificationToken"]'));
+                    console.log("- Order ID:", form.querySelector('input[name="orderId"]').value);
+                    
+                    try {
+                        // Now submit the form
+                        form.submit();
+                    } catch (e) {
+                        console.error("Error submitting form:", e);
+                        toastr.error("Error submitting form: " + e.message);
+                    }
                 } else {
                     console.error("Submit form not found!");
                     toastr.error("Error: Submit form not found");
@@ -880,6 +1006,9 @@
                 data: JSON.stringify(updateItems),
                 headers: {
                     'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                },
+                beforeSend: function (xhr) {
+                    xhr.setRequestHeader("X-CSRF-TOKEN", $('input[name="__RequestVerificationToken"]').val());
                 },
                 success: function(response) {
                     if (response.success) {
@@ -897,7 +1026,29 @@
                                 console.log("- Method: " + form.getAttribute('method'));
                                 console.log("- OrderId: " + form.querySelector('input[name="orderId"]').value);
                                 
-                                form.submit();
+                                // Ensure anti-forgery token is properly included
+                                var token = $('input[name="__RequestVerificationToken"]').val();
+                                if (!form.querySelector('input[name="__RequestVerificationToken"]')) {
+                                    var tokenInput = document.createElement('input');
+                                    tokenInput.type = 'hidden';
+                                    tokenInput.name = '__RequestVerificationToken';
+                                    tokenInput.value = token;
+                                    form.appendChild(tokenInput);
+                                }
+                                
+                                // Log form data for debugging
+                                console.log("Form data ready for submission after updates:");
+                                console.log("- Antiforgery token present:", !!form.querySelector('input[name="__RequestVerificationToken"]'));
+                                console.log("- Order ID:", form.querySelector('input[name="orderId"]').value);
+                                
+                                try {
+                                    form.submit();
+                                } catch (e) {
+                                    console.error("Error submitting form after updates:", e);
+                                    toastr.error("Error submitting form: " + e.message);
+                                    submitBtn.html(originalBtnText);
+                                    submitBtn.prop('disabled', false);
+                                }
                             } else {
                                 console.error("Submit form not found after updates!");
                                 toastr.error('Submit form not found');

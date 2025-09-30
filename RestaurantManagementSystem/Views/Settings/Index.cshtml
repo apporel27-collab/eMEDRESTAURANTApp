@@ -1,0 +1,151 @@
+@model RestaurantManagementSystem.ViewModels.RestaurantSettingsViewModel
+@{
+    ViewData["Title"] = "Restaurant Settings";
+}
+
+<link rel="stylesheet" href="~/css/settings.css" />
+
+<div class="container-fluid px-4 settings-container">
+    <h1 class="mt-4">Restaurant Settings</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="/Home/Index">Dashboard</a></li>
+        <li class="breadcrumb-item active">Restaurant Settings</li>
+    </ol>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="fas fa-check-circle me-2"></i>
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="settings-card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-store me-1"></i>
+                Restaurant Configuration
+            </div>
+            <div>
+                <a asp-action="Edit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-edit"></i> Edit Settings
+                </a>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="settings-card">
+                                <div class="card-header">
+                                    <i class="fas fa-building me-1"></i>
+                                    Restaurant Details
+                                </div>
+                                <div class="card-body info-section">
+                                    <dl class="row compact-info">
+                                        <dt class="col-sm-4">Restaurant Name</dt>
+                                        <dd class="col-sm-8 fw-bold">@Model.RestaurantName</dd>
+                                        
+                                        <dt class="col-sm-4">Address</dt>
+                                        <dd class="col-sm-8">
+                                            @Model.StreetAddress<br />
+                                            @Model.City, @Model.State - @Model.Pincode<br />
+                                            @Model.Country
+                                        </dd>
+                                        
+                                        <dt class="col-sm-4">Contact</dt>
+                                        <dd class="col-sm-8">
+                                            @if (!string.IsNullOrEmpty(Model.PhoneNumber))
+                                            {
+                                                <div><i class="fas fa-phone me-1 text-primary"></i> @Model.PhoneNumber</div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(Model.Email))
+                                            {
+                                                <div><i class="fas fa-envelope me-1 text-primary"></i> @Model.Email</div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(Model.Website))
+                                            {
+                                                <div><i class="fas fa-globe me-1 text-primary"></i> <a href="@Model.Website" target="_blank">@Model.Website</a></div>
+                                            }
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="settings-card">
+                                <div class="card-header">
+                                    <i class="fas fa-receipt me-1"></i>
+                                    Tax Information
+                                </div>
+                                <div class="card-body info-section">
+                                    <dl class="row compact-info">
+                                        <dt class="col-sm-5">GST Code</dt>
+                                        <dd class="col-sm-7 font-monospace">@Model.GSTCode</dd>
+                                        
+                                        <dt class="col-sm-5">Currency Symbol</dt>
+                                        <dd class="col-sm-7 currency-symbol">@Model.CurrencySymbol</dd>
+                                        
+                                        <dt class="col-sm-5">Default GST %</dt>
+                                        <dd class="col-sm-7">@Model.DefaultGSTPercentage%</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-card mb-3">
+                        <div class="card-header">
+                            <i class="fas fa-info-circle me-1"></i>
+                            System Information
+                        </div>
+                        <div class="card-body info-section">
+                            <dl class="row compact-info">
+                                <dt class="col-sm-3">Created On</dt>
+                                <dd class="col-sm-9 text-muted">@Model.CreatedAt</dd>
+                                
+                                <dt class="col-sm-3">Last Updated</dt>
+                                <dd class="col-sm-9 text-muted">@Model.UpdatedAt</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="settings-card h-100">
+                        <div class="card-header">
+                            <i class="fas fa-image me-1"></i>
+                            Restaurant Logo
+                        </div>
+                        <div class="logo-container">
+                            @if (!string.IsNullOrEmpty(Model.LogoPath))
+                            {
+                                <img src="@Model.LogoPath" alt="Restaurant Logo" class="logo-image" />
+                            }
+                            else
+                            {
+                                <div class="logo-placeholder">
+                                    <i class="fas fa-image fa-3x text-muted"></i>
+                                    <p class="mt-3 text-muted">No logo uploaded</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Enable Bootstrap tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            });
+        });
+    </script>
+}

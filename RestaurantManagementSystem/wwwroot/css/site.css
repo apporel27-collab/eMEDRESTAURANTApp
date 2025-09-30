@@ -63,6 +63,67 @@ body {
   font-weight: 500;
 }
 
+/* Process Payment Page Styling */
+.payment-method-selector {
+  position: relative;
+}
+
+.payment-icon {
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.7;
+  transition: all 0.3s;
+}
+
+.quick-amount, .quick-tip {
+  transition: all 0.2s;
+}
+
+.quick-amount.active, .quick-tip.active {
+  background-color: var(--bs-primary);
+  color: white;
+  border-color: var(--bs-primary);
+  transform: scale(1.05);
+  box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .075);
+}
+
+.quick-amount:hover, .quick-tip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15);
+}
+
+.form-floating.focused label {
+  color: var(--bs-primary);
+}
+
+.tip-preview {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.credit-card-icons .fab {
+  transition: all 0.3s;
+}
+
+.credit-card-icons .text-primary {
+  transform: scale(1.1);
+}
+
+#cardPaymentFields {
+  transition: all 0.3s ease;
+}
+
+.form-control, .form-select {
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
 /* Print styles */
 @media print {
     body {

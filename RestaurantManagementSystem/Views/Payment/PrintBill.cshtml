@@ -40,8 +40,8 @@
                         <tr>
                             <td>@item.MenuItemName</td>
                             <td class="text-center">@item.Quantity</td>
-                            <td class="text-end">$@item.UnitPrice.ToString("F2")</td>
-                            <td class="text-end">$@item.Subtotal.ToString("F2")</td>
+                            <td class="text-end">₹@item.UnitPrice.ToString("F2")</td>
+                            <td class="text-end">₹@item.Subtotal.ToString("F2")</td>
                         </tr>
                     }
                 </tbody>
@@ -54,38 +54,38 @@
             <table class="table table-sm">
                 <tr>
                     <td>Subtotal:</td>
-                    <td class="text-end">$@Model.Subtotal.ToString("F2")</td>
+                    <td class="text-end">₹@Model.Subtotal.ToString("F2")</td>
                 </tr>
                 <tr>
                     <td>Tax:</td>
-                    <td class="text-end">$@Model.TaxAmount.ToString("F2")</td>
+                    <td class="text-end">₹@Model.TaxAmount.ToString("F2")</td>
                 </tr>
                 @if (Model.DiscountAmount > 0)
                 {
                     <tr>
                         <td>Discount:</td>
-                        <td class="text-end text-danger">-$@Model.DiscountAmount.ToString("F2")</td>
+                        <td class="text-end text-danger">-₹@Model.DiscountAmount.ToString("F2")</td>
                     </tr>
                 }
                 @if (Model.TipAmount > 0)
                 {
                     <tr>
                         <td>Tip:</td>
-                        <td class="text-end">$@Model.TipAmount.ToString("F2")</td>
+                        <td class="text-end">₹@Model.TipAmount.ToString("F2")</td>
                     </tr>
                 }
                 <tr class="table-active">
                     <td><strong>Total:</strong></td>
-                    <td class="text-end"><strong>$@Model.TotalAmount.ToString("F2")</strong></td>
+                    <td class="text-end"><strong>₹@Model.TotalAmount.ToString("F2")</strong></td>
                 </tr>
                 <tr>
                     <td>Paid:</td>
-                    <td class="text-end text-success">$@Model.PaidAmount.ToString("F2")</td>
+                    <td class="text-end text-success">₹@Model.PaidAmount.ToString("F2")</td>
                 </tr>
                 <tr>
                     <td><strong>Remaining:</strong></td>
                     <td class="text-end @(Model.RemainingAmount <= 0 ? "text-success" : "text-danger")">
-                        <strong>$@Model.RemainingAmount.ToString("F2")</strong>
+                        <strong>₹@Model.RemainingAmount.ToString("F2")</strong>
                     </td>
                 </tr>
             </table>

@@ -64,6 +64,10 @@ namespace RestaurantManagementSystem.Models
         [Display(Name = "Item Type")]
         public string ItemType { get; set; }
         
+        [Display(Name = "GST Percentage")]
+        [Range(0, 100, ErrorMessage = "GST Percentage must be between 0% and 100%")]
+        public decimal? GSTPercentage { get; set; }
+        
         // Navigation properties
         public virtual ICollection<MenuItemAllergen> Allergens { get; set; } = new List<MenuItemAllergen>();
         public virtual ICollection<MenuItemIngredient> Ingredients { get; set; } = new List<MenuItemIngredient>();

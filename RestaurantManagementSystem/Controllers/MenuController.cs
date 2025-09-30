@@ -239,6 +239,7 @@ namespace RestaurantManagementSystem.Controllers
                 IsSpecial = menuItem.IsSpecial,
                 DiscountPercentage = menuItem.DiscountPercentage,
                 KitchenStationId = menuItem.KitchenStationId,
+                GSTPercentage = menuItem.GSTPercentage,
                 SelectedAllergens = menuItem.Allergens?.Select(a => a.AllergenId).ToList() ?? new List<int>(),
                 // Ingredients feature removed from Edit view model mapping
                 SelectedModifiers = menuItem.Modifiers?.Select(m => m.ModifierId).ToList() ?? new List<int>(),
@@ -633,7 +634,8 @@ namespace RestaurantManagementSystem.Controllers
                         m.[IsSpecial],
                         m.[DiscountPercentage],
                         m.[KitchenStationId],
-                        m.[TargetGP]
+                        m.[TargetGP],
+                        m.[GSTPercentage]
                     FROM [dbo].[MenuItems] m
                     INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
                     WHERE m.[Id] = @Id", connection))
@@ -662,6 +664,7 @@ namespace RestaurantManagementSystem.Controllers
                                 DiscountPercentage = SafeGetNullableDecimal(reader, "DiscountPercentage"),
                                 KitchenStationId = SafeGetNullableInt(reader, "KitchenStationId"),
                                 TargetGP = SafeGetNullableDecimal(reader, "TargetGP"),
+                                GSTPercentage = HasColumn(reader, "GSTPercentage") ? SafeGetNullableDecimal(reader, "GSTPercentage") : (decimal?)5.00m,
                                 Allergens = new List<MenuItemAllergen>(),
                                 // Ingredients list is no longer loaded
                                 Modifiers = new List<MenuItemModifier>()
@@ -750,10 +753,10 @@ namespace RestaurantManagementSystem.Controllers
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
                                           IsAvailable, PrepTime, CalorieCount, 
-                                          IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId)
+                                          IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId, GSTPercentage)
                     VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @ImagePath,
                             @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
-                            @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId);
+                            @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId, @GSTPercentage);
                     SELECT SCOPE_IDENTITY();", connection))
                 {
                     command.Parameters.AddWithValue("@PLUCode", model.PLUCode);
@@ -788,6 +791,11 @@ namespace RestaurantManagementSystem.Controllers
                     else
                         command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
                     
+                    if (model.GSTPercentage.HasValue)
+                        command.Parameters.AddWithValue("@GSTPercentage", model.GSTPercentage);
+                    else
+                        command.Parameters.AddWithValue("@GSTPercentage", 5.00); // Default to 5% if not provided
+                    
                     var result = command.ExecuteScalar();
                     menuItemId = Convert.ToInt32(result);
                 }
@@ -816,7 +824,8 @@ namespace RestaurantManagementSystem.Controllers
                         IsFeatured = @IsFeatured,
                         IsSpecial = @IsSpecial,
                         DiscountPercentage = @DiscountPercentage,
-                        KitchenStationId = @KitchenStationId
+                        KitchenStationId = @KitchenStationId,
+                        GSTPercentage = @GSTPercentage
                     WHERE Id = @Id", connection))
                 {
                     command.Parameters.AddWithValue("@Id", model.Id);
@@ -851,6 +860,11 @@ namespace RestaurantManagementSystem.Controllers
                         command.Parameters.AddWithValue("@KitchenStationId", model.KitchenStationId);
                     else
                         command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
+                    
+                    if (model.GSTPercentage.HasValue)
+                        command.Parameters.AddWithValue("@GSTPercentage", model.GSTPercentage);
+                    else
+                        command.Parameters.AddWithValue("@GSTPercentage", 5.00); // Default to 5% if not provided
                     
                     command.ExecuteNonQuery();
                 }

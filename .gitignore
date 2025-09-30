@@ -8,6 +8,9 @@ x86/
 [Ww][Ii][Nn]32/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
+
+# Ignore temp_repo directory
+temp_repo/
 bld/
 [Bb]in/
 [Oo]bj/

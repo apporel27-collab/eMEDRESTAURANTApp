@@ -62,6 +62,10 @@ namespace RestaurantManagementSystem.ViewModels
 
         [Display(Name = "Kitchen Station")]
         public int? KitchenStationId { get; set; }
+        
+        [Display(Name = "GST Percentage")]
+        [Range(0, 100, ErrorMessage = "GST Percentage must be between 0% and 100%")]
+        public decimal? GSTPercentage { get; set; }
 
         // Related data
         [Display(Name = "Allergens")]
