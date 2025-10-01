@@ -486,6 +486,18 @@
                 <text>toastr.error('@TempData["ErrorMessage"]');</text>
             }
             
+            // Build menu items lookup from datalist options for reliable matching
+            window.menuItemsMap = {};
+            $('#menuItems option').each(function(){
+                const name = $(this).val();
+                const idAttr = $(this).attr('data-id');
+                const priceAttr = $(this).attr('data-price');
+                if(!name || !idAttr) return;
+                const id = parseInt(idAttr,10);
+                const price = parseFloat(priceAttr);
+                window.menuItemsMap[name.toLowerCase()] = { id: id, name: name, price: isNaN(price)?0:price };
+            });
+
             // Track new items that haven't been saved to database yet
             window.newOrderItems = [];
             window.nextTempId = -1;  // Use negative IDs for unsaved items
@@ -506,79 +518,24 @@
         
         // Function to add a menu item to the table without saving to database
         function addMenuItemToTable() {
-            var menuItemInput = $('#menuItemInput').val();
-            var quantity = parseInt($('#quantity').val()) || 1;
-            
-            console.log('Adding menu item: ' + menuItemInput + ' with quantity: ' + quantity);
-            
-            if (!menuItemInput) {
-                toastr.error('Please select a menu item');
-                return;
+            const input = $('#menuItemInput').val().trim();
+            if(!input){ toastr.error('Please select a menu item'); return; }
+            let qty = parseInt($('#quantity').val(),10); if(isNaN(qty) || qty<1) qty=1;
+
+            // Direct exact lookup
+            let entry = window.menuItemsMap[input.toLowerCase()];
+            if(!entry){
+                // fuzzy: startsWith then contains
+                const lower = input.toLowerCase();
+                for(const k in window.menuItemsMap){ if(k.startsWith(lower)){ entry=window.menuItemsMap[k]; break; } }
+                if(!entry){ for(const k in window.menuItemsMap){ if(k.indexOf(lower)>-1){ entry=window.menuItemsMap[k]; break; } } }
             }
-            
-            if (quantity < 1) {
-                toastr.error('Quantity must be at least 1');
-                return;
-            }
-            
-            // Find the selected menu item from datalist
-            var menuItemId = null;
-            var menuItemPrice = null;
-            var menuItemName = null;
-            
-            // Check if it's a direct ID input
-            if (!isNaN(parseInt(menuItemInput))) {
-                menuItemId = parseInt(menuItemInput);
-                // Find the option with this ID
-                $('#menuItems option').each(function() {
-                    if ($(this).data('id') == menuItemId) {
-                        menuItemName = $(this).val();
-                        menuItemPrice = parseFloat($(this).data('price'));
-                        return false; // break the loop
-                    }
-                });
-            } else {
-                // Find by name
-                var matched = false;
-                $('#menuItems option').each(function() {
-                    // Exact match or starts with the input (partial match)
-                    if ($(this).val() === menuItemInput || $(this).val().toLowerCase().startsWith(menuItemInput.toLowerCase())) {
-                        menuItemId = $(this).data('id');
-                        menuItemName = $(this).val();
-                        menuItemPrice = parseFloat($(this).data('price'));
-                        matched = true;
-                        return false; // break the loop
-                    }
-                });
-                
-                // If no direct match, try a more flexible approach
-                if (!matched) {
-                    $('#menuItems option').each(function() {
-                        // Check if input text is included in any option
-                        if ($(this).val().toLowerCase().includes(menuItemInput.toLowerCase())) {
-                            menuItemId = $(this).data('id');
-                            menuItemName = $(this).val();
-                            menuItemPrice = parseFloat($(this).data('price'));
-                            matched = true;
-                            return false; // break the loop
-                        }
-                    });
-                }
-            }
-            
-            if (!menuItemId || !menuItemPrice || !menuItemName) {
-                console.error('Menu item not found in datalist. Input value:', menuItemInput);
-                console.log('Available options:', $('#menuItems option').map(function() { 
-                    return { val: $(this).val(), id: $(this).data('id'), price: $(this).data('price') }; 
-                }).get());
-                toastr.error('Menu item not found. Please select an item from the dropdown list.');
-                return;
-            }
-            
-            console.log('Menu item found:', { id: menuItemId, name: menuItemName, price: menuItemPrice });
+            if(!entry){ toastr.error('Menu item not found. Choose from list.'); return; }
+            const menuItemId = entry.id; const menuItemName = entry.name; const menuItemPrice = entry.price;
+            const subtotal = (qty * menuItemPrice).toFixed(2);
             
             // Calculate subtotal
-            var subtotal = (quantity * menuItemPrice).toFixed(2);
+            var subtotal = (qty * menuItemPrice).toFixed(2);
             
             // Hide the "no items" message if it exists
             $('.alert.alert-info:contains("No items added")').hide();
@@ -601,11 +558,11 @@
                             <input type="hidden" name="menuItemId" value="${menuItemId}" />
                             <input type="hidden" name="menuItemName" value="${menuItemName}" />
                             <input type="hidden" name="unitPrice" value="${menuItemPrice}" />
-                            <input type="number" name="quantity" value="${quantity}" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" onchange="updateNewItemDetails(${tempId}, this.value, ${menuItemPrice})" />
+                            <input type="number" name="quantity" value="${qty}" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" onchange="updateNewItemDetails(${tempId}, this.value, ${menuItemPrice})" />
                             <input type="text" name="specialInstructions" value="" placeholder="Note" class="form-control form-control-sm w-auto item-note" style="max-width:120px;" />
                         </form>
                     </td>
-                    <td class="align-middle qty-display">${quantity}</td>
+                    <td class="align-middle qty-display">${qty}</td>
                     <td class="align-middle">₹${menuItemPrice.toFixed(2)}</td>
                     <td class="align-middle subtotal-display">₹${subtotal}</td>
                     <td class="align-middle">
@@ -681,7 +638,7 @@
                 tempId: tempId,
                 menuItemId: menuItemId,
                 menuItemName: menuItemName,
-                quantity: quantity,
+                quantity: qty,
                 unitPrice: menuItemPrice,
                 specialInstructions: '',
                 isNew: true
@@ -695,7 +652,7 @@
             updateOrderTotals();
             
             // Show notification
-            toastr.success('Item added. Remember to click "Save Order Details" to save to database.');
+            toastr.success(menuItemName + ' added (unsaved). Click "Save Order Details" to persist.');
         }
         
         // Function to update details of a new item when quantity changes
@@ -746,7 +703,7 @@
             });
             
             // Update the subtotal display
-            $('#orderItemsTable tfoot tr.table-light td:last-child strong').text('₹' + subtotal.toFixed(2));
+            $('#orderSubtotalValue').text('₹' + subtotal.toFixed(2));
         }
         
         // Edit/Save/Cancel logic for order items
