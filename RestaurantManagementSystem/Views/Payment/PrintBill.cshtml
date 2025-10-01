@@ -121,6 +121,10 @@
             {
                 <p class="small">Email: @ViewBag.RestaurantSettings.Email</p>
             }
+            @if (!string.IsNullOrEmpty(ViewBag.RestaurantSettings.Website))
+            {
+                <p class="small">Website: @ViewBag.RestaurantSettings.Website</p>
+            }
         </div>
     </div>
 

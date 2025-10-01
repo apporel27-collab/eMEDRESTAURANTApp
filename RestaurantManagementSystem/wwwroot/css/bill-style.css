@@ -1,7 +1,8 @@
 .bill-header {
     margin-bottom: 20px;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 10px;
+    border-bottom: 2px solid #333;
+    padding-bottom: 15px;
+    position: relative;
 }
 
 .bill-header h2 {
@@ -53,11 +54,12 @@
 }
 
 .bill-footer {
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 1px dashed #ccc;
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 2px solid #333;
     font-size: 0.9rem;
     text-align: center;
+    position: relative;
 }
 
 .total-row {
@@ -77,18 +79,69 @@
     margin-bottom: 15px;
 }
 
+.watermark {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 8rem;
+    color: rgba(200, 200, 200, 0.1);
+    z-index: -1;
+    pointer-events: none;
+}
+
+.bill-header::after, .bill-footer::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, #333, #333 10px, transparent 10px, transparent 20px);
+}
+
+.bill-header::after {
+    bottom: -4px;
+}
+
+.bill-footer::before {
+    top: -4px;
+}
+
 /* Print-specific styles */
 @media print {
     body {
         font-size: 12pt;
+        background-color: white;
+        color: black;
     }
     
     .container {
         width: 100%;
         max-width: 100%;
+        padding: 0.5cm;
     }
     
     .no-print {
         display: none !important;
+    }
+    
+    .bill-table th {
+        background-color: #f8f8f8 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    /* Force page breaks */
+    .page-break-after {
+        page-break-after: always;
+    }
+    
+    .page-break-before {
+        page-break-before: always;
+    }
+    
+    /* Avoid page breaks inside elements */
+    .avoid-break {
+        page-break-inside: avoid;
     }
 }
