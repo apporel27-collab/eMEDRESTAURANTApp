@@ -228,12 +228,16 @@
         background-color: var(--light-color);
         border-radius: 10px;
         transition: all 0.3s ease;
+        text-decoration: none;
+        color: inherit;
+        display: block;
     }
     
     .quick-action-btn:hover {
         background-color: var(--primary-color);
         color: white;
         cursor: pointer;
+        text-decoration: none;
     }
     
     .quick-action-btn i {
@@ -304,14 +308,14 @@
         <div class="col-12">
             <h4 class="mb-3">Quick Actions</h4>
             <div class="quick-actions">
-                <div class="quick-action-btn">
+                <a href="/Order/Create" class="quick-action-btn">
                     <i class="fas fa-utensils"></i>
                     <span>New Order</span>
-                </div>
-                <div class="quick-action-btn">
-                    <i class="fas fa-calendar-check"></i>
-                    <span>Reservations</span>
-                </div>
+                </a>
+                <a href="/Reservation/Create" class="quick-action-btn">
+                    <i class="fas fa-calendar-plus"></i>
+                    <span>Reservation</span>
+                </a>
                 <div class="quick-action-btn">
                     <i class="fas fa-cash-register"></i>
                     <span>Checkout</span>
@@ -319,10 +323,6 @@
                 <div class="quick-action-btn">
                     <i class="fas fa-chart-bar"></i>
                     <span>Reports</span>
-                </div>
-                <div class="quick-action-btn">
-                    <i class="fas fa-cog"></i>
-                    <span>Settings</span>
                 </div>
             </div>
         </div>
