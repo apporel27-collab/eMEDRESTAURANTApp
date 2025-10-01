@@ -1,0 +1,42 @@
+/* Optimized CSS for Estimation Page */
+.estimation-page { padding: 15px; max-width: 1200px; margin: 0 auto; }
+.page-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.page-header h1 { margin: 0; font-size: 1.8rem; font-weight: 600; }
+.page-header p { margin: 8px 0 0 0; opacity: 0.9; font-size: 0.95rem; }
+.controls-section { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px; }
+.menu-section { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+.menu-header { background: #f8f9fa; padding: 15px; border-bottom: 1px solid #e9ecef; }
+.menu-header h3 { margin: 0; color: #495057; font-size: 1.2rem; }
+.form-control-sm { padding: 6px 8px; font-size: 0.875rem; }
+.btn-sm { padding: 6px 12px; font-size: 0.875rem; }
+.table-compact { margin-bottom: 0; }
+.table-compact th { padding: 8px; font-weight: 600; background-color: #f8f9fa; font-size: 0.875rem; }
+.table-compact td { padding: 8px; font-size: 0.875rem; vertical-align: middle; }
+.qty-input { width: 70px; text-align: center; }
+.estimation-section { background: #f8f9fa; border-top: 3px solid #4b6cb7; padding: 18px; border-radius: 8px; }
+.estimation-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.estimation-header h4 { margin: 0; color: #007bff; font-size: 1.1rem; }
+.estimation-summary { background: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); border: 1px solid #eef1f5; }
+.estimation-summary table thead th { border-bottom: 1px solid #e2e6ea; letter-spacing: .3px; }
+.estimate-totals { border: 1px solid #eef1f5; border-radius: 10px; }
+.estimate-totals .card-body { background: #ffffff; }
+.estimate-totals .card-footer { font-size: .7rem; }
+.estimation-table tbody tr:not(.total-row):hover { background: #f9fbfd; }
+.estimation-table td, .estimation-table th { padding: 6px 8px; }
+.total-row { background-color: #e8f5e8; font-weight: bold; }
+.print-hint { font-size: .65rem; }
+
+@media print {
+	body { background: #fff; }
+	.navbar, .controls-section, .menu-section, #printEstimateBtn, #clearEstimateBtn, .print-hint { display: none !important; }
+	.estimation-page { max-width: 100%; padding: 0; }
+	.estimation-section { border: none; padding: 0; }
+	.estimation-header { display: none; }
+	.estimate-totals { box-shadow: none; border: none; }
+	.estimation-summary { box-shadow: none; border: none; }
+	.estimation-table thead th { background: #f1f1f1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.loading-spinner { width: 1.5rem; height: 1.5rem; border: 2px solid #f3f3f3; border-top: 2px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.toast-notification { z-index: 9999; }
+@media (max-width: 768px) { .estimation-page { padding: 10px; } .controls-section { padding: 10px; } .table-responsive { font-size: 0.8rem; } }
