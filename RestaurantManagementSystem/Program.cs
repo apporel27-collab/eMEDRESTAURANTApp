@@ -47,6 +47,8 @@ namespace RestaurantManagementSystem
             builder.Services.AddScoped<UserRoleService>();
             builder.Services.AddScoped<AdminSetupService>();
             builder.Services.AddScoped<PasswordResetTool>();
+            // Hosted service for non-blocking admin initialization
+            builder.Services.AddHostedService<AdminInitializationHostedService>();
 
             // Configure SQL Server database connection using connection string from appsettings.json
             builder.Services.AddDbContext<RestaurantDbContext>(options =>
@@ -77,28 +79,7 @@ namespace RestaurantManagementSystem
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
 
-            // Ensure admin user exists on startup
-            using (var scope = app.Services.CreateScope())
-            {
-                var adminSetupService = scope.ServiceProvider.GetRequiredService<AdminSetupService>();
-                adminSetupService.EnsureAdminUserAsync().GetAwaiter().GetResult();
-                
-                // Reset admin password with BCrypt hash
-                if (app.Environment.IsDevelopment())
-                {
-                    try
-                    {
-                        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-                        logger.LogInformation("Resetting admin password for development environment");
-                        Utilities.AdminPasswordReset.ResetAdminPassword(scope.ServiceProvider).GetAwaiter().GetResult();
-                    }
-                    catch (Exception ex)
-                    {
-                        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-                        logger.LogError(ex, "Error resetting admin password");
-                    }
-                }
-            }
+            // Removed blocking admin initialization; now handled by AdminInitializationHostedService
 
             app.Run();
         }
