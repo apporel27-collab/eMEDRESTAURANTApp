@@ -831,6 +831,52 @@ namespace RestaurantManagementSystem.Controllers
                     return RedirectToAction("Index", "Order");
                 }
                 
+                // Get restaurant settings for bill header
+                RestaurantSettings settings = null;
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var command = new SqlCommand("SELECT * FROM RestaurantSettings", connection))
+                    {
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                settings = new RestaurantSettings
+                                {
+                                    RestaurantName = reader["RestaurantName"].ToString(),
+                                    StreetAddress = reader["StreetAddress"].ToString(),
+                                    City = reader["City"].ToString(),
+                                    State = reader["State"].ToString(),
+                                    Pincode = reader["Pincode"].ToString(),
+                                    Country = reader["Country"].ToString(),
+                                    GSTCode = reader["GSTCode"].ToString(),
+                                    PhoneNumber = reader["PhoneNumber"].ToString(),
+                                    Email = reader["Email"].ToString(),
+                                    Website = reader["Website"].ToString(),
+                                    CurrencySymbol = reader["CurrencySymbol"].ToString(),
+                                    DefaultGSTPercentage = reader["DefaultGSTPercentage"] != DBNull.Value 
+                                        ? Convert.ToDecimal(reader["DefaultGSTPercentage"]) 
+                                        : 0
+                                };
+                            }
+                        }
+                    }
+                }
+                
+                ViewBag.RestaurantSettings = settings ?? new RestaurantSettings
+                {
+                    RestaurantName = "Restaurant Management System",
+                    GSTCode = "Not Configured",
+                    StreetAddress = "",
+                    City = "",
+                    State = "",
+                    Pincode = "",
+                    Country = "",
+                    PhoneNumber = "",
+                    Email = ""
+                };
+                
                 return View(model);
             }
             catch (Exception ex)
