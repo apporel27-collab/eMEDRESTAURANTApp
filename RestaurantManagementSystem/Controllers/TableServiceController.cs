@@ -161,7 +161,8 @@ namespace RestaurantManagementSystem.Controllers
                 DirtyTables = 0,
                 ReservationCount = 0,
                 WaitlistCount = 0,
-                CurrentTurnovers = new List<ActiveTableViewModel>()
+                CurrentTurnovers = new List<ActiveTableViewModel>(),
+                UnoccupiedTables = new List<TableViewModel>()
             };
             
             using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
@@ -240,6 +241,29 @@ namespace RestaurantManagementSystem.Controllers
                                 Status = reader.GetInt32(6),
                                 ServerName = reader.IsDBNull(7) ? "Unassigned" : reader.GetString(7),
                                 Duration = reader.GetInt32(8)
+                            });
+                        }
+                    }
+                }
+                
+                // Get unoccupied tables
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                    SELECT Id, TableName, Capacity, Status
+                    FROM Tables
+                    WHERE Status = 0  -- Available
+                    ORDER BY TableName", connection))
+                {
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            model.UnoccupiedTables.Add(new TableViewModel
+                            {
+                                Id = reader.GetInt32(0),
+                                TableName = reader.GetString(1),
+                                Capacity = reader.GetInt32(2),
+                                Status = reader.GetInt32(3),
+                                StatusDisplay = "Available"
                             });
                         }
                     }

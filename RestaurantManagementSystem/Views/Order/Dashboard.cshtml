@@ -75,7 +75,7 @@
             <div class="card bg-info text-white metric-card">
                 <div class="card-body">
                     <h5>Today's Sales</h5>
-                    <h2>$@Model.TotalSales.ToString("F2")</h2>
+                    <h2>₹@Model.TotalSales.ToString("F2")</h2>
                 </div>
             </div>
         </div>
@@ -140,7 +140,7 @@
                                             <td>@order.CreatedAt.ToString("dd/MM HH:mm")</td>
                                             <td>@order.Duration.ToString(@"hh\:mm")</td>
                                             <td>@order.ItemCount</td>
-                                            <td><strong>$@order.TotalAmount.ToString("F2")</strong></td>
+                                            <td><strong>₹@order.TotalAmount.ToString("F2")</strong></td>
                                             <td>
                                                 <div class="btn-group">
                                                     <a asp-action="Details" asp-route-id="@order.Id" class="btn btn-sm btn-outline-primary" title="View Order">
@@ -202,7 +202,7 @@
                                             <td><span class="badge bg-secondary">Cancelled</span></td>
                                             <td>@order.Duration.ToString(@"hh\:mm")</td>
                                             <td>@order.ItemCount</td>
-                                            <td><strong>$@order.TotalAmount.ToString("F2")</strong></td>
+                                            <td><strong>₹@order.TotalAmount.ToString("F2")</strong></td>
                                             <td>
                                                 <a asp-action="Details" asp-route-id="@order.Id" class="btn btn-sm btn-outline-secondary" title="View Order">
                                                     <i class="fas fa-eye"></i>
@@ -245,7 +245,7 @@
                                         <tr class="align-middle text-center">
                                             <td><strong>@order.OrderNumber</strong></td>
                                             <td>@order.OrderTypeDisplay</td>
-                                            <td><strong>$@order.TotalAmount.ToString("F2")</strong></td>
+                                            <td><strong>₹@order.TotalAmount.ToString("F2")</strong></td>
                                             <td>
                                                 <a asp-action="Details" asp-route-id="@order.Id" class="btn btn-sm btn-outline-secondary" title="View Order">
                                                     <i class="fas fa-eye"></i>
@@ -259,7 +259,7 @@
                         <div class="alert alert-success mt-2 mb-0 py-2">
                             <strong>Total Completed:</strong> @Model.CompletedOrdersCount
                             <span class="mx-2">|</span>
-                            <strong>Total Sales:</strong> $@Model.TotalSales.ToString("F2")
+                            <strong>Total Sales:</strong> ₹@Model.TotalSales.ToString("F2")
                         </div>
                     }
                     else

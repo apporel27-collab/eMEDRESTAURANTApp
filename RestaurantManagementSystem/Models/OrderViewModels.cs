@@ -45,6 +45,9 @@ namespace RestaurantManagementSystem.Models
         [Display(Name = "Table")]
         public int? TableTurnoverId { get; set; }
         
+        [Display(Name = "Selected Table")]
+        public int? SelectedTableId { get; set; }
+        
         [Required]
         [Display(Name = "Order Type")]
         public int OrderType { get; set; } = 0; // Default to Dine-In

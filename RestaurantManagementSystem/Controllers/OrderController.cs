@@ -19,9 +19,15 @@ namespace RestaurantManagementSystem.Controllers
         }
         
         // Create New Order
-        public IActionResult Create()
+        public IActionResult Create(int? tableId = null)
         {
             var model = new CreateOrderViewModel();
+            
+            if (tableId.HasValue)
+            {
+                model.SelectedTableId = tableId.Value;
+                model.OrderType = 0; // 0 = Dine-In
+            }
             
             // Get available tables
             using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
@@ -98,6 +104,15 @@ namespace RestaurantManagementSystem.Controllers
                                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_CreateOrder", connection, transaction))
                                 {
                                     command.CommandType = CommandType.StoredProcedure;
+                                    
+                                    // If a table was selected from the TableService Dashboard
+                                    if (model.SelectedTableId.HasValue)
+                                    {
+                                        // Need to seat guests at this table first
+                                        int turnoverId = SeatGuestsAtTable(model.SelectedTableId.Value, "Walk-in", 2, connection, transaction); // Default 2 guests for walk-ins
+                                        model.TableTurnoverId = turnoverId;
+                                    }
+                                    
                                     command.Parameters.AddWithValue("@TableTurnoverId", model.TableTurnoverId ?? (object)DBNull.Value);
                                     command.Parameters.AddWithValue("@OrderType", model.OrderType);
                                     command.Parameters.AddWithValue("@UserId", GetCurrentUserId());
@@ -2598,6 +2613,34 @@ namespace RestaurantManagementSystem.Controllers
                 TempData["ErrorMessage"] = "Error submitting order: " + ex.Message;
                 return RedirectToAction("Details", new { id = orderId });
             }
+        }
+        
+        // Helper method to seat guests at a table and return the turnover ID
+        private int SeatGuestsAtTable(int tableId, string guestName, int partySize, Microsoft.Data.SqlClient.SqlConnection connection, Microsoft.Data.SqlClient.SqlTransaction transaction)
+        {
+            int turnoverId = 0;
+            
+            // First, change table status to occupied
+            using (Microsoft.Data.SqlClient.SqlCommand updateTableCmd = new Microsoft.Data.SqlClient.SqlCommand(
+                "UPDATE Tables SET Status = 2 WHERE Id = @TableId", connection, transaction))
+            {
+                updateTableCmd.Parameters.AddWithValue("@TableId", tableId);
+                updateTableCmd.ExecuteNonQuery();
+            }
+            
+            // Then create a new turnover record
+            using (Microsoft.Data.SqlClient.SqlCommand createTurnoverCmd = new Microsoft.Data.SqlClient.SqlCommand(
+                @"INSERT INTO TableTurnovers (TableId, GuestName, PartySize, SeatedAt, Status)
+                  OUTPUT INSERTED.Id
+                  VALUES (@TableId, @GuestName, @PartySize, GETDATE(), 0)", connection, transaction))
+            {
+                createTurnoverCmd.Parameters.AddWithValue("@TableId", tableId);
+                createTurnoverCmd.Parameters.AddWithValue("@GuestName", guestName);
+                createTurnoverCmd.Parameters.AddWithValue("@PartySize", partySize);
+                turnoverId = Convert.ToInt32(createTurnoverCmd.ExecuteScalar());
+            }
+            
+            return turnoverId;
         }
     }
 }

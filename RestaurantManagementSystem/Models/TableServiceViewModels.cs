@@ -101,5 +101,6 @@ namespace RestaurantManagementSystem.Models
         public int ReservationCount { get; set; }
         public int WaitlistCount { get; set; }
         public List<ActiveTableViewModel> CurrentTurnovers { get; set; } = new List<ActiveTableViewModel>();
+        public List<TableViewModel> UnoccupiedTables { get; set; } = new List<TableViewModel>();
     }
 }
