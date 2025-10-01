@@ -80,7 +80,7 @@
                     @if (Model.Items.Any())
                     {
                         <div class="table-responsive">
-                            <table class="table table-striped table-hover">
+                            <table id="orderItemsTable" class="table table-striped table-hover">
                                 <thead>
                                     <tr>
                                         <th style="width: 5%"></th>
@@ -615,7 +615,7 @@
             `;
             
             // Check if the table exists, if not create it
-            var orderTable = $('table.table-striped');
+            var orderTable = $('#orderItemsTable');
             if (orderTable.length === 0) {
                 // Create table if it doesn't exist
                 var tableHtml = `
@@ -658,11 +658,11 @@
                 $('.alert.alert-info:contains("No items added")').replaceWith(tableHtml);
                 
                 // Get the new tbody reference
-                var tbody = $('table tbody');
+                var tbody = $('#orderItemsTable tbody');
                 tbody.append(newRow);
             } else {
                 // Add the row to the existing table
-                var tbody = $('table tbody');
+                var tbody = $('#orderItemsTable tbody');
                 // If there's a table-secondary row at the start (course header), add after it
                 var firstRow = tbody.find('tr').first();
                 if (firstRow.hasClass('table-secondary')) {
@@ -738,7 +738,7 @@
             var subtotal = 0;
             
             // Calculate from existing items
-            $('table tbody tr').not('.table-secondary').each(function() {
+            $('#orderItemsTable tbody tr').not('.table-secondary').each(function() {
                 var itemSubtotal = $(this).find('td:nth-child(5)').text().replace('₹', '');
                 if (!isNaN(parseFloat(itemSubtotal))) {
                     subtotal += parseFloat(itemSubtotal);
@@ -746,7 +746,7 @@
             });
             
             // Update the subtotal display
-            $('table tfoot tr.table-light td:last-child strong').text('₹' + subtotal.toFixed(2));
+            $('#orderItemsTable tfoot tr.table-light td:last-child strong').text('₹' + subtotal.toFixed(2));
         }
         
         // Edit/Save/Cancel logic for order items
