@@ -6,20 +6,21 @@
     <h2 class="mb-3">Category Master</h2>
     @if (TempData["SuccessMessage"] != null)
     {
-        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        <div class="alert alert-success alert-dismissible fade show">@TempData["SuccessMessage"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
     }
     @if (TempData["ErrorMessage"] != null)
     {
-        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        <div class="alert alert-danger alert-dismissible fade show">@TempData["ErrorMessage"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
     }
     <div class="row g-3">
         <div class="col-md-5">
             <div class="card shadow-sm">
                 <div class="card-header"><strong id="formModeLabel">Create Category</strong></div>
                 <div class="card-body">
-                    <form id="categoryForm" method="post" asp-action="Save">
+                    <form id="categoryForm" method="post" asp-action="Save" novalidate>
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="Id" id="catId" value="0" />
+                        <div class="text-danger small mb-2" id="clientValidation"></div>
                         <div class="mb-3">
                             <label for="catName" class="form-label">Name</label>
                             <input type="text" class="form-control" id="catName" name="Name" required maxlength="80" />
@@ -90,6 +91,7 @@
             const formModeLabel = document.getElementById('formModeLabel');
             const saveBtnText = document.getElementById('saveBtnText');
             const resetBtn = document.getElementById('resetBtn');
+            const clientValidation = document.getElementById('clientValidation');
 
             function setCreateMode(){
                 idInput.value = '0';
@@ -116,6 +118,15 @@
             });
             resetBtn.addEventListener('click', setCreateMode);
             setCreateMode();
+
+            form.addEventListener('submit', (e) => {
+                clientValidation.textContent = '';
+                if (!nameInput.value.trim()) {
+                    e.preventDefault();
+                    clientValidation.textContent = 'Name is required.';
+                    nameInput.focus();
+                }
+            });
         })();
     </script>
 }

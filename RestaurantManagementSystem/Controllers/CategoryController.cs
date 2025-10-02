@@ -19,9 +19,17 @@ namespace RestaurantManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult Save([FromForm] Category model)
         {
+            // Manual validation (avoid silent model binding issues)
+            if (string.IsNullOrWhiteSpace(model.Name))
+            {
+                TempData["ErrorMessage"] = "Category name is required.";
+                return RedirectToAction(nameof(Index));
+            }
             if (!ModelState.IsValid)
             {
-                TempData["ErrorMessage"] = "Validation failed.";
+                var errs = ModelState.Where(kv => kv.Value?.Errors.Count > 0)
+                    .Select(kv => $"{kv.Key}: {string.Join("; ", kv.Value!.Errors.Select(e => e.ErrorMessage))}");
+                TempData["ErrorMessage"] = "Validation failed: " + string.Join(" | ", errs);
                 return RedirectToAction(nameof(Index));
             }
             if (model.Id == 0)
