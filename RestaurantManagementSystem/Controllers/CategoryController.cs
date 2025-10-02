@@ -17,39 +17,32 @@ namespace RestaurantManagementSystem.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create([FromForm] Category model)
+        public IActionResult Save([FromForm] Category model)
         {
             if (!ModelState.IsValid)
             {
                 TempData["ErrorMessage"] = "Validation failed.";
                 return RedirectToAction(nameof(Index));
             }
-            model.Id = 0; // ensure new
-            _db.Categories.Add(model);
-            _db.SaveChanges();
-            TempData["SuccessMessage"] = "Category created.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Update([FromForm] Category model)
-        {
-            var existing = _db.Categories.FirstOrDefault(c => c.Id == model.Id);
-            if (existing == null)
+            if (model.Id == 0)
             {
-                TempData["ErrorMessage"] = "Category not found.";
-                return RedirectToAction(nameof(Index));
+                _db.Categories.Add(model);
+                _db.SaveChanges();
+                TempData["SuccessMessage"] = "Category created.";
             }
-            if (!ModelState.IsValid)
+            else
             {
-                TempData["ErrorMessage"] = "Validation failed.";
-                return RedirectToAction(nameof(Index));
+                var existing = _db.Categories.FirstOrDefault(c => c.Id == model.Id);
+                if (existing == null)
+                {
+                    TempData["ErrorMessage"] = "Category not found.";
+                    return RedirectToAction(nameof(Index));
+                }
+                existing.Name = model.Name;
+                existing.IsActive = model.IsActive;
+                _db.SaveChanges();
+                TempData["SuccessMessage"] = "Category updated.";
             }
-            existing.Name = model.Name;
-            existing.IsActive = model.IsActive;
-            _db.SaveChanges();
-            TempData["SuccessMessage"] = "Category updated.";
             return RedirectToAction(nameof(Index));
         }
 

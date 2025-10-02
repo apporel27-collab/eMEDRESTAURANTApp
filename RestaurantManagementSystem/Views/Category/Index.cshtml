@@ -17,7 +17,7 @@
             <div class="card shadow-sm">
                 <div class="card-header"><strong id="formModeLabel">Create Category</strong></div>
                 <div class="card-body">
-                    <form id="categoryForm" method="post" asp-action="Create">
+                    <form id="categoryForm" method="post" asp-action="Save">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="Id" id="catId" value="0" />
                         <div class="mb-3">
@@ -92,7 +92,6 @@
             const resetBtn = document.getElementById('resetBtn');
 
             function setCreateMode(){
-                form.action = '/Category/Create';
                 idInput.value = '0';
                 nameInput.value = '';
                 activeInput.checked = true;
@@ -101,7 +100,6 @@
             }
 
             function setEditMode(id, name, isActive){
-                form.action = '/Category/Update';
                 idInput.value = id;
                 nameInput.value = name;
                 activeInput.checked = (isActive === 'True' || isActive === true);
