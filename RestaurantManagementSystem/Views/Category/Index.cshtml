@@ -1,0 +1,123 @@
+@model IEnumerable<RestaurantManagementSystem.Models.Category>
+@{
+    ViewData["Title"] = "Categories";
+}
+<div class="container py-3">
+    <h2 class="mb-3">Category Master</h2>
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    }
+    <div class="row g-3">
+        <div class="col-md-5">
+            <div class="card shadow-sm">
+                <div class="card-header"><strong id="formModeLabel">Create Category</strong></div>
+                <div class="card-body">
+                    <form id="categoryForm" method="post" asp-action="Create">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Id" id="catId" value="0" />
+                        <div class="mb-3">
+                            <label for="catName" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="catName" name="Name" required maxlength="80" />
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="catActive" name="IsActive" checked />
+                            <label for="catActive" class="form-check-label">Active</label>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" id="saveBtn"><i class="fas fa-save me-1"></i><span id="saveBtnText">Create</span></button>
+                            <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Existing Categories</strong>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height:55vh;">
+                        <table class="table table-sm table-hover mb-0 align-middle" id="categoriesTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th style="width:90px" class="text-center">Active</th>
+                                    <th style="width:140px">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in Model)
+                                {
+                                    <tr data-id="@c.Id" data-name="@c.Name" data-active="@c.IsActive">
+                                        <td>@c.Name</td>
+                                        <td class="text-center">
+                                            <span class="badge @(c.IsActive ? "bg-success" : "bg-secondary")">@(c.IsActive ? "Yes" : "No")</span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <button type="button" class="btn btn-outline-primary editCatBtn" title="Edit"><i class="fas fa-edit"></i></button>
+                                                <form method="post" asp-action="ToggleActive" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@c.Id" />
+                                                    <button type="submit" class="btn btn-outline-warning" title="Toggle Active"><i class="fas fa-sync"></i></button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function(){
+            const form = document.getElementById('categoryForm');
+            const idInput = document.getElementById('catId');
+            const nameInput = document.getElementById('catName');
+            const activeInput = document.getElementById('catActive');
+            const formModeLabel = document.getElementById('formModeLabel');
+            const saveBtnText = document.getElementById('saveBtnText');
+            const resetBtn = document.getElementById('resetBtn');
+
+            function setCreateMode(){
+                form.action = '/Category/Create';
+                idInput.value = '0';
+                nameInput.value = '';
+                activeInput.checked = true;
+                formModeLabel.textContent = 'Create Category';
+                saveBtnText.textContent = 'Create';
+            }
+
+            function setEditMode(id, name, isActive){
+                form.action = '/Category/Update';
+                idInput.value = id;
+                nameInput.value = name;
+                activeInput.checked = (isActive === 'True' || isActive === true);
+                formModeLabel.textContent = 'Edit Category';
+                saveBtnText.textContent = 'Update';
+            }
+
+            document.querySelectorAll('.editCatBtn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const row = btn.closest('tr');
+                    setEditMode(row.dataset.id, row.dataset.name, row.dataset.active);
+                    nameInput.focus();
+                });
+            });
+            resetBtn.addEventListener('click', setCreateMode);
+            setCreateMode();
+        })();
+    </script>
+}
