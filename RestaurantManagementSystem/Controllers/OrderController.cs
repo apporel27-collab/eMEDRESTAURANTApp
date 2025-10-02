@@ -1,6 +1,6 @@
 namespace RestaurantManagementSystem.Controllers
 {
-    public class OrderController : Controller
+    public partial class OrderController : Controller
     {
         private readonly IConfiguration _configuration;
         private readonly string _connectionString;
@@ -2432,8 +2432,8 @@ namespace RestaurantManagementSystem.Controllers
             public int? TempId { get; set; }      // For tracking new items client-side
         }
         
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
         public IActionResult UpdateMultipleOrderItems(int orderId, [FromBody] List<OrderItemUpdateModel> items)
         {
             if (items == null || !items.Any())
@@ -2641,6 +2641,13 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             return turnoverId;
+        }
+        
+        // Menu Items & Estimation Page
+        public IActionResult Estimation()
+        {
+            ViewData["Title"] = "Menu Items & Estimation";
+            return View();
         }
     }
 }

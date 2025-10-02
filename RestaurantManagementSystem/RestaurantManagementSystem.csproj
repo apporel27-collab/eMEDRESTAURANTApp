@@ -4,7 +4,6 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>11.0</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,8 +18,6 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.8" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <!-- Remove System.Data.SqlClient to avoid ambiguity -->
-    <!-- <PackageReference Include="System.Data.SqlClient" Version="4.9.0" /> -->
   </ItemGroup>
 
 </Project>

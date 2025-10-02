@@ -2,1031 +2,178 @@
 @{
     ViewData["Title"] = "Order Details";
 }
-
-<div class="container-fluid p-2">
-    <div class="row g-2 align-items-center mb-2">
-        <div class="col-md-8 d-flex flex-wrap align-items-center gap-2">
-            <div id="quickAddForm" class="d-flex flex-row align-items-center gap-2 mb-0 p-0">
-                <input type="hidden" id="orderId" value="@Model.Id" />
-                <label for="menuItemInput" class="form-label mb-0">Add Menu Item:</label>
-                <input list="menuItems" id="menuItemInput" class="form-control form-control-sm w-auto" style="min-width:200px;" placeholder="Type to search..." autocomplete="off" required />
-                <datalist id="menuItems">
-                    @foreach (var item in Model.AvailableMenuItems)
-                    {
-                        <option value="@item.Name" data-id="@item.Id" data-price="@item.Price.ToString("F2")">@item.Name (₹@item.Price.ToString("F2"))</option>
-                    }
-                </datalist>
-                <input type="number" id="quantity" min="1" value="1" class="form-control form-control-sm w-auto" style="max-width:70px;" required />
-                <button type="button" id="quickAddButton" class="btn btn-success btn-sm"><i class="fas fa-plus"></i> Add</button>
-            </div>
-            <button type="button" class="btn btn-sm btn-warning ms-2" data-bs-toggle="modal" data-bs-target="#fireItemsModal" 
-                    title="Send selected items to the kitchen for preparation" data-bs-toggle="tooltip">
-                <i class="fas fa-fire"></i> Fire to Kitchen
-            </button>
-            <a asp-action="Dashboard" class="btn btn-outline-secondary btn-sm ms-2">
-                <i class="fas fa-arrow-left"></i> Back
-            </a>
-            <!-- Removed Add Items button as requested -->
-            <a asp-controller="Payment" asp-action="Index" asp-route-id="@Model.Id" class="btn btn-success btn-sm ms-2">
-                <i class="fas fa-credit-card"></i> Payment
-            </a>
+<div class="container-fluid py-3" id="orderDetailsApp" data-order-id="@Model.Id">
+  <div class="row g-3">
+    <div class="col-lg-8 col-12">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <form id="orderItemAddForm" class="row row-cols-auto g-2 align-items-center flex-grow-1" autocomplete="off">
+          @Html.AntiForgeryToken()
+          <input type="hidden" id="orderId" value="@Model.Id" />
+          <div class="col flex-grow-1" style="min-width:200px;">
+            <label for="menuItemInput" class="visually-hidden">Menu Item</label>
+            <input list="menuItems" id="menuItemInput" class="form-control form-control-sm" placeholder="Search menu (name)..." required />
+            <datalist id="menuItems">
+              @foreach (var mi in Model.AvailableMenuItems)
+              {
+                <option value="@mi.Name" data-id="@mi.Id" data-price="@mi.Price.ToString("F2")">@mi.Name (₹@mi.Price.ToString("F2"))</option>
+              }
+            </datalist>
+          </div>
+          <div class="col">
+            <label for="menuItemQty" class="visually-hidden">Qty</label>
+            <input type="number" id="menuItemQty" class="form-control form-control-sm" min="1" value="1" required />
+          </div>
+            <div class="col">
+            <button type="submit" class="btn btn-sm btn-primary" id="addItemBtn"><i class="fas fa-plus"></i> Add</button>
+          </div>
+        </form>
+        <div class="ms-auto d-flex gap-2">
+          <button type="button" id="fireItemsBtn" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#fireItemsModal"><i class="fas fa-fire"></i> Fire To Kitchen</button>
+          <a asp-action="Dashboard" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+          <a asp-controller="Payment" asp-action="Index" asp-route-id="@Model.Id" class="btn btn-sm btn-success"><i class="fas fa-credit-card"></i> Payment</a>
         </div>
-        <div class="col-md-4 text-end">
-            <span class="fs-5 fw-bold">Order #: @Model.OrderNumber</span>
+      </div>
+      <div class="card shadow-sm mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
+          <div class="small"><strong>Order #:</strong> @Model.OrderNumber <span class="badge bg-secondary ms-2">@Model.StatusDisplay</span></div>
+          <button id="saveOrderBtn" class="btn btn-sm btn-primary"><i class="fas fa-save"></i> Save</button>
         </div>
-    </div>
-    <div class="row g-2">
-        <!-- Add anti-forgery token for AJAX calls -->
-        @Html.AntiForgeryToken()
-        
-        @if (TempData["SuccessMessage"] != null)
-        {
-            <div class="col-12">
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    @TempData["SuccessMessage"]
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            </div>
-        }
-        
-        @if (TempData["ErrorMessage"] != null)
-        {
-            <div class="col-12">
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    @TempData["ErrorMessage"]
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            </div>
-        }
-        
-        <!-- Information about button functionality -->
-        <div class="col-12">
-            <div class="alert alert-info alert-dismissible fade show" role="alert">
-                <h6><i class="fas fa-info-circle"></i> About Order Actions:</h6>
-                <ul class="mb-0">
-                    <li><strong>Save Order Details</strong> - Updates quantities, notes, prices, and totals in the database</li>
-                    <li><strong>Fire to Kitchen</strong> - Sends selected items to the kitchen for preparation</li>
-                </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        </div>
-        
-        <div class="col-lg-8">
-            <div class="card mb-2 shadow-sm">
-                <div class="card-header py-2 px-3 bg-light d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Order Items</h6>
-                </div>
-                <div class="card-body p-2">
-                    @if (Model.Items.Any())
-                    {
-                        <div class="table-responsive">
-                            <table id="orderItemsTable" class="table table-striped table-hover">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 5%"></th>
-                                        <th style="width: 40%">Item</th>
-                                        <th style="width: 10%">Qty</th>
-                                        <th style="width: 15%">Price</th>
-                                        <th style="width: 15%">Subtotal</th>
-                                        <th style="width: 15%">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @{
-                                        string currentCourse = null;
-                                    }
-                                    @foreach (var item in Model.Items)
-                                    {
-                                        @if (item.CourseName != currentCourse && !string.IsNullOrEmpty(item.CourseName))
-                                        {
-                                            <tr class="table-secondary">
-                                                <td colspan="6"><strong>@item.CourseName</strong></td>
-                                            </tr>
-                                            currentCourse = item.CourseName;
-                                        }
-                                        <tr>
-                                            <td>
-                                                @if (item.Status == 0)
-                                                {
-                                                    <input type="checkbox" class="fireItem" value="@item.Id" form="fireItemsForm" name="SelectedItems" />
-                                                    <form asp-action="CancelOrderItem" method="post" class="d-inline-block ms-1" onsubmit="return confirm('Are you sure you want to cancel this item?');">
-                                                        <input type="hidden" name="orderId" value="@Model.Id" />
-                                                        <input type="hidden" name="orderItemId" value="@item.Id" />
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancel Item">
-                                                            <i class="fas fa-times"></i>
-                                                        </button>
-                                                    </form>
-                                                }
-                                                else
-                                                {
-                                                    <i class="fas fa-check-circle text-success"></i>
-                                                }
-                                            </td>
-                                            <td>
-                                                <div><strong>@item.MenuItemName</strong></div>
-                                                @if (item.Modifiers.Any())
-                                                {
-                                                    <div class="text-muted small">
-                                                        @foreach (var mod in item.Modifiers)
-                                                        {
-                                                            <span class="badge bg-secondary me-1">@mod.ModifierName @(mod.Price > 0 ? $"+${mod.Price:F2}" : "")</span>
-                                                        }
-                                                    </div>
-                                                }
-                                                <form class="d-flex align-items-center gap-2 mt-1 order-item-edit-form">
-                                                    <input type="hidden" name="orderId" value="@Model.Id" />
-                                                    <input type="hidden" name="orderItemId" value="@item.Id" />
-                                                    <input type="number" name="quantity" value="@item.Quantity" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" readonly disabled />
-                                                    <input type="text" name="specialInstructions" value="@item.SpecialInstructions" placeholder="Note" class="form-control form-control-sm w-auto item-note" style="max-width:120px;" readonly disabled />
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm edit-item-btn" onclick="enableEdit(this)">
-                                                        <i class="fas fa-edit"></i> Edit
-                                                    </button>
-                                                    <button type="button" class="btn btn-success btn-sm save-item-btn d-none" onclick="saveEdit(this)">
-                                                        <i class="fas fa-save"></i> Save
-                                                    </button>
-                                                    <button type="button" class="btn btn-secondary btn-sm cancel-edit-btn d-none" onclick="cancelEdit(this)">
-                                                        <i class="fas fa-times"></i> Cancel
-                                                    </button>
-                                                </form>
-                                            </td>
-                                            <td class="align-middle">@item.Quantity</td>
-                                            <td class="align-middle">₹@item.UnitPrice.ToString("F2")</td>
-                                            <td class="align-middle">₹@item.Subtotal.ToString("F2")</td>
-                                            <td class="align-middle">
-                                                @{
-                                                    var badgeClass = item.Status switch
-                                                    {
-                                                        0 => "bg-primary",
-                                                        1 => "bg-warning text-dark",
-                                                        2 => "bg-info",
-                                                        3 => "bg-success",
-                                                        4 => "bg-dark",
-                                                        5 => "bg-danger",
-                                                        _ => "bg-secondary"
-                                                    };
-                                                }
-                                                <span class="badge @badgeClass">@item.StatusDisplay</span>
-                                                @if (item.FireTime.HasValue)
-                                                {
-                                                    <div class="small text-muted">@item.FireTime.Value.ToString("HH:mm")</div>
-                                                }
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="6" class="text-center">
-                                            <form id="submitOrderForm" action="/Order/SubmitOrder" method="post" style="display:inline;">
-                                                <input type="hidden" name="orderId" value="@Model.Id" />
-                                                <!-- Adding anti-forgery token explicitly -->
-                                                @Html.AntiForgeryToken()
-                                                <button type="button" class="btn btn-primary btn-lg" onclick="submitOrderWithEdits()" 
-                                                        data-bs-toggle="tooltip" title="Save all order details, quantities, prices, and recalculate totals">
-                                                    <i class="fas fa-save"></i> Save Order Details
-                                                </button>
-                                                <!-- Hidden direct submit button for testing -->
-                                                <button type="submit" class="d-none">Direct Submit</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    <tr class="table-light">
-                                        <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
-                                        <td colspan="2">
-                                            <strong>
-                                                ₹@((Model.Items.Where(i => i.Status != 5).Sum(i => i.Subtotal)).ToString("F2"))
-                                            </strong>
-                                        </td>
-                                    </tr>
-                                    <tr class="table-light">
-                                        <td colspan="4" class="text-end">Tax:</td>
-                                        <td colspan="2">₹@(Model.TaxAmount.ToString("F2"))</td>
-                                    </tr>
-                                    @if (Model.DiscountAmount > 0)
-                                    {
-                                        <tr class="table-light">
-                                            <td colspan="4" class="text-end">Discount:</td>
-                                            <td colspan="2">-₹@(Model.DiscountAmount.ToString("F2"))</td>
-                                        </tr>
-                                    }
-                                    @if (Model.TipAmount > 0)
-                                    {
-                                        <tr class="table-light">
-                                            <td colspan="4" class="text-end">Tip:</td>
-                                            <td colspan="2">₹@(Model.TipAmount.ToString("F2"))</td>
-                                        </tr>
-                                    }
-                                    <tr class="table-light">
-                                        <td colspan="4" class="text-end"><strong>Total:</strong></td>
-                                        <td colspan="2">
-                                            <strong>
-                                                ₹@((Model.Items.Where(i => i.Status != 5).Sum(i => i.Subtotal) + Model.TaxAmount + Model.TipAmount - Model.DiscountAmount).ToString("F2"))
-                                            </strong>
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="alert alert-info">
-                            <p>No items added to this order yet.</p>
-                            <a asp-action="BrowseMenu" asp-route-id="@Model.Id" class="btn btn-primary mt-2">
-                                <i class="fas fa-utensils"></i> Browse Menu
-                            </a>
-                        </div>
-                    }
-                </div>
-            </div>
-            
-            @if (Model.KitchenTickets.Any())
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0" id="orderItemsTable">
+          <thead class="table-light">
+            <tr>
+              <th style="width:50px"><input type="checkbox" id="selectAllFire" /></th>
+              <th>Item</th>
+              <th style="width:90px" class="text-center">Qty</th>
+              <th style="width:110px" class="text-end">Unit</th>
+              <th style="width:120px" class="text-end">Subtotal</th>
+              <th style="width:110px">Status</th>
+              <th style="width:70px"></th>
+            </tr>
+          </thead>
+          <tbody id="orderItemsBody">
+            @foreach (var it in Model.Items.Where(i=> i.Status != 5))
             {
-                <div class="card mb-4">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0">Kitchen Tickets</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Ticket #</th>
-                                        <th>Items</th>
-                                        <th>Status</th>
-                                        <th>Created</th>
-                                        <th>Completed</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var ticket in Model.KitchenTickets)
-                                    {
-                                        <tr>
-                                            <td>@ticket.TicketNumber</td>
-                                            <td>@ticket.Items.Count</td>
-                                            <td>
-                                                @{
-                                                    var badgeClass = ticket.Status switch
-                                                    {
-                                                        0 => "bg-primary",
-                                                        1 => "bg-warning text-dark",
-                                                        2 => "bg-success",
-                                                        3 => "bg-dark",
-                                                        4 => "bg-danger",
-                                                        _ => "bg-secondary"
-                                                    };
-                                                }
-                                                <span class="badge @badgeClass">@ticket.StatusDisplay</span>
-                                            </td>
-                                            <td>@ticket.CreatedAt.ToString("HH:mm")</td>
-                                            <td>@(ticket.CompletedAt.HasValue ? ticket.CompletedAt.Value.ToString("HH:mm") : "-")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+              <tr data-order-item-id="@it.Id" data-menu-item-id="@it.MenuItemId" class="existing-item-row">
+                <td class="text-center"><input type="checkbox" class="fire-select" value="@it.Id" /></td>
+                <td>
+                  <div class="fw-semibold">@it.MenuItemName</div>
+                  <div class="d-flex gap-1 mt-1">
+                    <input type="text" class="form-control form-control-sm item-note" value="@it.SpecialInstructions" placeholder="Note" disabled />
+                    <button type="button" class="btn btn-sm btn-outline-secondary edit-row" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-success save-row d-none" title="Apply"><i class="fas fa-check"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-warning cancel-row d-none" title="Cancel"><i class="fas fa-undo"></i></button>
+                  </div>
+                </td>
+                <td class="text-center"><input type="number" class="form-control form-control-sm item-qty" value="@it.Quantity" min="1" disabled /></td>
+                <td class="text-end">₹@it.UnitPrice.ToString("F2")</td>
+                <td class="text-end subtotal-cell">₹@it.Subtotal.ToString("F2")</td>
+                <td><span class="badge bg-@(it.Status==0?"primary":it.Status==1?"warning text-dark":it.Status==2?"info":it.Status==3?"success":"secondary")">@it.StatusDisplay</span></td>
+                <td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm remove-existing"><i class="fas fa-times"></i></button></td>
+              </tr>
             }
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td colspan="4" class="text-end fw-semibold">Subtotal:</td>
+              <td colspan="3" class="text-end" id="orderSubtotalCell">₹@((Model.Items.Where(i=>i.Status!=5).Sum(i=>i.Subtotal)).ToString("F2"))</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-end">Tax:</td>
+              <td colspan="3" class="text-end" id="orderTaxCell">₹@Model.TaxAmount.ToString("F2")</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-end fw-semibold">Total:</td>
+              <td colspan="3" class="text-end fw-bold" id="orderTotalCell">₹@((Model.Items.Where(i=>i.Status!=5).Sum(i=>i.Subtotal)+Model.TaxAmount+Model.TipAmount-Model.DiscountAmount).ToString("F2"))</td>
+            </tr>
+          </tfoot>
+            </table>
+          </div>
         </div>
-        
-        <div class="col-lg-4">
-            <div class="card mb-2 shadow-sm">
-                <div class="card-header py-2 px-3 bg-light">
-                    <h6 class="mb-0">Order Info</h6>
-                </div>
-                <div class="card-body p-2">
-                    <div class="row mb-1"><div class="col-5 text-muted">Type:</div><div class="col-7">@Model.OrderTypeDisplay</div></div>
-                    <div class="row mb-1"><div class="col-5 text-muted">Status:</div><div class="col-7">
-                        @{
-                            var statusBadgeClass = Model.Status switch
-                            {
-                                0 => "bg-primary",
-                                1 => "bg-warning text-dark",
-                                2 => "bg-success",
-                                3 => "bg-dark",
-                                4 => "bg-danger",
-                                _ => "bg-secondary"
-                            };
-                        }
-                        <span class="badge @statusBadgeClass">@Model.StatusDisplay</span>
-                    </div></div>
-                    <div class="row mb-1"><div class="col-5 text-muted">Created:</div><div class="col-7">@Model.CreatedAt.ToString("g")</div></div>
-                    <div class="row mb-1"><div class="col-5 text-muted">Server:</div><div class="col-7">@(Model.ServerName ?? "Unassigned")</div></div>
-                    @if (Model.OrderType == 0)
-                    {
-                        <div class="row mb-1"><div class="col-5 text-muted">Table:</div><div class="col-7">@(Model.TableName ?? "No Table")</div></div>
-                        <div class="row mb-1"><div class="col-5 text-muted">Guest:</div><div class="col-7">@(Model.GuestName ?? "No Name")</div></div>
-                    }
-                    else
-                    {
-                        <div class="row mb-1"><div class="col-5 text-muted">Customer:</div><div class="col-7">@(Model.CustomerName ?? "No Name")</div></div>
-                        <div class="row mb-1"><div class="col-5 text-muted">Phone:</div><div class="col-7">@(Model.CustomerPhone ?? "No Phone")</div></div>
-                    }
-                    @if (!string.IsNullOrEmpty(Model.SpecialInstructions))
-                    {
-                        <div class="row mb-1"><div class="col-5 text-muted">Notes:</div><div class="col-7">@Model.SpecialInstructions</div></div>
-                    }
-                </div>
-            </div>
-            @if (Model.KitchenTickets.Any())
-            {
-                <div class="card mb-2 shadow-sm">
-                    <div class="card-header py-2 px-3 bg-light">
-                        <h6 class="mb-0">Kitchen Tickets</h6>
-                    </div>
-                    <div class="card-body p-2">
-                        <table class="table table-sm mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Ticket #</th>
-                                    <th>Items</th>
-                                    <th>Status</th>
-                                    <th>Created</th>
-                                    <th>Completed</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var ticket in Model.KitchenTickets)
-                                {
-                                    <tr>
-                                        <td>@ticket.TicketNumber</td>
-                                        <td>@ticket.Items.Count</td>
-                                        <td>
-                                            @{
-                                                var badgeClass = ticket.Status switch
-                                                {
-                                                    0 => "bg-primary",
-                                                    1 => "bg-warning text-dark",
-                                                    2 => "bg-success",
-                                                    3 => "bg-dark",
-                                                    4 => "bg-danger",
-                                                    _ => "bg-secondary"
-                                                };
-                                            }
-                                            <span class="badge @badgeClass">@ticket.StatusDisplay</span>
-                                        </td>
-                                        <td>@ticket.CreatedAt.ToString("HH:mm")</td>
-                                        <td>@(ticket.CompletedAt.HasValue ? ticket.CompletedAt.Value.ToString("HH:mm") : "-")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            }
-        </div>
+      </div>
     </div>
-</div>
-
-<!-- Fire Items Modal -->
-<div class="modal fade" id="fireItemsModal" tabindex="-1" aria-labelledby="fireItemsModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="col-lg-4 col-12">
+      <div class="sticky-top" style="top:1rem;">
+        <div class="card mb-3 shadow-sm">
+          <div class="card-header py-2"><i class="fas fa-info-circle me-1"></i> Order Summary</div>
+          <div class="card-body small">
+            <dl class="row mb-0">
+              <dt class="col-5">Customer</dt><dd class="col-7">@(!string.IsNullOrEmpty(Model.CustomerName)?Model.CustomerName: (string.IsNullOrEmpty(Model.GuestName)?"—":Model.GuestName))</dd>
+              <dt class="col-5">Phone</dt><dd class="col-7">@(!string.IsNullOrEmpty(Model.CustomerPhone)?Model.CustomerPhone:"—")</dd>
+              <dt class="col-5">Table</dt><dd class="col-7">@(!string.IsNullOrEmpty(Model.TableName)?Model.TableName:"—")</dd>
+              <dt class="col-5">Server</dt><dd class="col-7">@(!string.IsNullOrEmpty(Model.ServerName)?Model.ServerName:"—")</dd>
+              <dt class="col-5">Type</dt><dd class="col-7">@Model.OrderTypeDisplay</dd>
+              <dt class="col-5">Created</dt><dd class="col-7">@Model.CreatedAt.ToString("g")</dd>
+            </dl>
+          </div>
+        </div>
+        <div class="card mb-3 shadow-sm">
+          <div class="card-header py-2"><i class="fas fa-sticky-note me-1"></i> Order Note</div>
+          <div class="card-body small">
+            @if(!string.IsNullOrWhiteSpace(Model.SpecialInstructions)){
+              <div class="text-muted">@Model.SpecialInstructions</div>
+            } else { <div class="text-muted fst-italic">No note provided.</div> }
+          </div>
+        </div>
+        <div class="card shadow-sm">
+          <div class="card-header py-2"><i class="fas fa-receipt me-1"></i> Totals</div>
+          <div class="card-body p-2">
+            <table class="table table-sm mb-0">
+              <tbody class="small">
+                <tr><td class="text-muted">Subtotal</td><td class="text-end" id="orderSubtotalCell">₹@Model.Subtotal.ToString("F2")</td></tr>
+                <tr><td class="text-muted">Tax</td><td class="text-end" id="orderTaxCell">₹@Model.TaxAmount.ToString("F2")</td></tr>
+                <tr><td class="text-muted">Tip</td><td class="text-end">₹@Model.TipAmount.ToString("F2")</td></tr>
+                <tr><td class="text-muted">Discount</td><td class="text-end">₹@Model.DiscountAmount.ToString("F2")</td></tr>
+                <tr class="table-light"><th>Total</th><th class="text-end" id="orderTotalCell">₹@Model.TotalAmount.ToString("F2")</th></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  @if (Model.Items.Any(i=>i.Status==0))
+  {
+    <div class="modal fade" id="fireItemsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
         <div class="modal-content">
-            <form id="fireItemsForm" asp-action="FireItems" method="post">
-                <input type="hidden" name="OrderId" value="@Model.Id" />
-                <div class="modal-header">
-                    <h5 class="modal-title" id="fireItemsModalLabel">Fire Items to Kitchen</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <form id="fireItemsForm" asp-action="FireItems" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="OrderId" value="@Model.Id" />
+            <div class="modal-header"><h5 class="modal-title">Send Items To Kitchen</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="small text-muted">Select which un-fired items to send.</span>
+                <div class="form-check form-check-sm">
+                  <input type="checkbox" class="form-check-input" id="fireSelectAll" />
+                  <label for="fireSelectAll" class="form-check-label small">All</label>
                 </div>
-                <div class="modal-body">
-                    <p>Select which items to send to the kitchen.</p>
-                    
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="fireAll" name="FireAll" value="true">
-                        <label class="form-check-label" for="fireAll">
-                            Fire all unfired items
-                        </label>
-                    </div>
-                    
-                    <div id="itemSelection">
-                        <p class="text-muted">Or select individual items:</p>
-                        <ul class="list-group">
-                            @foreach (var item in Model.Items.Where(i => i.Status == 0)) // Only New items
-                            {
-                                <li class="list-group-item">
-                                    <div class="form-check">
-                                        <input class="form-check-input item-checkbox" type="checkbox" value="@item.Id" id="item_@item.Id" name="SelectedItems">
-                                        <label class="form-check-label" for="item_@item.Id">
-                                            @item.MenuItemName (@item.Quantity)
-                                            @if (!string.IsNullOrEmpty(item.CourseName))
-                                            {
-                                                <span class="ms-1 badge bg-secondary">@item.CourseName</span>
-                                            }
-                                        </label>
-                                    </div>
-                                </li>
-                            }
-                        </ul>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Fire to Kitchen</button>
-                </div>
-            </form>
+              </div>
+              <div class="list-group small" style="max-height:260px;overflow:auto;">
+                @foreach (var ni in Model.Items.Where(i=>i.Status==0))
+                {
+                  <label class="list-group-item d-flex align-items-center gap-2 py-1">
+                    <input type="checkbox" class="form-check-input fire-item-checkbox" value="@ni.Id" name="SelectedItems" />
+                    <span class="flex-grow-1 d-flex justify-content-between align-items-center">
+                      <span>@ni.MenuItemName</span>
+                      <span class="badge bg-light text-dark border" style="font-weight:500;">x @ni.Quantity</span>
+                    </span>
+                  </label>
+                }
+                @if(!Model.Items.Any(i=>i.Status==0)){
+                  <div class="text-muted fst-italic px-2 py-1">No pending items to fire.</div>
+                }
+              </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-fire"></i> Send To Kitchen</button></div>
+          </form>
         </div>
+      </div>
     </div>
+  }
 </div>
 
 @section Scripts {
-    <style>
-        /* Styling for edit mode */
-        .item-edit-active {
-            background-color: rgba(255, 248, 220, 0.5) !important; /* Light yellow background */
-            transition: background-color 0.3s ease;
-        }
-        
-        .item-qty:focus, .item-note:focus {
-            border-color: #ffc107;
-            box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25);
-        }
-    </style>
-    
-    <script>
-        $(document).ready(function () {
-            // Initialize tooltips
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl)
-            });
-            
-            // Handle FireAll checkbox
-            $('#fireAll').change(function () {
-                if ($(this).is(':checked')) {
-                    $('#itemSelection').addClass('d-none');
-                    $('.item-checkbox').prop('checked', false);
-                } else {
-                    $('#itemSelection').removeClass('d-none');
-                }
-            });
-            
-            // Handle item checkboxes
-            $('.item-checkbox').change(function () {
-                if ($('.item-checkbox:checked').length > 0) {
-                    $('#fireAll').prop('checked', false);
-                }
-            });
-            
-            // Check if there are any new items
-            var newItemsCount = @Model.Items.Count(i => i.Status == 0);
-            if (newItemsCount === 0) {
-                // No new items to fire
-                $('.btn[data-bs-target="#fireItemsModal"]').addClass('disabled');
-            }
-            
-            // Display TempData messages with toastr if they exist
-            @if (TempData["SuccessMessage"] != null)
-            {
-                <text>toastr.success('@TempData["SuccessMessage"]');</text>
-            }
-            
-            @if (TempData["ErrorMessage"] != null)
-            {
-                <text>toastr.error('@TempData["ErrorMessage"]');</text>
-            }
-            
-            // Build menu items lookup from datalist options for reliable matching
-            window.menuItemsMap = {};
-            $('#menuItems option').each(function(){
-                const name = $(this).val();
-                const idAttr = $(this).attr('data-id');
-                const priceAttr = $(this).attr('data-price');
-                if(!name || !idAttr) return;
-                const id = parseInt(idAttr,10);
-                const price = parseFloat(priceAttr);
-                window.menuItemsMap[name.toLowerCase()] = { id: id, name: name, price: isNaN(price)?0:price };
-            });
-
-            // Track new items that haven't been saved to database yet
-            window.newOrderItems = [];
-            window.nextTempId = -1;  // Use negative IDs for unsaved items
-            
-            // Handle quick add button click
-            $('#quickAddButton').click(function() {
-                addMenuItemToTable();
-            });
-            
-            // Also add on Enter key in the input
-            $('#menuItemInput, #quantity').keypress(function(e) {
-                if(e.which == 13) {
-                    e.preventDefault();
-                    addMenuItemToTable();
-                }
-            });
-        });
-        
-        // Function to add a menu item to the table without saving to database
-        function addMenuItemToTable() {
-            const input = $('#menuItemInput').val().trim();
-            if(!input){ toastr.error('Please select a menu item'); return; }
-            let qty = parseInt($('#quantity').val(),10); if(isNaN(qty) || qty<1) qty=1;
-
-            // Direct exact lookup
-            let entry = window.menuItemsMap[input.toLowerCase()];
-            if(!entry){
-                // fuzzy: startsWith then contains
-                const lower = input.toLowerCase();
-                for(const k in window.menuItemsMap){ if(k.startsWith(lower)){ entry=window.menuItemsMap[k]; break; } }
-                if(!entry){ for(const k in window.menuItemsMap){ if(k.indexOf(lower)>-1){ entry=window.menuItemsMap[k]; break; } } }
-            }
-            if(!entry){ toastr.error('Menu item not found. Choose from list.'); return; }
-            const menuItemId = entry.id; const menuItemName = entry.name; const menuItemPrice = entry.price;
-            const subtotal = (qty * menuItemPrice).toFixed(2);
-            
-            // Calculate subtotal
-            var subtotal = (qty * menuItemPrice).toFixed(2);
-            
-            // Hide the "no items" message if it exists
-            $('.alert.alert-info:contains("No items added")').hide();
-            
-            // Create a new row in the table
-            var tempId = window.nextTempId--;
-            var newRow = `
-                <tr class="new-item-row" data-temp-id="${tempId}">
-                    <td>
-                        <input type="checkbox" class="fireItem" value="${tempId}" form="fireItemsForm" name="SelectedItems" />
-                        <button type="button" class="btn btn-sm btn-outline-danger" title="Remove Item" onclick="removeNewItem(${tempId})">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </td>
-                    <td>
-                        <div><strong>${menuItemName}</strong></div>
-                        <form class="d-flex align-items-center gap-2 mt-1 order-item-edit-form new-item-form">
-                            <input type="hidden" name="orderId" value="${$('#orderId').val()}" />
-                            <input type="hidden" name="orderItemId" value="${tempId}" />
-                            <input type="hidden" name="menuItemId" value="${menuItemId}" />
-                            <input type="hidden" name="menuItemName" value="${menuItemName}" />
-                            <input type="hidden" name="unitPrice" value="${menuItemPrice}" />
-                            <input type="number" name="quantity" value="${qty}" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" onchange="updateNewItemDetails(${tempId}, this.value, ${menuItemPrice})" />
-                            <input type="text" name="specialInstructions" value="" placeholder="Note" class="form-control form-control-sm w-auto item-note" style="max-width:120px;" />
-                        </form>
-                    </td>
-                    <td class="align-middle qty-display">${qty}</td>
-                    <td class="align-middle">₹${menuItemPrice.toFixed(2)}</td>
-                    <td class="align-middle subtotal-display">₹${subtotal}</td>
-                    <td class="align-middle">
-                        <span class="badge bg-info">New (Unsaved)</span>
-                    </td>
-                </tr>
-            `;
-            
-            // Check if the table exists, if not create it
-            var orderTable = $('#orderItemsTable');
-            if (orderTable.length === 0) {
-                // Create table if it doesn't exist
-                var tableHtml = `
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th style="width: 90px">Actions</th>
-                                <th>Item</th>
-                                <th style="width: 80px">Qty</th>
-                                <th style="width: 100px">Unit Price</th>
-                                <th style="width: 100px">Subtotal</th>
-                                <th style="width: 120px">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                        <tfoot>
-                            <tr>
-                                <td colspan="6" class="text-center">
-                                    <form id="submitOrderForm" action="/Order/SubmitOrder" method="post" style="display:inline;">
-                                        <input type="hidden" name="orderId" value="${$('#orderId').val()}" />
-                                        <button type="button" class="btn btn-primary btn-lg" onclick="submitOrderWithEdits()" 
-                                                data-bs-toggle="tooltip" title="Save all order details, quantities, prices, and recalculate totals">
-                                            <i class="fas fa-save"></i> Save Order Details
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                            <tr class="table-light">
-                                <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
-                                <td colspan="2">
-                                    <strong>₹${subtotal}</strong>
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>`;
-                
-                // Replace the alert with the table
-                $('.alert.alert-info:contains("No items added")').replaceWith(tableHtml);
-                
-                // Get the new tbody reference
-                var tbody = $('#orderItemsTable tbody');
-                tbody.append(newRow);
-            } else {
-                // Add the row to the existing table
-                var tbody = $('#orderItemsTable tbody');
-                // If there's a table-secondary row at the start (course header), add after it
-                var firstRow = tbody.find('tr').first();
-                if (firstRow.hasClass('table-secondary')) {
-                    $(newRow).insertAfter(firstRow);
-                } else {
-                    tbody.prepend(newRow);
-                }
-            }
-            
-            // Clear input field and reset quantity for next item
-            $('#menuItemInput').val('').focus();
-            $('#quantity').val(1);
-            
-            // Store the new item data
-            window.newOrderItems.push({
-                tempId: tempId,
-                menuItemId: menuItemId,
-                menuItemName: menuItemName,
-                quantity: qty,
-                unitPrice: menuItemPrice,
-                specialInstructions: '',
-                isNew: true
-            });
-            
-            // Clear the form for next entry
-            $('#menuItemInput').val('').focus();
-            $('#quantity').val(1);
-            
-            // Update subtotal
-            updateOrderTotals();
-            
-            // Show notification
-            toastr.success(menuItemName + ' added (unsaved). Click "Save Order Details" to persist.');
-        }
-        
-        // Function to update details of a new item when quantity changes
-        function updateNewItemDetails(tempId, newQuantity, unitPrice) {
-            newQuantity = parseInt(newQuantity) || 1;
-            if (newQuantity < 1) newQuantity = 1;
-            
-            // Update quantity display
-            const row = $(`tr[data-temp-id="${tempId}"]`);
-            row.find('.qty-display').text(newQuantity);
-            
-            // Update subtotal
-            const subtotal = (newQuantity * unitPrice).toFixed(2);
-            row.find('.subtotal-display').text('₹' + subtotal);
-            
-            // Update in the newOrderItems array
-            const itemIndex = window.newOrderItems.findIndex(item => item.tempId === tempId);
-            if (itemIndex !== -1) {
-                window.newOrderItems[itemIndex].quantity = newQuantity;
-                window.newOrderItems[itemIndex].subtotal = parseFloat(subtotal);
-            }
-            
-            // Update overall order total
-            updateOrderTotals();
-        }
-        
-        // Function to remove a new (unsaved) item
-        function removeNewItem(tempId) {
-            $(`tr[data-temp-id="${tempId}"]`).remove();
-            
-            // Remove from newOrderItems array
-            window.newOrderItems = window.newOrderItems.filter(item => item.tempId !== tempId);
-            
-            // Update subtotal
-            updateOrderTotals();
-        }
-        
-        // Update order totals when items are added/removed
-        function updateOrderTotals() {
-            var subtotal = 0;
-            
-            // Calculate from existing items
-            $('#orderItemsTable tbody tr').not('.table-secondary').each(function() {
-                var itemSubtotal = $(this).find('td:nth-child(5)').text().replace('₹', '');
-                if (!isNaN(parseFloat(itemSubtotal))) {
-                    subtotal += parseFloat(itemSubtotal);
-                }
-            });
-            
-            // Update the subtotal display
-            $('#orderSubtotalValue').text('₹' + subtotal.toFixed(2));
-        }
-        
-        // Edit/Save/Cancel logic for order items
-        function enableEdit(btn) {
-            // First cancel any other item in edit mode
-            $('.order-item-edit-form').each(function() {
-                if ($(this).find('.save-item-btn').is(':visible')) {
-                    var cancelBtn = $(this).find('.cancel-edit-btn')[0];
-                    cancelEdit(cancelBtn);
-                }
-            });
-            
-            var form = btn.closest('.order-item-edit-form');
-            var row = $(form).closest('tr');
-            
-            // Enable fields
-            form.querySelector('.item-qty').removeAttribute('readonly');
-            form.querySelector('.item-qty').removeAttribute('disabled');
-            form.querySelector('.item-note').removeAttribute('readonly');
-            form.querySelector('.item-note').removeAttribute('disabled');
-            
-            // Show/hide buttons
-            btn.classList.add('d-none');
-            form.querySelector('.save-item-btn').classList.remove('d-none');
-            form.querySelector('.cancel-edit-btn').classList.remove('d-none');
-            
-            // Add visual indication that row is being edited
-            row.addClass('item-edit-active');
-            
-            // Focus on quantity field
-            form.querySelector('.item-qty').focus();
-        }
-        
-        function cancelEdit(btn) {
-            var form = btn.closest('.order-item-edit-form');
-            var row = $(form).closest('tr');
-            
-            // Reset form to original values
-            var orderItemId = form.querySelector('input[name="orderItemId"]').value;
-            var originalQty = $(row).find('td:nth-child(3)').text();
-            
-            // Disable fields and restore original values
-            form.querySelector('.item-qty').value = originalQty;
-            form.querySelector('.item-qty').setAttribute('readonly', 'readonly');
-            form.querySelector('.item-qty').setAttribute('disabled', 'disabled');
-            form.querySelector('.item-note').setAttribute('readonly', 'readonly');
-            form.querySelector('.item-note').setAttribute('disabled', 'disabled');
-            
-            // Show/hide buttons
-            btn.classList.add('d-none');
-            form.querySelector('.save-item-btn').classList.add('d-none');
-            form.querySelector('.edit-item-btn').classList.remove('d-none');
-            
-            // Remove visual indication
-            row.removeClass('item-edit-active');
-        }
-        
-        function saveEdit(btn) {
-            var form = btn.closest('.order-item-edit-form');
-            var row = $(form).closest('tr');
-            var orderId = form.querySelector('input[name="orderId"]').value;
-            var orderItemId = form.querySelector('input[name="orderItemId"]').value;
-            var quantity = form.querySelector('.item-qty').value;
-            var note = form.querySelector('.item-note').value;
-            
-            if (quantity < 1) {
-                toastr.error('Quantity must be at least 1');
-                return;
-            }
-            
-            // Disable form elements and show loading indicator
-            $(btn).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
-            $(btn).prop('disabled', true);
-            $('.item-qty, .item-note, .cancel-edit-btn', form).prop('disabled', true);
-            
-            // Send AJAX request to update the item
-            $.ajax({
-                url: '/Order/UpdateOrderItemQty',
-                type: 'POST',
-                data: {
-                    orderId: orderId,
-                    orderItemId: orderItemId,
-                    quantity: quantity,
-                    specialInstructions: note,
-                    __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // Update displayed quantity and subtotal in table
-                        $(row).find('td:nth-child(3)').text(quantity);
-                        
-                        // Calculate new subtotal
-                        var unitPrice = parseFloat($(row).find('td:nth-child(4)').text().replace('₹', ''));
-                        var newSubtotal = (unitPrice * quantity).toFixed(2);
-                        $(row).find('td:nth-child(5)').text('₹' + newSubtotal);
-                        
-                        // Update UI
-                        form.querySelector('.item-qty').setAttribute('readonly', 'readonly');
-                        form.querySelector('.item-qty').setAttribute('disabled', 'disabled');
-                        form.querySelector('.item-note').setAttribute('readonly', 'readonly');
-                        form.querySelector('.item-note').setAttribute('disabled', 'disabled');
-                        btn.classList.add('d-none');
-                        form.querySelector('.cancel-edit-btn').classList.add('d-none');
-                        form.querySelector('.edit-item-btn').classList.remove('d-none');
-                        
-                        // Remove edit mode visual indication
-                        row.removeClass('item-edit-active');
-                        
-                        // Show success message
-                        toastr.success(response.message || 'Item updated successfully');
-                        
-                        // Highlight the updated row briefly to show it was updated
-                        $(row).css('background-color', '#d4edda').delay(1000).queue(function(next) {
-                            $(this).css('background-color', '');
-                            next();
-                        });
-                    } else {
-                        toastr.error(response.message || 'Error updating item');
-                        // Re-enable form elements
-                        $(btn).html('<i class="fas fa-save"></i> Save');
-                        $(btn).prop('disabled', false);
-                        $('.cancel-edit-btn', form).prop('disabled', false);
-                        $('.item-qty, .item-note', form).prop('disabled', false);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    toastr.error('Failed to update item: ' + error);
-                    // Re-enable form elements
-                    $(btn).html('<i class="fas fa-save"></i> Save');
-                    $(btn).prop('disabled', false);
-                    $('.cancel-edit-btn', form).prop('disabled', false);
-                    $('.item-qty, .item-note', form).prop('disabled', false);
-                }
-            });
-        }
-        
-        // Submit all edits with order
-        function submitOrderWithEdits() {
-            // First check if any items are currently in edit mode
-            var itemsInEditMode = $('.order-item-edit-form').filter(function() {
-                return $(this).find('.save-item-btn').is(':visible');
-            });
-            
-            if (itemsInEditMode.length > 0) {
-                // Ask user if they want to save changes first
-                if (confirm('You have unsaved changes. Do you want to save them before submitting the order?')) {
-                    // Save each item in edit mode first
-                    itemsInEditMode.each(function() {
-                        var saveBtn = $(this).find('.save-item-btn')[0];
-                        saveEdit(saveBtn);
-                    });
-                    
-                    // Wait a bit to let the saves complete before submitting
-                    setTimeout(function() {
-                        submitOrderToServer();
-                    }, 1000);
-                    return;
-                }
-            }
-            
-            submitOrderToServer();
-        }
-        
-        function submitOrderToServer() {
-            var submitBtn = $('#submitOrderForm button');
-            var originalBtnText = submitBtn.html();
-            
-            // Show loading state
-            submitBtn.html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Submitting...');
-            submitBtn.prop('disabled', true);
-            
-            var forms = document.querySelectorAll('.order-item-edit-form:not(.new-item-form)');
-            var updateItems = [];
-            var orderId = $('#orderId').val();
-            
-            // First add all existing items updates
-            forms.forEach(function(form) {
-                var qty = parseInt(form.querySelector('.item-qty').value);
-                var note = form.querySelector('.item-note').value;
-                var orderItemId = parseInt(form.querySelector('input[name="orderItemId"]').value);
-                
-                updateItems.push({
-                    orderItemId: orderItemId,
-                    quantity: qty,
-                    specialInstructions: note,
-                    isNew: false
-                });
-            });
-            
-            // Now add all new items
-            if (window.newOrderItems && window.newOrderItems.length > 0) {
-                $('.new-item-form').each(function(index) {
-                    var form = $(this)[0];
-                    var tempId = parseInt(form.querySelector('input[name="orderItemId"]').value);
-                    var qty = parseInt(form.querySelector('.item-qty').value);
-                    var note = form.querySelector('.item-note').value;
-                    var menuItemId = parseInt(form.querySelector('input[name="menuItemId"]').value);
-                    
-                    // Update the stored new item data with form values
-                    window.newOrderItems.forEach(function(item) {
-                        if (item.tempId === tempId) {
-                            item.quantity = qty;
-                            item.specialInstructions = note;
-                        }
-                    });
-                    
-                    updateItems.push({
-                        tempId: tempId,
-                        menuItemId: menuItemId,
-                        quantity: qty,
-                        specialInstructions: note,
-                        isNew: true
-                    });
-                });
-            }
-            
-            if (updateItems.length === 0) {
-                console.log("No items to update, submitting form directly");
-                var form = document.getElementById('submitOrderForm');
-                if (form) {
-                    console.log("Form found, submitting to: " + form.action);
-                    
-                    // Ensure anti-forgery token is properly included
-                    var token = $('input[name="__RequestVerificationToken"]').val();
-                    if (!form.querySelector('input[name="__RequestVerificationToken"]')) {
-                        var tokenInput = document.createElement('input');
-                        tokenInput.type = 'hidden';
-                        tokenInput.name = '__RequestVerificationToken';
-                        tokenInput.value = token;
-                        form.appendChild(tokenInput);
-                    }
-                    
-                    // Log form data for debugging
-                    console.log("Form data ready for submission:");
-                    console.log("- Antiforgery token present:", !!form.querySelector('input[name="__RequestVerificationToken"]'));
-                    console.log("- Order ID:", form.querySelector('input[name="orderId"]').value);
-                    
-                    try {
-                        // Now submit the form
-                        form.submit();
-                    } catch (e) {
-                        console.error("Error submitting form:", e);
-                        toastr.error("Error submitting form: " + e.message);
-                    }
-                } else {
-                    console.error("Submit form not found!");
-                    toastr.error("Error: Submit form not found");
-                }
-                return;
-            }
-            
-            // Use the new bulk update API
-            $.ajax({
-                url: '/Order/UpdateMultipleOrderItems?orderId=' + orderId,
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify(updateItems),
-                headers: {
-                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-                },
-                beforeSend: function (xhr) {
-                    xhr.setRequestHeader("X-CSRF-TOKEN", $('input[name="__RequestVerificationToken"]').val());
-                },
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success("Items updated. Saving order details...");
-                        // Briefly show confirmation before submitting
-                        setTimeout(function() {
-                            // Make sure to submit the form properly
-                            var form = document.getElementById('submitOrderForm');
-                            if (form) {
-                                console.log("Form found after updates, submitting to: " + form.action);
-                                
-                                // Debug output
-                                console.log("Form details:");
-                                console.log("- Action: " + form.getAttribute('action'));
-                                console.log("- Method: " + form.getAttribute('method'));
-                                console.log("- OrderId: " + form.querySelector('input[name="orderId"]').value);
-                                
-                                // Ensure anti-forgery token is properly included
-                                var token = $('input[name="__RequestVerificationToken"]').val();
-                                if (!form.querySelector('input[name="__RequestVerificationToken"]')) {
-                                    var tokenInput = document.createElement('input');
-                                    tokenInput.type = 'hidden';
-                                    tokenInput.name = '__RequestVerificationToken';
-                                    tokenInput.value = token;
-                                    form.appendChild(tokenInput);
-                                }
-                                
-                                // Log form data for debugging
-                                console.log("Form data ready for submission after updates:");
-                                console.log("- Antiforgery token present:", !!form.querySelector('input[name="__RequestVerificationToken"]'));
-                                console.log("- Order ID:", form.querySelector('input[name="orderId"]').value);
-                                
-                                try {
-                                    form.submit();
-                                } catch (e) {
-                                    console.error("Error submitting form after updates:", e);
-                                    toastr.error("Error submitting form: " + e.message);
-                                    submitBtn.html(originalBtnText);
-                                    submitBtn.prop('disabled', false);
-                                }
-                            } else {
-                                console.error("Submit form not found after updates!");
-                                toastr.error('Submit form not found');
-                                submitBtn.html(originalBtnText);
-                                submitBtn.prop('disabled', false);
-                            }
-                        }, 500);
-                    } else {
-                        toastr.error(response.message);
-                        // Reset button
-                        submitBtn.html(originalBtnText);
-                        submitBtn.prop('disabled', false);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    toastr.error('Error updating items: ' + error);
-                    // Reset button
-                    submitBtn.html(originalBtnText);
-                    submitBtn.prop('disabled', false);
-                }
-            });
-        }
-    </script>
+  <script src="~/js/order-modern.js"></script>
 }
