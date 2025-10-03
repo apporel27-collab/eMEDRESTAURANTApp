@@ -61,9 +61,24 @@
                                     {
                                         <select asp-for="TableTurnoverId" class="form-select">
                                             <option value="">-- No Table --</option>
-                                            @foreach (var table in Model.OccupiedTables)
+                                            @if (Model.AvailableTables.Any())
                                             {
-                                                <option value="@table.TurnoverId">@table.TableName - @table.GuestName (@table.PartySize guests)</option>
+                                                <optgroup label="Available Tables">
+                                                    @foreach (var table in Model.AvailableTables)
+                                                    {
+                                                        // Use negative value sentinel so POST can distinguish available (not yet seated) tables
+                                                        <option value="-@table.Id">@table.TableName (Available - seats @table.Capacity)</option>
+                                                    }
+                                                </optgroup>
+                                            }
+                                            @if (Model.OccupiedTables.Any())
+                                            {
+                                                <optgroup label="Seated Tables">
+                                                    @foreach (var table in Model.OccupiedTables)
+                                                    {
+                                                        <option value="@table.TurnoverId">@table.TableName - @table.GuestName (@table.PartySize guests)</option>
+                                                    }
+                                                </optgroup>
                                             }
                                         </select>
                                     }

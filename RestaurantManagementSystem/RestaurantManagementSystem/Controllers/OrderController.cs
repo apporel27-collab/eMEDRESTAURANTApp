@@ -83,6 +83,12 @@ namespace RestaurantManagementSystem.Controllers
                 }
             }
             
+            // If user selected an available table (negative sentinel) but form invalid, keep selection in UI
+            if (model.TableTurnoverId.HasValue && model.TableTurnoverId < 0)
+            {
+                // nothing extra to do; dropdown will still show negative value; view logic maintains grouping
+            }
+            
             return View(model);
         }
         
@@ -111,6 +117,13 @@ namespace RestaurantManagementSystem.Controllers
                                         // Need to seat guests at this table first
                                         int turnoverId = SeatGuestsAtTable(model.SelectedTableId.Value, "Walk-in", 2, connection, transaction); // Default 2 guests for walk-ins
                                         model.TableTurnoverId = turnoverId;
+                                    }
+                                    else if (model.TableTurnoverId.HasValue && model.TableTurnoverId < 0)
+                                    {
+                                        // User selected an available (unseated) table from dropdown (negative sentinel = -TableId)
+                                        int availableTableId = Math.Abs(model.TableTurnoverId.Value);
+                                        int turnoverId = SeatGuestsAtTable(availableTableId, model.CustomerName ?? "Walk-in", 2, connection, transaction);
+                                        model.TableTurnoverId = turnoverId; // Replace sentinel with real turnover id
                                     }
                                     
                                     command.Parameters.AddWithValue("@TableTurnoverId", model.TableTurnoverId ?? (object)DBNull.Value);
