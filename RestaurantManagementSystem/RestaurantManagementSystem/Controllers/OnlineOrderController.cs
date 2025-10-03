@@ -18,10 +18,136 @@ namespace RestaurantManagementSystem.Controllers
     public class OnlineOrderController : Controller
     {
         private readonly string _connectionString;
+        private static bool _onlineOrdersSchemaEnsured = false;
+        private static readonly object _schemaInitLock = new object();
         
         public OnlineOrderController(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
+        }
+        
+        /// <summary>
+        /// Ensures the OnlineOrderStatuses table exists with the expected seed data.
+        /// This prevents runtime errors if the Online Order setup script has not yet been executed.
+        /// </summary>
+        /// <param name="connection">Open SQL connection</param>
+        private void EnsureOnlineOrderStatusesTable(SqlConnection connection)
+        {
+            using (var command = new SqlCommand(@"IF OBJECT_ID('dbo.OnlineOrderStatuses','U') IS NULL
+BEGIN
+    CREATE TABLE OnlineOrderStatuses (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        Name NVARCHAR(50) NOT NULL,
+        Description NVARCHAR(200) NULL,
+        Color NVARCHAR(20) NULL,
+        IsActive BIT NOT NULL DEFAULT 1
+    );
+
+    SET IDENTITY_INSERT OnlineOrderStatuses ON;
+    INSERT INTO OnlineOrderStatuses (Id, Name, Description, Color, IsActive) VALUES
+        (1,'New','Newly received order','#007bff',1),
+        (2,'Acknowledged','Acknowledged by staff','#17a2b8',1),
+        (3,'In Preparation','Being prepared','#ffc107',1),
+        (4,'Ready For Pickup','Ready for pickup','#28a745',1),
+        (5,'Out For Delivery','Out for delivery','#6f42c1',1);
+    SET IDENTITY_INSERT OnlineOrderStatuses OFF;
+END", connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+        
+        /// <summary>
+        /// Ensures the broader Online Orders schema exists to prevent invalid object errors.
+        /// Creates minimal versions of OrderSources and OnlineOrders if they are missing.
+        /// </summary>
+        private void EnsureOnlineOrdersSchema(SqlConnection connection)
+        {
+            if (_onlineOrdersSchemaEnsured) return;
+            lock (_schemaInitLock)
+            {
+                if (_onlineOrdersSchemaEnsured) return;
+
+                // OrderSources
+                using (var cmd = new SqlCommand(@"IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name='OrderSources')
+BEGIN
+    CREATE TABLE dbo.OrderSources (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        Name NVARCHAR(50) NOT NULL,
+        Description NVARCHAR(200) NULL,
+        ApiKey NVARCHAR(100) NULL,
+        ApiSecret NVARCHAR(100) NULL,
+        WebhookUrl NVARCHAR(255) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME NOT NULL DEFAULT GETDATE()
+    );
+    INSERT INTO dbo.OrderSources (Name, Description) VALUES ('Default','Auto-created order source');
+END", connection))
+                { cmd.ExecuteNonQuery(); }
+
+                // Statuses + seed
+                using (var cmd = new SqlCommand(@"IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name='OnlineOrderStatuses')
+BEGIN
+    CREATE TABLE dbo.OnlineOrderStatuses (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        Name NVARCHAR(50) NOT NULL,
+        Description NVARCHAR(200) NULL,
+        Color NVARCHAR(20) NULL,
+        IsActive BIT NOT NULL DEFAULT 1
+    );
+    SET IDENTITY_INSERT dbo.OnlineOrderStatuses ON;
+    INSERT INTO dbo.OnlineOrderStatuses (Id, Name, Description, Color, IsActive) VALUES
+        (1,'New','Newly received order','#007bff',1),
+        (2,'Acknowledged','Acknowledged by staff','#17a2b8',1),
+        (3,'In Preparation','Being prepared','#ffc107',1),
+        (4,'Ready For Pickup','Ready for pickup','#28a745',1),
+        (5,'Out For Delivery','Out for delivery','#6f42c1',1);
+    SET IDENTITY_INSERT dbo.OnlineOrderStatuses OFF;
+END", connection))
+                { cmd.ExecuteNonQuery(); }
+
+                // OnlineOrders (depends on sources & statuses)
+                using (var cmd = new SqlCommand(@"IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name='OnlineOrders')
+BEGIN
+    CREATE TABLE dbo.OnlineOrders (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        OrderSourceId INT NOT NULL,
+        ExternalOrderId NVARCHAR(50) NULL,
+        OrderNumber NVARCHAR(20) NOT NULL DEFAULT ('ON-' + CONVERT(VARCHAR(8), GETDATE(), 112) + RIGHT('0000'+CAST(ABS(CHECKSUM(NEWID()))%10000 AS VARCHAR(4)),4)),
+        CustomerName NVARCHAR(100) NULL,
+        CustomerPhone NVARCHAR(20) NULL,
+        OrderStatusId INT NOT NULL DEFAULT 1,
+        OrderTotal DECIMAL(10,2) NOT NULL DEFAULT 0,
+        TaxAmount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        IsDelivery BIT NOT NULL DEFAULT 0,
+        RequestedDeliveryTime DATETIME NULL,
+        SyncStatus INT NOT NULL DEFAULT 0,
+        SyncedToLocalOrderId INT NULL,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME NOT NULL DEFAULT GETDATE()
+    );
+END", connection))
+                { cmd.ExecuteNonQuery(); }
+
+                // WebhookEvents (depends on OrderSources)
+                using (var cmd = new SqlCommand(@"IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name='WebhookEvents')
+BEGIN
+    CREATE TABLE dbo.WebhookEvents (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        OrderSourceId INT NOT NULL,
+        EventType NVARCHAR(50) NOT NULL,
+        Payload NVARCHAR(MAX) NOT NULL,
+        ProcessStatus INT NOT NULL DEFAULT 0,
+        ErrorDetails NVARCHAR(MAX) NULL,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        ProcessedAt DATETIME NULL
+    );
+END", connection))
+                { cmd.ExecuteNonQuery(); }
+
+                _onlineOrdersSchemaEnsured = true;
+            }
         }
         
         /// <summary>
@@ -35,9 +161,18 @@ namespace RestaurantManagementSystem.Controllers
             using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
+                try
+                {
+                    EnsureOnlineOrdersSchema(connection);
+                }
+                catch (SqlException)
+                {
+                    // Retry once in case of race condition
+                    System.Threading.Thread.Sleep(200);
+                    EnsureOnlineOrdersSchema(connection);
+                }
                 
-                // Get stats for dashboard
-                var stats = new OnlineOrderStats();
+                var stats = new OnlineOrderStats(); // Get stats for dashboard
                 
                 // Count of orders by status
                 var statusCounts = connection.Query<dynamic>(@"
@@ -152,6 +287,7 @@ namespace RestaurantManagementSystem.Controllers
             using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
+                EnsureOnlineOrdersSchema(connection);
                 
                 // Get order statuses
                 model.OrderStatuses = connection.Query<OnlineOrderStatusViewModel>(@"
@@ -196,6 +332,7 @@ namespace RestaurantManagementSystem.Controllers
             using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
+                EnsureOnlineOrdersSchema(connection);
                 
                 var parameters = new DynamicParameters();
                 parameters.Add("@OrderId", id);
