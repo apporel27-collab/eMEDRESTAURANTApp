@@ -53,10 +53,40 @@ namespace RestaurantManagementSystem.Controllers
             return View(viewModel);
         }
 
-        public IActionResult Orders()
+        [HttpGet]
+        public async Task<IActionResult> Orders()
         {
             ViewData["Title"] = "Order Reports";
-            return View();
+            
+            var viewModel = new OrderReportViewModel();
+            
+            // Load available users for the filter dropdown
+            await LoadOrderReportUsersAsync(viewModel);
+            
+            // Load default report (today's orders)
+            await LoadOrderReportDataAsync(viewModel);
+            
+            return View(viewModel);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Orders(OrderReportFilter filter, int page = 1)
+        {
+            ViewData["Title"] = "Order Reports";
+            
+            var viewModel = new OrderReportViewModel
+            {
+                Filter = filter,
+                CurrentPage = page
+            };
+            
+            // Load available users for the filter dropdown
+            await LoadOrderReportUsersAsync(viewModel);
+            
+            // Load report data based on filter
+            await LoadOrderReportDataAsync(viewModel);
+            
+            return View(viewModel);
         }
 
         public IActionResult Menu()
@@ -240,6 +270,153 @@ namespace RestaurantManagementSystem.Controllers
                 // Log error and provide default empty data
                 Console.WriteLine($"Error loading sales report data: {ex.Message}");
                 viewModel.Summary = new SalesReportSummary();
+            }
+        }
+
+        private async Task LoadOrderReportUsersAsync(OrderReportViewModel viewModel)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                using var command = new SqlCommand(@"
+                    SELECT DISTINCT u.Id, u.FirstName, u.LastName 
+                    FROM Users u 
+                    INNER JOIN Orders o ON u.Id = o.UserId 
+                    WHERE u.IsActive = 1 AND u.FirstName IS NOT NULL AND u.LastName IS NOT NULL
+                    ORDER BY u.FirstName, u.LastName", connection);
+                
+                using var reader = await command.ExecuteReaderAsync();
+                
+                // Add "All Users" option
+                viewModel.AvailableUsers.Add(new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem
+                {
+                    Value = "",
+                    Text = "All Users"
+                });
+                
+                while (await reader.ReadAsync())
+                {
+                    viewModel.AvailableUsers.Add(new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem
+                    {
+                        Value = reader.GetInt32("Id").ToString(),
+                        Text = $"{reader.GetString("FirstName")} {reader.GetString("LastName")}"
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading users for order report: {ex.Message}");
+            }
+        }
+
+        private async Task LoadOrderReportDataAsync(OrderReportViewModel viewModel)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                using var command = new SqlCommand("usp_GetOrderReport", connection)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
+                
+                // Add parameters
+                command.Parameters.AddWithValue("@FromDate", viewModel.Filter.FromDate);
+                command.Parameters.AddWithValue("@ToDate", viewModel.Filter.ToDate);
+                command.Parameters.AddWithValue("@UserId", viewModel.Filter.UserId.HasValue ? (object)viewModel.Filter.UserId.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@Status", viewModel.Filter.Status.HasValue ? (object)viewModel.Filter.Status.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@OrderType", viewModel.Filter.OrderType.HasValue ? (object)viewModel.Filter.OrderType.Value : DBNull.Value);
+                command.Parameters.AddWithValue("@SearchTerm", !string.IsNullOrWhiteSpace(viewModel.Filter.SearchTerm) ? (object)viewModel.Filter.SearchTerm : DBNull.Value);
+                command.Parameters.AddWithValue("@PageNumber", viewModel.CurrentPage);
+                command.Parameters.AddWithValue("@PageSize", viewModel.Filter.PageSize);
+                
+                using var reader = await command.ExecuteReaderAsync();
+                
+                // Read Summary Statistics (First Result Set)
+                if (await reader.ReadAsync())
+                {
+                    viewModel.Summary = new OrderReportSummary
+                    {
+                        TotalOrders = reader.GetInt32("TotalOrders"),
+                        PendingOrders = reader.GetInt32("PendingOrders"),
+                        InProgressOrders = reader.GetInt32("InProgressOrders"),
+                        CompletedOrders = reader.GetInt32("CompletedOrders"),
+                        CancelledOrders = reader.GetInt32("CancelledOrders"),
+                        TotalRevenue = reader.GetDecimal("TotalRevenue"),
+                        AverageOrderValue = reader.GetDecimal("AverageOrderValue"),
+                        DineInOrders = reader.GetInt32("DineInOrders"),
+                        TakeawayOrders = reader.GetInt32("TakeawayOrders"),
+                        DeliveryOrders = reader.GetInt32("DeliveryOrders")
+                    };
+                }
+                
+                // Read Order Details (Second Result Set)
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        viewModel.Orders.Add(new OrderReportItem
+                        {
+                            Id = reader.GetInt32("Id"),
+                            OrderNumber = reader.GetString("OrderNumber"),
+                            CustomerName = reader.IsDBNull("CustomerName") ? "" : reader.GetString("CustomerName"),
+                            CustomerPhone = reader.IsDBNull("CustomerPhone") ? "" : reader.GetString("CustomerPhone"),
+                            WaiterName = reader.GetString("WaiterName"),
+                            OrderType = reader.GetInt32("OrderType"),
+                            OrderTypeName = reader.GetString("OrderTypeName"),
+                            Status = reader.GetInt32("Status"),
+                            StatusName = reader.GetString("StatusName"),
+                            Subtotal = reader.GetDecimal("Subtotal"),
+                            TaxAmount = reader.GetDecimal("TaxAmount"),
+                            TipAmount = reader.GetDecimal("TipAmount"),
+                            DiscountAmount = reader.GetDecimal("DiscountAmount"),
+                            TotalAmount = reader.GetDecimal("TotalAmount"),
+                            SpecialInstructions = reader.IsDBNull("SpecialInstructions") ? "" : reader.GetString("SpecialInstructions"),
+                            CreatedAt = reader.GetDateTime("CreatedAt"),
+                            CompletedAt = reader.IsDBNull("CompletedAt") ? null : reader.GetDateTime("CompletedAt"),
+                            PreparationTimeMinutes = reader.IsDBNull("PreparationTimeMinutes") ? null : reader.GetInt32("PreparationTimeMinutes"),
+                            ItemCount = reader.GetInt32("ItemCount"),
+                            TotalQuantity = reader.GetInt32("TotalQuantity")
+                        });
+                    }
+                }
+                
+                // Read Total Count (Third Result Set)
+                if (await reader.NextResultAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        viewModel.TotalCount = reader.GetInt32("TotalCount");
+                    }
+                }
+                
+                // Skip Users result set (Fourth Result Set) - already loaded separately
+                if (await reader.NextResultAsync())
+                {
+                    // Skip this result set
+                }
+                
+                // Read Hourly Distribution (Fifth Result Set)
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        viewModel.HourlyDistribution.Add(new HourlyOrderDistribution
+                        {
+                            Hour = reader.GetInt32("Hour"),
+                            OrderCount = reader.GetInt32("OrderCount"),
+                            HourlyRevenue = reader.GetDecimal("HourlyRevenue")
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading order report data: {ex.Message}");
+                viewModel.Summary = new OrderReportSummary();
             }
         }
     }
