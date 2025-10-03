@@ -78,6 +78,14 @@ namespace RestaurantManagementSystem.Models
         [Display(Name = "Reference Number")]
         [StringLength(100)]
         public string ReferenceNumber { get; set; }
+
+    [Display(Name = "UPI Reference")] 
+    [StringLength(100)]
+    public string UPIReference { get; set; }
+
+    [Display(Name = "Discount Amount")]
+    [Range(0, 10000)]
+    public decimal DiscountAmount { get; set; }
         
         [Display(Name = "Notes")]
         [StringLength(500)]
@@ -96,6 +104,7 @@ namespace RestaurantManagementSystem.Models
         
         // Helper properties
         public bool IsCardPayment { get; set; }
+        public bool IsUPIPayment { get; set; }
     }
     
     public class VoidPaymentViewModel

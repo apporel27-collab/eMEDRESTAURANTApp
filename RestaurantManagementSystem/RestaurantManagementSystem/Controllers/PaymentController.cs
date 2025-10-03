@@ -59,6 +59,16 @@ namespace RestaurantManagementSystem.Controllers
             using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
+
+                // Ensure UPI method exists
+                using (var ensureCmd = new Microsoft.Data.SqlClient.SqlCommand(@"IF NOT EXISTS (SELECT 1 FROM PaymentMethods WHERE Name='UPI')
+BEGIN
+    INSERT INTO PaymentMethods (Name, DisplayName, IsActive, RequiresCardInfo, RequiresCardPresent, RequiresApproval)
+    VALUES ('UPI','UPI',1,0,0,0);
+END", connection))
+                {
+                    ensureCmd.ExecuteNonQuery();
+                }
                 
                 // Get available payment methods
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
@@ -76,6 +86,10 @@ namespace RestaurantManagementSystem.Controllers
                                 Value = reader.GetInt32(0).ToString(),
                                 Text = reader.GetString(2)
                             });
+                            if (reader.GetString(1).Equals("UPI", StringComparison.OrdinalIgnoreCase))
+                            {
+                                model.IsUPIPayment = true; // marker for JS (initial load none selected so not used yet)
+                            }
                         }
                     }
                 }
@@ -94,16 +108,24 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     // Validate payment method requires card info
                     bool requiresCardInfo = false;
+                    string paymentMethodName = string.Empty;
                     
                     using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
                         using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                            SELECT RequiresCardInfo FROM PaymentMethods WHERE Id = @PaymentMethodId", connection))
+                            SELECT Name, RequiresCardInfo FROM PaymentMethods WHERE Id = @PaymentMethodId", connection))
                         {
                             command.Parameters.AddWithValue("@PaymentMethodId", model.PaymentMethodId);
-                            requiresCardInfo = (bool)command.ExecuteScalar();
+                            using (var rdr = command.ExecuteReader())
+                            {
+                                if (rdr.Read())
+                                {
+                                    paymentMethodName = rdr.GetString(0);
+                                    requiresCardInfo = rdr.GetBoolean(1);
+                                }
+                            }
                         }
                     }
                     
@@ -142,6 +164,12 @@ namespace RestaurantManagementSystem.Controllers
                             command.Parameters.AddWithValue("@Notes", string.IsNullOrEmpty(model.Notes) ? (object)DBNull.Value : model.Notes);
                             command.Parameters.AddWithValue("@ProcessedBy", GetCurrentUserId());
                             command.Parameters.AddWithValue("@ProcessedByName", GetCurrentUserName());
+                            // If UPI selected store reference in ReferenceNumber if not provided separately
+                            if (paymentMethodName.Equals("UPI", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(model.UPIReference))
+                            {
+                                // override ReferenceNumber param value
+                                command.Parameters["@ReferenceNumber"].Value = model.UPIReference;
+                            }
                             
                             using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                             {
@@ -160,6 +188,18 @@ namespace RestaurantManagementSystem.Controllers
                                         else // Pending
                                         {
                                             TempData["InfoMessage"] = "Payment requires approval. It has been saved as pending.";
+                                        }
+
+                                        // If discount provided update order
+                                        if (model.DiscountAmount > 0)
+                                        {
+                                            reader.Close();
+                                            using (var discountCmd = new Microsoft.Data.SqlClient.SqlCommand(@"UPDATE Orders SET DiscountAmount = DiscountAmount + @Disc, UpdatedAt = GETDATE(), TotalAmount = Subtotal + TaxAmount + TipAmount - (DiscountAmount + @Disc) WHERE Id = @OrderId", connection))
+                                            {
+                                                discountCmd.Parameters.AddWithValue("@Disc", model.DiscountAmount);
+                                                discountCmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                                discountCmd.ExecuteNonQuery();
+                                            }
                                         }
                                         return RedirectToAction("Index", new { id = model.OrderId });
                                     }
