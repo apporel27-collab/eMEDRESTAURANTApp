@@ -73,17 +73,41 @@
                                 <i class="fas fa-credit-card position-absolute text-primary payment-icon"></i>
                             </div>
                             <span asp-validation-for="PaymentMethodId" class="text-danger"></span>
+                            <div id="upiReferenceWrapper" class="mt-3" style="display:none;">
+                                <label asp-for="UPIReference" class="form-label fw-semibold">UPI Transaction Reference</label>
+                                <input asp-for="UPIReference" class="form-control form-control-lg shadow-sm" placeholder="Enter UPI transaction / UTR number" />
+                                <span asp-validation-for="UPIReference" class="text-danger"></span>
+                            </div>
                         </div>
                         
-                        <!-- Payment Amount Section -->
-                        <h5 class="mb-3 fw-semibold">2. Enter Payment Amount</h5>
+                        <!-- Discount Section (moved before payment amount) -->
+                        <h5 class="mb-3 fw-semibold">2. Discount (Optional)</h5>
+                        <div class="mb-4">
+                            <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+                                <div class="btn-group" role="group" aria-label="Discount Type">
+                                    <input type="radio" class="btn-check" name="discountMode" id="discountModeAmount" value="amount" checked>
+                                    <label class="btn btn-outline-secondary" for="discountModeAmount">Amount</label>
+                                    <input type="radio" class="btn-check" name="discountMode" id="discountModePercent" value="percent">
+                                    <label class="btn btn-outline-secondary" for="discountModePercent">Percent</label>
+                                </div>
+                                <div class="input-group input-group-lg" style="max-width:320px;">
+                                    <span id="discountPrefix" class="input-group-text bg-light fw-bold">₹</span>
+                                    <input type="number" min="0" step="0.01" id="discountEntry" class="form-control form-control-lg shadow-sm" placeholder="Enter discount" />
+                                </div>
+                                <small class="text-muted">Applies to remaining balance; payment amount auto-adjusts.</small>
+                            </div>
+                            <input type="hidden" asp-for="DiscountAmount" />
+                            <span asp-validation-for="DiscountAmount" class="text-danger"></span>
+                        </div>
+
+                        <!-- Payment Amount Section (after discount) -->
+                        <h5 class="mb-3 fw-semibold">3. Enter Payment Amount</h5>
                         <div class="mb-4">
                             <div class="input-group input-group-lg mb-3">
                                 <span class="input-group-text bg-light fw-bold">₹</span>
                                 <input asp-for="Amount" class="form-control form-control-lg shadow-sm" placeholder="Enter amount" />
                             </div>
                             <span asp-validation-for="Amount" class="text-danger"></span>
-                            
                             <div class="quick-amounts mt-3">
                                 <div class="d-flex flex-wrap gap-2">
                                     <button type="button" class="btn btn-outline-primary quick-amount px-3 py-2 rounded-pill" data-amount="@Math.Round(Model.RemainingAmount, 2)">
@@ -101,9 +125,9 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tip Amount Section -->
-                        <h5 class="mb-3 fw-semibold">3. Add Tip (Optional)</h5>
+                        <h5 class="mb-3 fw-semibold">4. Add Tip (Optional)</h5>
                         <div class="mb-4">
                             <div class="input-group input-group-lg mb-3">
                                 <span class="input-group-text bg-light fw-bold">₹</span>
@@ -191,7 +215,7 @@
                         </div>
                         
                         <!-- Additional Notes Section -->
-                        <h5 class="mb-3 fw-semibold">4. Additional Notes (Optional)</h5>
+                        <h5 class="mb-3 fw-semibold">5. Additional Notes (Optional)</h5>
                         <div class="mb-4">
                             <div class="form-floating">
                                 <textarea asp-for="Notes" class="form-control shadow-sm" rows="3" style="min-height: 100px;" placeholder="Enter notes"></textarea>
@@ -209,6 +233,10 @@
                                 <div class="row mb-2">
                                     <div class="col-6">Payment Amount:</div>
                                     <div class="col-6 text-end fw-bold">₹<span id="summaryAmount">0.00</span></div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-6">Discount:</div>
+                                    <div class="col-6 text-end text-danger">-₹<span id="summaryDiscount">0.00</span></div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-6">Tip Amount:</div>
@@ -243,16 +271,23 @@
             updatePaymentSummary();
             calculateTipPreviews();
             
-            // Show/hide card payment fields based on payment method
+            // Show/hide card payment fields & UPI reference based on payment method
             $('#paymentMethodSelect').change(function() {
                 var selectedOption = $(this).find('option:selected');
                 var requiresCardInfo = false;
+                var text = selectedOption.text().toLowerCase();
                 
                 // Update card type icon
                 if ($(this).val()) {
                     $('.payment-icon').addClass('text-primary');
                 } else {
                     $('.payment-icon').removeClass('text-primary');
+                }
+                if (text.includes('upi')) {
+                    $('#upiReferenceWrapper').slideDown(200);
+                } else {
+                    $('#upiReferenceWrapper').slideUp(200);
+                    $('#UPIReference').val('');
                 }
                 
                 // We'll use AJAX to get payment method details or store this in data attributes
@@ -321,7 +356,7 @@
             });
             
             // Update payment summary when amount or tip changes
-            $('#Amount, #TipAmount').on('input', function() {
+            $('#Amount, #TipAmount, #DiscountAmount').on('input', function() {
                 updatePaymentSummary();
                 
                 // Recalculate tip previews if amount changed
@@ -345,16 +380,62 @@
                 }
             }
             
-            // Update payment summary display
+            // Track original remaining for discount calculations
+            var originalRemaining = parseFloat('@Model.RemainingAmount');
+            var manualAmountOverride = false;
+
+            $('#Amount').on('input', function(){
+                manualAmountOverride = true;
+                updatePaymentSummary();
+                calculateTipPreviews();
+            });
+
+            // Update payment summary display (discount already applied by adjusting Amount)
             function updatePaymentSummary() {
                 var amount = parseFloat($('#Amount').val()) || 0;
                 var tip = parseFloat($('#TipAmount').val()) || 0;
-                var total = amount + tip;
-                
+                var discount = parseFloat($('#DiscountAmount').val()) || 0;
+                var total = amount + tip; // Discount already reflected in amount
                 $('#summaryAmount').text('₹' + amount.toFixed(2));
                 $('#summaryTip').text('₹' + tip.toFixed(2));
+                $('#summaryDiscount').text((discount).toFixed(2));
                 $('#summaryTotal').text('₹' + total.toFixed(2));
             }
+
+            function recalcDiscountAndAmount(){
+                var mode = $('input[name=discountMode]:checked').val();
+                var entry = parseFloat($('#discountEntry').val());
+                if (isNaN(entry) || entry < 0) entry = 0;
+                var discountAmt = 0;
+                if (mode === 'percent'){
+                    if (entry > 100) entry = 100;
+                    discountAmt = originalRemaining * (entry / 100.0);
+                } else {
+                    discountAmt = entry;
+                }
+                if (discountAmt > originalRemaining) discountAmt = originalRemaining;
+                $('#DiscountAmount').val(discountAmt.toFixed(2));
+                if (!manualAmountOverride){
+                    var newAmount = originalRemaining - discountAmt;
+                    if (newAmount < 0) newAmount = 0;
+                    $('#Amount').val(newAmount.toFixed(2));
+                }
+                updatePaymentSummary();
+                calculateTipPreviews();
+            }
+
+            $('#discountEntry').on('input', recalcDiscountAndAmount);
+            $('input[name=discountMode]').change(function(){
+                manualAmountOverride = false; // reset override on mode change
+                if ($(this).val() === 'percent') {
+                    $('#discountPrefix').text('%');
+                } else {
+                    $('#discountPrefix').text('₹');
+                }
+                recalcDiscountAndAmount();
+            });
+            // initial
+            recalcDiscountAndAmount();
             
             // Highlight relevant card icons
             function highlightCardIcons(cardTypes) {
