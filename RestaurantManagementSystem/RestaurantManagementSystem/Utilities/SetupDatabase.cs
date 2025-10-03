@@ -1,0 +1,58 @@
+using System;
+using System.IO;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+
+namespace RestaurantManagementSystem.Utilities
+{
+    public static class SetupDatabase
+    {
+        public static void ExecuteSqlScript(IConfiguration configuration, string scriptPath)
+        {
+            string connectionString = configuration.GetConnectionString("DefaultConnection");
+            
+            try
+            {
+                // Read the SQL script content
+                string script = File.ReadAllText(scriptPath);
+                
+                // Split the script by GO statements to execute each batch separately
+                string[] batches = script.Split(new string[] { "GO", "go" }, StringSplitOptions.RemoveEmptyEntries);
+                
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    
+                    
+                    // Execute each batch
+                    foreach (string batch in batches)
+                    {
+                        if (!string.IsNullOrWhiteSpace(batch))
+                        {
+                            using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(batch, connection))
+                            {
+                                try
+                                {
+                                    command.ExecuteNonQuery();
+                                }
+                                catch (SqlException ex)
+                                {
+                                    
+                                    
+                                    // Continue with next batch instead of throwing
+                                }
+                            }
+                        }
+                    }
+                    
+                    
+                }
+            }
+            catch (Exception ex)
+            {
+                
+                throw;
+            }
+        }
+    }
+}

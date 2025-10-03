@@ -1,0 +1,373 @@
+@model RestaurantManagementSystem.Models.SalesReportViewModel
+@{
+    ViewData["Title"] = "Sales Reports";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="h3 mb-0">
+                    <i class="fas fa-chart-line text-success me-2"></i>
+                    Sales Analytics & Reports
+                </h2>
+                <div class="btn-group">
+                    <button class="btn btn-outline-success" onclick="exportToPDF()">
+                        <i class="fas fa-file-pdf me-2"></i>Export PDF
+                    </button>
+                    <button class="btn btn-success" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel me-2"></i>Export Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light border-0">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter me-2"></i>Report Filters
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" asp-action="Sales" id="filterForm">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label asp-for="Filter.StartDate" class="form-label">From Date</label>
+                                <input asp-for="Filter.StartDate" class="form-control" type="date" />
+                                <span asp-validation-for="Filter.StartDate" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label asp-for="Filter.EndDate" class="form-label">To Date</label>
+                                <input asp-for="Filter.EndDate" class="form-control" type="date" />
+                                <span asp-validation-for="Filter.EndDate" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label asp-for="Filter.UserId" class="form-label">Server/User</label>
+                                <select asp-for="Filter.UserId" class="form-select">
+                                    <option value="">All Servers</option>
+                                    @foreach (var user in Model.AvailableUsers)
+                                    {
+                                        <option value="@user.Id">@user.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-2"></i>Generate Report
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm h-100 bg-gradient-success text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-rupee-sign fa-2x mb-3"></i>
+                    <h4 class="card-title">₹@Model.Summary.TotalSales.ToString("N2")</h4>
+                    <p class="card-text mb-0 opacity-75">Total Sales</p>
+                    <small class="opacity-75">
+                        Completion Rate: @Model.Summary.CompletionRate.ToString("F1")%
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm h-100 bg-gradient-primary text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-shopping-cart fa-2x mb-3"></i>
+                    <h4 class="card-title">@Model.Summary.TotalOrders</h4>
+                    <p class="card-text mb-0 opacity-75">Total Orders</p>
+                    <small class="opacity-75">
+                        Completed: @Model.Summary.CompletedOrders
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm h-100 bg-gradient-info text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-calculator fa-2x mb-3"></i>
+                    <h4 class="card-title">₹@Model.Summary.AverageOrderValue.ToString("N2")</h4>
+                    <p class="card-text mb-0 opacity-75">Average Order</p>
+                    <small class="opacity-75">
+                        Tax: ₹@Model.Summary.TotalTax.ToString("N2")
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm h-100 bg-gradient-warning text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-hand-holding-usd fa-2x mb-3"></i>
+                    <h4 class="card-title">₹@Model.Summary.TotalTips.ToString("N2")</h4>
+                    <p class="card-text mb-0 opacity-75">Total Tips</p>
+                    <small class="opacity-75">
+                        Discounts: ₹@Model.Summary.TotalDiscounts.ToString("N2")
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts and Tables Row -->
+    <div class="row mb-4">
+        <div class="col-md-8 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light border-0">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-area me-2"></i>Daily Sales Trend
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.DailySales.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Orders</th>
+                                        <th>Sales</th>
+                                        <th>Avg Order</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var day in Model.DailySales.Take(7))
+                                    {
+                                        <tr>
+                                            <td>@day.SalesDateFormatted</td>
+                                            <td><span class="badge bg-primary">@day.OrderCount</span></td>
+                                            <td class="fw-bold text-success">₹@day.DailySales.ToString("N2")</td>
+                                            <td>₹@day.AvgOrderValue.ToString("N2")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center py-5">
+                            <i class="fas fa-chart-line fa-3x mb-3 d-block"></i>
+                            No sales data available for the selected period
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light border-0">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-crown me-2"></i>Top Selling Items
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.TopMenuItems.Any())
+                    {
+                        @foreach (var item in Model.TopMenuItems.Take(5))
+                        {
+                            var maxRevenue = Model.TopMenuItems.First().TotalRevenue;
+                            var percentage = maxRevenue > 0 ? (item.TotalRevenue / maxRevenue) * 100 : 0;
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <span class="fw-bold">@item.ItemName</span>
+                                    <br><small class="text-muted">Qty: @item.TotalQuantitySold</small>
+                                </div>
+                                <span class="badge bg-success">₹@item.TotalRevenue.ToString("N0")</span>
+                            </div>
+                            <div class="progress mb-3" style="height: 6px;">
+                                <div class="progress-bar bg-success" style="width: @percentage%"></div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center py-3">No menu items data available</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Server Performance -->
+    @if (Model.ServerPerformance.Any())
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light border-0">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-users me-2"></i>Server Performance
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Server</th>
+                                        <th>Orders</th>
+                                        <th>Total Sales</th>
+                                        <th>Avg Order Value</th>
+                                        <th>Tips</th>
+                                        <th>Tip %</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var server in Model.ServerPerformance)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div>
+                                                    <span class="fw-bold">@server.ServerName</span>
+                                                    <br><small class="text-muted">@server.Username</small>
+                                                </div>
+                                            </td>
+                                            <td><span class="badge bg-primary">@server.OrderCount</span></td>
+                                            <td class="fw-bold text-success">₹@server.TotalSales.ToString("N2")</td>
+                                            <td>₹@server.AvgOrderValue.ToString("N2")</td>
+                                            <td>₹@server.TotalTips.ToString("N2")</td>
+                                            <td>
+                                                <span class="badge bg-info">@server.TipPercentage.ToString("F1")%</span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Order Status & Hourly Pattern -->
+    <div class="row mb-4">
+        @if (Model.OrderStatusData.Any())
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-light border-0">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Order Status Distribution
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var status in Model.OrderStatusData)
+                        {
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold">@status.OrderStatus</span>
+                                <div>
+                                    <span class="badge bg-primary me-2">@status.OrderCount</span>
+                                    <small class="text-muted">@status.Percentage.ToString("F1")%</small>
+                                </div>
+                            </div>
+                            <div class="progress mb-3" style="height: 8px;">
+                                <div class="progress-bar 
+                                    @(status.OrderStatus == "Completed" ? "bg-success" : 
+                                      status.OrderStatus == "Cancelled" ? "bg-danger" : 
+                                      status.OrderStatus == "Active" ? "bg-warning" : "bg-info")" 
+                                     style="width: @status.Percentage%"></div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (Model.HourlySalesPattern.Any())
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-light border-0">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-clock me-2"></i>Hourly Sales Pattern
+                        </h5>
+                    </div>
+                    <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                        @foreach (var hour in Model.HourlySalesPattern.Where(h => h.OrderCount > 0))
+                        {
+                            var maxHourlySales = Model.HourlySalesPattern.Max(h => h.HourlySales);
+                            var percentage = maxHourlySales > 0 ? (hour.HourlySales / maxHourlySales) * 100 : 0;
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <span class="fw-bold">@hour.HourRange</span>
+                                    <br><small class="text-muted">@hour.OrderCount orders</small>
+                                </div>
+                                <span class="badge bg-info">₹@hour.HourlySales.ToString("N0")</span>
+                            </div>
+                            <div class="progress mb-3" style="height: 6px;">
+                                <div class="progress-bar bg-info" style="width: @percentage%"></div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    function exportToPDF() {
+        // Implementation for PDF export
+        alert('PDF export functionality will be implemented with a library like jsPDF');
+    }
+
+    function exportToExcel() {
+        // Implementation for Excel export
+        alert('Excel export functionality will be implemented with a library like SheetJS');
+    }
+
+    // Auto-submit form when filter values change
+    document.addEventListener('DOMContentLoaded', function() {
+        const startDate = document.querySelector('input[name="Filter.StartDate"]');
+        const endDate = document.querySelector('input[name="Filter.EndDate"]');
+        const userId = document.querySelector('select[name="Filter.UserId"]');
+
+        [startDate, endDate, userId].forEach(element => {
+            if (element) {
+                element.addEventListener('change', function() {
+                    document.getElementById('filterForm').submit();
+                });
+            }
+        });
+    });
+</script>
+
+<style>
+    .bg-gradient-success {
+        background: linear-gradient(45deg, #28a745, #20c997);
+    }
+    .bg-gradient-primary {
+        background: linear-gradient(45deg, #007bff, #6610f2);
+    }
+    .bg-gradient-info {
+        background: linear-gradient(45deg, #17a2b8, #6f42c1);
+    }
+    .bg-gradient-warning {
+        background: linear-gradient(45deg, #ffc107, #fd7e14);
+    }
+    .opacity-75 {
+        opacity: 0.75;
+    }
+</style>

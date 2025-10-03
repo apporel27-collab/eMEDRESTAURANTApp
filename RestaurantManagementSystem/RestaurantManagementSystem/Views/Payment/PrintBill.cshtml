@@ -1,0 +1,176 @@
+@model PaymentViewModel
+@{
+    ViewData["Title"] = "Print Bill";
+    Layout = "_PrintLayout";
+}
+
+<!-- CSS moved to bill-style.css -->
+
+<div class="container p-3">
+    <div class="text-center bill-header">
+        <h2>@ViewBag.RestaurantSettings.RestaurantName</h2>
+        <p class="mb-0">
+            @ViewBag.RestaurantSettings.StreetAddress, @ViewBag.RestaurantSettings.City, 
+            @ViewBag.RestaurantSettings.State - @ViewBag.RestaurantSettings.Pincode, @ViewBag.RestaurantSettings.Country
+        </p>
+        @if (!string.IsNullOrEmpty(ViewBag.RestaurantSettings.PhoneNumber))
+        {
+            <p class="mb-0"><strong>Contact:</strong> @ViewBag.RestaurantSettings.PhoneNumber</p>
+        }
+        @if (!string.IsNullOrEmpty(ViewBag.RestaurantSettings.Email))
+        {
+            <p class="mb-0"><strong>Email:</strong> @ViewBag.RestaurantSettings.Email</p>
+        }
+        @if (!string.IsNullOrEmpty(ViewBag.RestaurantSettings.GSTCode))
+        {
+            <p class="mb-0"><strong>GST Code:</strong> <span class="gst-code">@ViewBag.RestaurantSettings.GSTCode</span></p>
+        }
+        <h4 class="mt-3 bill-title">Bill cum Receipt</h4>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-6">
+            <p><strong>Order #:</strong> @Model.OrderNumber</p>
+            <p><strong>Date:</strong> @DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")</p>
+        </div>
+        <div class="col-6 text-end">
+            <p><strong>Table:</strong> @Model.TableName</p>
+            <p><strong>Status:</strong> @Model.OrderStatusDisplay</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h5>Order Items</h5>
+            <table class="table table-sm table-bordered bill-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-end">Price</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.OrderItems)
+                    {
+                        <tr>
+                            <td>@item.MenuItemName</td>
+                            <td class="text-center">@item.Quantity</td>
+                            <td class="text-end">₹@item.UnitPrice.ToString("F2")</td>
+                            <td class="text-end">₹@item.Subtotal.ToString("F2")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row justify-content-end">
+        <div class="col-md-5">
+            <table class="table table-sm">
+                <tr>
+                    <td>Subtotal:</td>
+                    <td class="text-end">₹@Model.Subtotal.ToString("F2")</td>
+                </tr>
+                @if (Model.GSTPercentage > 0)
+                {
+                    <tr>
+                        <td>GST (@Model.GSTPercentage.ToString("F2")%):</td>
+                        <td class="text-end">₹@Model.TaxAmount.ToString("F2")</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;CGST (@((Model.GSTPercentage/2).ToString("F2"))%):</td>
+                        <td class="text-end">₹@Model.CGSTAmount.ToString("F2")</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;SGST (@((Model.GSTPercentage/2).ToString("F2"))%):</td>
+                        <td class="text-end">₹@Model.SGSTAmount.ToString("F2")</td>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <td>GST (5.00%):</td>
+                        <td class="text-end">₹@Model.TaxAmount.ToString("F2")</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;CGST (2.50%):</td>
+                        <td class="text-end">₹@((Model.TaxAmount/2).ToString("F2"))</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;SGST (2.50%):</td>
+                        <td class="text-end">₹@((Model.TaxAmount/2).ToString("F2"))</td>
+                    </tr>
+                }
+                @if (Model.DiscountAmount > 0)
+                {
+                    <tr>
+                        <td>Discount:</td>
+                        <td class="text-end text-danger">-₹@Model.DiscountAmount.ToString("F2")</td>
+                    </tr>
+                }
+                @if (Model.TipAmount > 0)
+                {
+                    <tr>
+                        <td>Tip:</td>
+                        <td class="text-end">₹@Model.TipAmount.ToString("F2")</td>
+                    </tr>
+                }
+                <tr class="table-active">
+                    <td><strong>Total:</strong></td>
+                    <td class="text-end"><strong>₹@Model.TotalAmount.ToString("F2")</strong></td>
+                </tr>
+                <tr>
+                    <td>Paid:</td>
+                    <td class="text-end text-success">₹@Model.PaidAmount.ToString("F2")</td>
+                </tr>
+                <tr>
+                    <td><strong>Remaining:</strong></td>
+                    <td class="text-end @(Model.RemainingAmount <= 0 ? "text-success" : "text-danger")">
+                        <strong>₹@Model.RemainingAmount.ToString("F2")</strong>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12 text-center bill-footer">
+            <p>Thank you for dining with us!</p>
+            <p class="small">For questions about your bill, please contact @ViewBag.RestaurantSettings.RestaurantName.</p>
+            @if (!string.IsNullOrEmpty(ViewBag.RestaurantSettings.PhoneNumber))
+            {
+                <p class="small mb-0">Contact: @ViewBag.RestaurantSettings.PhoneNumber</p>
+            }
+            @if (!string.IsNullOrEmpty(ViewBag.RestaurantSettings.Email))
+            {
+                <p class="small">Email: @ViewBag.RestaurantSettings.Email</p>
+            }
+            @if (!string.IsNullOrEmpty(ViewBag.RestaurantSettings.Website))
+            {
+                <p class="small">Website: @ViewBag.RestaurantSettings.Website</p>
+            }
+        </div>
+    </div>
+
+    <div class="d-print-none mt-4 text-center">
+        <button type="button" class="btn btn-primary" onclick="window.print();">
+            <i class="fas fa-print"></i> Print Bill
+        </button>
+        <a asp-action="Index" asp-route-id="@Model.OrderId" class="btn btn-secondary">
+            Back to Payment
+        </a>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Auto-print when page loads
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        });
+    </script>
+}

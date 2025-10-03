@@ -1,0 +1,474 @@
+@model PaymentViewModel
+@{
+    ViewData["Title"] = "Payment Management";
+}
+
+<div class="container-fluid p-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>@ViewData["Title"] - Order #@Model.OrderNumber</h1>
+        <div>
+            <a asp-controller="Order" asp-action="Details" asp-route-id="@Model.OrderId" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Order
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["InfoMessage"] != null)
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            @TempData["InfoMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0 fw-bold">Order Summary</h5>
+                    @if (Model.OrderStatus < 3) @* Not Completed *@
+                    {
+                        <span class="badge bg-primary rounded-pill px-3 py-2">@Model.OrderStatusDisplay</span>
+                    }
+                    else if (Model.OrderStatus == 3) @* Completed *@
+                    {
+                        <span class="badge bg-success rounded-pill px-3 py-2">@Model.OrderStatusDisplay</span>
+                    }
+                    else @* Cancelled *@
+                    {
+                        <span class="badge bg-danger rounded-pill px-3 py-2">@Model.OrderStatusDisplay</span>
+                    }
+                </div>
+                <div class="card-body p-4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <p class="mb-1"><span class="text-muted">Table:</span></p>
+                                <p class="fs-5 fw-semibold">@Model.TableName</p>
+                            </div>
+                            <div class="mb-3">
+                                <p class="mb-1"><span class="text-muted">Status:</span></p>
+                                <p class="fs-5 fw-semibold">@Model.OrderStatusDisplay</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <div class="row mb-2">
+                                        <div class="col-6 text-end text-muted">Subtotal:</div>
+                                        <div class="col-6 text-end">₹@Model.Subtotal.ToString("F2")</div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-6 text-end text-muted">GST (@Model.GSTPercentage.ToString("F2")%):</div>
+                                        <div class="col-6 text-end">₹@Model.TaxAmount.ToString("F2")</div>
+                                    </div>
+                                    <div class="row mb-1">
+                                        <div class="col-6 text-end text-muted small">&nbsp;&nbsp;CGST:</div>
+                                        <div class="col-6 text-end small">₹@Model.CGSTAmount.ToString("F2")</div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-6 text-end text-muted small">&nbsp;&nbsp;SGST:</div>
+                                        <div class="col-6 text-end small">₹@Model.SGSTAmount.ToString("F2")</div>
+                                    </div>
+                            @if (Model.DiscountAmount > 0)
+                            {
+                                <div class="row mb-2">
+                                    <div class="col-6 text-end">Discount:</div>
+                                    <div class="col-6 text-end text-danger">-₹@Model.DiscountAmount.ToString("F2")</div>
+                                </div>
+                            }
+                            @if (Model.TipAmount > 0)
+                            {
+                                <div class="row mb-2">
+                                    <div class="col-6 text-end text-muted">Tip:</div>
+                                    <div class="col-6 text-end">₹@Model.TipAmount.ToString("F2")</div>
+                                </div>
+                            }
+                            <hr class="my-2">
+                            <div class="row mb-2">
+                                <div class="col-6 text-end fw-semibold">Total:</div>
+                                <div class="col-6 text-end fw-semibold">₹@Model.TotalAmount.ToString("F2")</div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-6 text-end text-muted">Paid:</div>
+                                <div class="col-6 text-end text-success">₹@Model.PaidAmount.ToString("F2")</div>
+                            </div>
+                            <hr class="my-2">
+                            <div class="row mb-2">
+                                <div class="col-6 text-end fs-5 fw-bold">Remaining:</div>
+                                <div class="col-6 text-end fs-5 fw-bold @(Model.RemainingAmount <= 0 ? "text-success" : "text-danger")">
+                                    ₹@Model.RemainingAmount.ToString("F2")
+                                </div>
+                            </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-center mt-4">
+                        @if (Model.OrderStatus != 4) @* Not Cancelled *@
+                        {
+                            <div class="d-flex gap-2">
+                                @if (Model.RemainingAmount > 0)
+                                {
+                                    <a asp-action="ProcessPayment" asp-route-orderId="@Model.OrderId" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-money-bill-wave me-1"></i> Process Payment
+                                    </a>
+                                }
+                                
+                                <a asp-action="SplitBill" asp-route-orderId="@Model.OrderId" class="btn btn-outline-primary btn-lg">
+                                    <i class="fas fa-receipt me-1"></i> Split Bill
+                                </a>
+                                
+                                <a asp-action="PrintBill" asp-route-orderId="@Model.OrderId" class="btn btn-outline-success btn-lg" target="_blank">
+                                    <i class="fas fa-print me-1"></i> Final Bill
+                                </a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.Payments.Any())
+            {
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0 fw-bold">Payment History</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Date/Time</th>
+                                        <th>Method</th>
+                                        <th>Amount</th>
+                                        <th>Tip</th>
+                                        <th>Status</th>
+                                        <th>Processed By</th>
+                                        <th class="text-end pe-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var payment in Model.Payments)
+                                    {
+                                        <tr>
+                                            <td class="ps-4">
+                                                <div class="fw-semibold">@payment.CreatedAt.ToString("MM/dd/yyyy")</div>
+                                                <div class="small text-muted">@payment.CreatedAt.ToString("HH:mm")</div>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold">@payment.PaymentMethodDisplay</div>
+                                                @if (!string.IsNullOrEmpty(payment.LastFourDigits))
+                                                {
+                                                    <div class="small text-muted">
+                                                        @payment.CardType •••• @payment.LastFourDigits
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(payment.ReferenceNumber))
+                                                {
+                                                    <div class="small text-muted">Ref: @payment.ReferenceNumber</div>
+                                                }
+                                            </td>
+                                            <td class="fw-semibold">₹@payment.Amount.ToString("F2")</td>
+                                            <td>₹@payment.TipAmount.ToString("F2")</td>
+                                            <td>
+                                                @{
+                                                    var badgeClass = payment.Status switch
+                                                    {
+                                                        0 => "bg-warning text-dark",
+                                                        1 => "bg-success",
+                                                        2 => "bg-danger",
+                                                        3 => "bg-secondary",
+                                                        _ => "bg-secondary"
+                                                    };
+                                                }
+                                                <span class="badge @badgeClass rounded-pill px-3 py-2">@payment.StatusDisplay</span>
+                                            </td>
+                                            <td>@payment.ProcessedByName</td>
+                                            <td class="text-end pe-4">
+                                                @if (payment.Status == 1) @* Approved *@
+                                                {
+                                                    <a asp-action="VoidPayment" asp-route-id="@payment.Id" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                                        <i class="fas fa-ban me-1"></i> Void
+                                                    </a>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+            
+            @if (Model.SplitBills.Any())
+            {
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0 fw-bold">Split Bills</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Date/Time</th>
+                                        <th>Amount</th>
+                                        <th>GST</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                        <th class="pe-4">Created By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var splitBill in Model.SplitBills)
+                                    {
+                                        <tr>
+                                            <td class="ps-4">
+                                                <div class="fw-semibold">@splitBill.CreatedAt.ToString("MM/dd/yyyy")</div>
+                                                <div class="small text-muted">@splitBill.CreatedAt.ToString("HH:mm")</div>
+                                            </td>
+                                            <td>₹@splitBill.Amount.ToString("F2")</td>
+                                            <td>₹@splitBill.TaxAmount.ToString("F2")</td>
+                                            <td class="fw-semibold">₹@(splitBill.Amount + splitBill.TaxAmount).ToString("F2")</td>
+                                            <td>
+                                                @{
+                                                    var badgeClass = splitBill.Status switch
+                                                    {
+                                                        0 => "bg-primary",
+                                                        1 => "bg-success",
+                                                        2 => "bg-secondary",
+                                                        _ => "bg-secondary"
+                                                    };
+                                                }
+                                                <span class="badge @badgeClass rounded-pill px-3 py-2">@splitBill.StatusDisplay</span>
+                                            </td>
+                                            <td class="pe-4">@splitBill.CreatedByName</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">Order Items</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        @foreach (var item in Model.OrderItems)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-4 py-3">
+                                <div>
+                                    <div class="fw-semibold">@item.MenuItemName</div>
+                                    <div class="small text-muted">@item.Quantity x ₹@item.UnitPrice.ToString("F2")</div>
+                                </div>
+                                <div class="fw-bold">₹@item.Subtotal.ToString("F2")</div>
+                            </li>
+                        }
+                    </ul>
+                    <div class="card-footer bg-light p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Total Items:</span>
+                            <span class="fw-semibold">@Model.OrderItems.Sum(i => i.Quantity)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function printBill(orderId) {
+            // Open a new window with print-friendly layout
+            var printWindow = window.open('', '_blank');
+            
+            // Create print-friendly content
+            var content = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Final Bill - Order #@Model.OrderNumber</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            margin: 20px;
+                            font-size: 12pt;
+                        }
+                        .header {
+                            text-align: center;
+                            margin-bottom: 20px;
+                        }
+                        .info {
+                            display: flex;
+                            justify-content: space-between;
+                            margin-bottom: 20px;
+                        }
+                        .table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-bottom: 20px;
+                        }
+                        .table th, .table td {
+                            padding: 8px;
+                            border-bottom: 1px solid #ddd;
+                            text-align: left;
+                        }
+                        .table th {
+                            border-top: 1px solid #ddd;
+                        }
+                        .text-end {
+                            text-align: right;
+                        }
+                        .text-center {
+                            text-align: center;
+                        }
+                        .totals {
+                            width: 50%;
+                            margin-left: auto;
+                        }
+                        .footer {
+                            text-align: center;
+                            margin-top: 30px;
+                            border-top: 1px solid #ddd;
+                            padding-top: 20px;
+                        }
+                        @@media print {
+                            .no-print {
+                                display: none;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2>Restaurant Management System</h2>
+                        <h3>Final Bill</h3>
+                    </div>
+                    
+                    <div class="info">
+                        <div>
+                            <p><strong>Order #:</strong> @Model.OrderNumber</p>
+                            <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p><strong>Table:</strong> @Model.TableName</p>
+                            <p><strong>Status:</strong> @Model.OrderStatusDisplay</p>
+                        </div>
+                    </div>
+                    
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">Price</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.OrderItems)
+                            {
+                                <tr>
+                                    <td>@item.MenuItemName</td>
+                                    <td class="text-center">@item.Quantity</td>
+                                    <td class="text-end">₹@item.UnitPrice.ToString("F2")</td>
+                                    <td class="text-end">₹@item.Subtotal.ToString("F2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    
+                    <table class="totals">
+                        <tr>
+                            <td>Subtotal:</td>
+                            <td class="text-end">₹@Model.Subtotal.ToString("F2")</td>
+                        </tr>
+                        <tr>
+                            <td>GST (@Model.GSTPercentage.ToString("F2")%):</td>
+                            <td class="text-end">₹@Model.TaxAmount.ToString("F2")</td>
+                        </tr>
+                        <tr>
+                            <td>&nbsp;&nbsp;CGST:</td>
+                            <td class="text-end">₹@Model.CGSTAmount.ToString("F2")</td>
+                        </tr>
+                        <tr>
+                            <td>&nbsp;&nbsp;SGST:</td>
+                            <td class="text-end">₹@Model.SGSTAmount.ToString("F2")</td>
+                        </tr>
+                        @if (Model.DiscountAmount > 0)
+                        {
+                            <tr>
+                                <td>Discount:</td>
+                                <td class="text-end">-₹@Model.DiscountAmount.ToString("F2")</td>
+                            </tr>
+                        }
+                        @if (Model.TipAmount > 0)
+                        {
+                            <tr>
+                                <td>Tip:</td>
+                                <td class="text-end">₹@Model.TipAmount.ToString("F2")</td>
+                            </tr>
+                        }
+                        <tr style="font-weight: bold;">
+                            <td>Total:</td>
+                            <td class="text-end">₹@Model.TotalAmount.ToString("F2")</td>
+                        </tr>
+                        <tr>
+                            <td>Paid:</td>
+                            <td class="text-end">₹@Model.PaidAmount.ToString("F2")</td>
+                        </tr>
+                        <tr style="font-weight: bold;">
+                            <td>Remaining:</td>
+                            <td class="text-end">₹@Model.RemainingAmount.ToString("F2")</td>
+                        </tr>
+                    </table>
+                    
+                    <div class="footer">
+                        <p>Thank you for dining with us!</p>
+                        <p class="small">For questions about your bill, please contact the restaurant.</p>
+                    </div>
+                    
+                    <div class="no-print" style="text-align: center; margin-top: 20px;">
+                        <button onclick="window.print();" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Print Bill
+                        </button>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            // Write content to the new window
+            printWindow.document.write(content);
+            printWindow.document.close();
+            
+            // Focus on the new window
+            printWindow.focus();
+        }
+    </script>
+}

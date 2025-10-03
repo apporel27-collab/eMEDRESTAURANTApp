@@ -1,0 +1,375 @@
+@model PaymentDashboardViewModel
+@{
+    ViewData["Title"] = "Payment Dashboard";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Payment Dashboard
+                        </h4>
+                        <small>Today: @DateTime.Today.ToString("MMM dd, yyyy")</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Analytics Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-success text-white h-100 shadow-sm">
+                                <div class="card-body text-center">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="card-title text-uppercase text-white-50 mb-1">Today's Total Payments</h6>
+                                            <h3 class="mb-0 fw-bold">₹@Model.TodayTotalPayments.ToString("N2")</h3>
+                                        </div>
+                                        <div class="icon-circle">
+                                            <i class="fas fa-rupee-sign fa-2x opacity-75"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-info text-white h-100 shadow-sm">
+                                <div class="card-body text-center">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="card-title text-uppercase text-white-50 mb-1">Today's Total GST</h6>
+                                            <h3 class="mb-0 fw-bold">₹@Model.TodayTotalGST.ToString("N2")</h3>
+                                        </div>
+                                        <div class="icon-circle">
+                                            <i class="fas fa-percentage fa-2x opacity-75"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-warning text-white h-100 shadow-sm">
+                                <div class="card-body text-center">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="card-title text-uppercase text-white-50 mb-1">Today's Total Tips</h6>
+                                            <h3 class="mb-0 fw-bold">₹@Model.TodayTotalTips.ToString("N2")</h3>
+                                        </div>
+                                        <div class="icon-circle">
+                                            <i class="fas fa-hand-holding-usd fa-2x opacity-75"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Method Breakdown Card -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-credit-card me-2"></i>Today's Payment Methods
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            @if (Model.PaymentMethodBreakdowns.Any(pm => pm.TotalAmount > 0))
+                            {
+                                <div class="row">
+                                    @foreach (var paymentMethod in Model.PaymentMethodBreakdowns.Where(pm => pm.TotalAmount > 0))
+                                    {
+                                        <div class="col-md-3 col-sm-6 mb-3">
+                                            <div class="card border-left-primary shadow-sm h-100 payment-method-card">
+                                                <div class="card-body p-3">
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="flex-grow-1">
+                                                            <h6 class="text-primary fw-bold mb-1">@paymentMethod.PaymentMethodDisplayName</h6>
+                                                            <h4 class="text-dark mb-1 fw-bold">₹@paymentMethod.TotalAmount.ToString("N2")</h4>
+                                                            <small class="text-muted">
+                                                                <i class="fas fa-receipt me-1"></i>@paymentMethod.TransactionCount transaction@(paymentMethod.TransactionCount != 1 ? "s" : "")
+                                                            </small>
+                                                        </div>
+                                                        <div class="text-primary">
+                                                            @switch (paymentMethod.PaymentMethodName.ToLower())
+                                                            {
+                                                                case "cash":
+                                                                    <i class="fas fa-money-bill-wave fa-2x"></i>
+                                                                    break;
+                                                                case "card":
+                                                                case "credit card":
+                                                                case "debit card":
+                                                                    <i class="fas fa-credit-card fa-2x"></i>
+                                                                    break;
+                                                                case "upi":
+                                                                case "digital":
+                                                                    <i class="fas fa-mobile-alt fa-2x"></i>
+                                                                    break;
+                                                                default:
+                                                                    <i class="fas fa-coins fa-2x"></i>
+                                                                    break;
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center py-3">
+                                    <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                                    <h6 class="text-muted">No Payments Today</h6>
+                                    <p class="text-muted mb-0">No payment transactions have been processed today.</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Date Filter Section -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-filter me-2"></i>Payment History Filter
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="get" action="@Url.Action("Dashboard")" class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="fromDate" class="form-label">From Date</label>
+                                    <input type="date" class="form-control" id="fromDate" name="fromDate" 
+                                           value="@Model.FromDate.ToString("yyyy-MM-dd")" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="toDate" class="form-label">To Date</label>
+                                    <input type="date" class="form-control" id="toDate" name="toDate" 
+                                           value="@Model.ToDate.ToString("yyyy-MM-dd")" required>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary me-2">
+                                        <i class="fas fa-search me-1"></i>Filter
+                                    </button>
+                                    <a href="@Url.Action("Dashboard")" class="btn btn-outline-secondary">
+                                        <i class="fas fa-redo me-1"></i>Reset
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Payment History Table -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-history me-2"></i>Payment History
+                                </h5>
+                                <span class="badge bg-primary">@Model.PaymentHistory.Count Records</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            @if (Model.PaymentHistory.Any())
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped" id="paymentHistoryTable">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th scope="col">Order No</th>
+                                                <th scope="col">Table No</th>
+                                                <th scope="col">Total Payable</th>
+                                                <th scope="col">Total Paid</th>
+                                                <th scope="col">Due Amount</th>
+                                                <th scope="col">Status</th>
+                                                <th scope="col">Payment Date</th>
+                                                <th scope="col">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var payment in Model.PaymentHistory)
+                                            {
+                                                <tr>
+                                                    <td class="fw-bold">@payment.OrderNumber</td>
+                                                    <td>@payment.TableName</td>
+                                                    <td class="text-end fw-bold text-primary">₹@payment.TotalPayable.ToString("N2")</td>
+                                                    <td class="text-end fw-bold text-success">₹@payment.TotalPaid.ToString("N2")</td>
+                                                    <td class="text-end fw-bold @(payment.DueAmount > 0 ? "text-danger" : "text-success")">
+                                                        ₹@payment.DueAmount.ToString("N2")
+                                                    </td>
+                                                    <td>
+                                                        @if (payment.OrderStatus == 3)
+                                                        {
+                                                            <span class="badge bg-success">@payment.OrderStatusDisplay</span>
+                                                        }
+                                                        else if (payment.OrderStatus == 4)
+                                                        {
+                                                            <span class="badge bg-danger">@payment.OrderStatusDisplay</span>
+                                                        }
+                                                        else if (payment.DueAmount <= 0)
+                                                        {
+                                                            <span class="badge bg-info">Paid</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-warning text-dark">Pending</span>
+                                                        }
+                                                    </td>
+                                                    <td>@payment.PaymentDate.ToString("MMM dd, yyyy HH:mm")</td>
+                                                    <td>
+                                                        <div class="btn-group" role="group">
+                                                            <a href="@Url.Action("PrintBill", new { orderId = payment.OrderId })" 
+                                                               class="btn btn-sm btn-outline-primary" target="_blank"
+                                                               title="Print Bill">
+                                                                <i class="fas fa-print"></i>
+                                                            </a>
+                                                            <a href="@Url.Action("Index", new { id = payment.OrderId })" 
+                                                               class="btn btn-sm btn-outline-info"
+                                                               title="View Payment Details">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                            @if (payment.DueAmount > 0)
+                                                            {
+                                                                <a href="@Url.Action("ProcessPayment", new { orderId = payment.OrderId })" 
+                                                                   class="btn btn-sm btn-outline-success"
+                                                                   title="Process Payment">
+                                                                    <i class="fas fa-credit-card"></i>
+                                                                </a>
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center py-5">
+                                    <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                                    <h5 class="text-muted">No Payment Records Found</h5>
+                                    <p class="text-muted">No payment records found for the selected date range.</p>
+                                    <a href="@Url.Action("Dashboard")" class="btn btn-outline-primary">
+                                        <i class="fas fa-redo me-1"></i>View All Records
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .icon-circle {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .card {
+        border: none;
+        transition: transform 0.2s;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .border-left-primary {
+        border-left: 4px solid #007bff !important;
+    }
+    
+    .payment-method-card {
+        transition: all 0.2s ease-in-out;
+    }
+    
+    .payment-method-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    .table th {
+        border-top: none;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-group .btn {
+        border-radius: 0;
+    }
+    
+    .btn-group .btn:first-child {
+        border-top-left-radius: 0.25rem;
+        border-bottom-left-radius: 0.25rem;
+    }
+    
+    .btn-group .btn:last-child {
+        border-top-right-radius: 0.25rem;
+        border-bottom-right-radius: 0.25rem;
+    }
+    
+    @@media (max-width: 768px) {
+        .btn-group {
+            flex-direction: column;
+        }
+        
+        .btn-group .btn {
+            border-radius: 0.25rem !important;
+            margin-bottom: 2px;
+        }
+    }
+</style>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Initialize DataTable for better user experience
+            if ($.fn.DataTable) {
+                $('#paymentHistoryTable').DataTable({
+                    "pageLength": 25,
+                    "order": [[ 6, "desc" ]], // Sort by payment date descending
+                    "responsive": true,
+                    "language": {
+                        "search": "Search payments:",
+                        "lengthMenu": "Show _MENU_ payments per page",
+                        "info": "Showing _START_ to _END_ of _TOTAL_ payments",
+                        "infoEmpty": "No payments found",
+                        "infoFiltered": "(filtered from _MAX_ total payments)"
+                    }
+                });
+            }
+            
+            // Set max date to today for date inputs
+            var today = new Date().toISOString().split('T')[0];
+            document.getElementById('fromDate').setAttribute('max', today);
+            document.getElementById('toDate').setAttribute('max', today);
+            
+            // Validate date range
+            $('#fromDate, #toDate').on('change', function() {
+                var fromDate = new Date($('#fromDate').val());
+                var toDate = new Date($('#toDate').val());
+                
+                if (fromDate > toDate) {
+                    alert('From date cannot be greater than To date');
+                    if (this.id === 'fromDate') {
+                        this.value = $('#toDate').val();
+                    } else {
+                        this.value = $('#fromDate').val();
+                    }
+                }
+            });
+        });
+    </script>
+}

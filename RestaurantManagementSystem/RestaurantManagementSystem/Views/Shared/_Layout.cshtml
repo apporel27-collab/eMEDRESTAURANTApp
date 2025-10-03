@@ -1,0 +1,719 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - RestaurantManagementSystem</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/RestaurantManagementSystem.styles.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="~/css/datatables.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.13.18/jquery.timepicker.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+    <link rel="stylesheet" href="~/css/settings.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <style>
+        /* Compact navigation styles */
+        .navbar {
+            padding-top: 0.25rem !important;
+            padding-bottom: 0.25rem !important;
+        }
+        .navbar .nav-link {
+            padding: 0.4rem 0.6rem !important;
+            font-size: 0.95rem !important;
+            font-weight: 500 !important;
+        }
+        .navbar .dropdown-menu {
+            font-size: 0.9rem;
+        }
+        .navbar .dropdown-item {
+            padding: 0.35rem 0.75rem;
+        }
+        .navbar .navbar-brand {
+            font-size: 1.2rem !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        .compact-icon {
+            font-size: 0.8rem;
+            width: 16px;
+            text-align: center;
+        }
+        .navbar .dropdown-toggle::after {
+            vertical-align: middle;
+        }
+        .navbar-nav > li {
+            margin-right: 3px;
+        }
+        footer {
+            padding: 0.3rem 0.5rem !important;
+            font-size: 0.85rem !important;
+            min-height: 24px !important;
+            line-height: 1.2 !important;
+        }
+    </style>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark bg-gradient mb-3" style="background-color: #1a3c5b; border-bottom: 3px solid #f8b133; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-bold" asp-area="" asp-controller="Home" asp-action="Index" style="color: #ffffff;">
+                    <i class="fas fa-utensils me-1"></i>Restaurant Management
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                        aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1 align-items-center">
+                        <li class="nav-item">
+                            <a class="nav-link text-white" asp-area="" asp-controller="Home" asp-action="Index">
+                                <i class="fas fa-home compact-icon"></i> Home
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="reservationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="far fa-calendar-alt compact-icon"></i> Reservations
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="reservationsDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="List"><i class="fas fa-list compact-icon text-primary"></i> Reservations</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Waitlist"><i class="fas fa-clock compact-icon text-primary"></i> Waitlist</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reservation" asp-action="Tables"><i class="fas fa-table compact-icon text-primary"></i> Tables</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="tableServiceDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-chair compact-icon"></i> Tables
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="tableServiceDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="ActiveTables"><i class="fas fa-list-alt compact-icon text-primary"></i> Active Tables</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="TableService" asp-action="SeatGuest"><i class="fas fa-user-plus compact-icon text-primary"></i> Seat Guest</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="orderDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-clipboard-list compact-icon"></i> Orders
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="orderDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Order" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Order" asp-action="Create"><i class="fas fa-plus compact-icon text-primary"></i> Create Order</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Order" asp-action="Estimation" target="_blank"><i class="fas fa-calculator compact-icon text-primary"></i> Menu Items & Estimation</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Payment" asp-action="Dashboard"><i class="fas fa-chart-line compact-icon text-success"></i> Payment Dashboard</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="kitchenDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-fire compact-icon"></i> Kitchen
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="kitchenDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Tickets"><i class="fas fa-receipt compact-icon text-primary"></i> Tickets</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Kitchen" asp-action="Stations"><i class="fas fa-map-signs compact-icon text-primary"></i> Stations</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="onlineOrderDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-globe compact-icon"></i> Online
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="onlineOrderDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="Dashboard"><i class="fas fa-th-large compact-icon text-primary"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="Index"><i class="fas fa-list compact-icon text-primary"></i> Order List</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="OrderSources"><i class="fas fa-external-link-alt compact-icon text-primary"></i> Sources</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OnlineOrder" asp-action="MenuItemMappings"><i class="fas fa-exchange-alt compact-icon text-primary"></i> Mappings</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="menuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-book-open compact-icon"></i> Menu
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="menuDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Menu" asp-action="Index"><i class="fas fa-utensils compact-icon text-primary"></i> Menu Items</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Recipe" asp-action="Dashboard"><i class="fas fa-clipboard-list compact-icon text-primary"></i> Recipe Dashboard</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Recipe" asp-action="Index"><i class="fas fa-book compact-icon text-primary"></i> All Recipes</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Category" asp-action="Index"><i class="fas fa-tags compact-icon text-primary"></i> Categories</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Master" asp-action="IngredientsList"><i class="fas fa-carrot compact-icon text-primary"></i> Ingredients</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="masterDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-cogs compact-icon"></i> Settings
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="masterDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Settings" asp-action="Index"><i class="fas fa-store compact-icon text-primary"></i> Restaurant Settings</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="User" asp-action="UserList"><i class="fas fa-users compact-icon text-primary"></i> Users & Roles</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-chart-bar compact-icon"></i> Reports
+                            </a>
+                            <ul class="dropdown-menu shadow-lg" aria-labelledby="reportsDropdown" style="border-top: 2px solid #f8b133;">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="Sales"><i class="fas fa-dollar-sign compact-icon text-primary"></i> Sales Reports</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="Orders"><i class="fas fa-shopping-cart compact-icon text-primary"></i> Order Reports</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="Menu"><i class="fas fa-utensils compact-icon text-primary"></i> Menu Analysis</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="Customers"><i class="fas fa-users compact-icon text-primary"></i> Customer Reports</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="Financial"><i class="fas fa-calculator compact-icon text-primary"></i> Financial Summary</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <partial name="_LoginPartial" />
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="footer mt-4 py-3 bg-gradient" style="background-color: #1a3c5b; border-top: 3px solid #f8b133;">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6 text-white">
+                    <h5><i class="fas fa-utensils me-2"></i>Restaurant Management System</h5>
+                    <p class="small mb-0">&copy; 2025 - All rights reserved</p>
+                </div>
+                <div class="col-md-6 text-end text-white">
+                    <p class="mb-0">
+                        <a class="text-white text-decoration-none" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy Policy</a> | 
+                        <a class="text-white text-decoration-none" href="#">Terms of Service</a>
+                    </p>
+                    <p class="small mt-1 text-white-50">Version 2.1.5</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/datatables.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.13.18/jquery.timepicker.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+        // Configure toastr
+        toastr.options = {
+            "closeButton": true,
+            "progressBar": true,
+            "positionClass": "toast-top-right",
+            "timeOut": "3000"
+        };
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+
+    <!-- Menu Items Modal -->
+    <div class="modal fade" id="menuItemsModal" tabindex="-1" role="dialog" aria-labelledby="menuItemsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="menuItemsModalLabel">Menu Items & Estimation</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <input type="text" id="menuItemSearch" class="form-control" placeholder="Search menu items...">
+                        </div>
+                        <div class="col-md-4">
+                            <select id="categoryFilter" class="form-control">
+                                <option value="all">All Categories</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button id="estimateBtn" class="btn btn-success w-100">Estimate</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="menuItemsTable" class="table table-striped table-hover">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th width="45%">Name</th>
+                                    <th width="15%">Price</th>
+                                    <th width="15%">Category</th>
+                                    <th width="15%">PLU Code</th>
+                                    <th width="10%">Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody id="menuItemsTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center">Click "Menu Items & Estimation" to load data</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="estimation-section p-3 border-top bg-light" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 text-primary">
+                            <i class="fas fa-calculator me-2"></i>Order Estimation
+                        </h5>
+                        <small class="text-muted">All prices include GST</small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped" id="estimationTable">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th width="45%">Item Description</th>
+                                    <th width="20%" class="text-end">Unit Price</th>
+                                    <th width="15%" class="text-center">Qty</th>
+                                    <th width="20%" class="text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="estimationTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="d-flex w-100 justify-content-between">
+                        <div>
+                            <button type="button" id="clearEstimateBtn" class="btn btn-warning me-2" style="display: none;">
+                                <i class="fas fa-eraser"></i> Clear
+                            </button>
+                            <button type="button" id="printEstimateBtn" class="btn btn-info" style="display: none;">
+                                <i class="fas fa-print"></i> Print Estimate
+                            </button>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Initialize Menu Items Modal functionality for navigation
+            $('#menuItemsNavBtn').click(function() {
+                loadMenuItemsInModal();
+                var menuModal = new bootstrap.Modal(document.getElementById('menuItemsModal'));
+                menuModal.show();
+                
+                // Reset estimation section
+                $('.estimation-section').hide();
+                $('#printEstimateBtn').hide();
+                $('#clearEstimateBtn').hide();
+                $('#estimationTableBody').empty();
+            });
+            
+            // Menu Items search functionality
+            $('#menuItemSearch').on('keyup', function() {
+                var searchText = $(this).val().toLowerCase();
+                $('#menuItemsTable tbody tr').filter(function() {
+                    $(this).toggle($(this).text().toLowerCase().indexOf(searchText) > -1);
+                });
+            });
+            
+            // Category filter functionality
+            $('#categoryFilter').on('change', function() {
+                var category = $(this).val().toLowerCase();
+                if (category === 'all') {
+                    $('#menuItemsTable tbody tr').show();
+                } else {
+                    $('#menuItemsTable tbody tr').filter(function() {
+                        $(this).toggle($(this).find('td:eq(2)').text().toLowerCase() === category);
+                    });
+                }
+            });
+            
+            // Estimate button functionality
+            $('#estimateBtn').on('click', function() {
+                generateMenuEstimate();
+            });
+            
+            // Print estimate button functionality
+            $('#printEstimateBtn').on('click', function() {
+                printMenuEstimate();
+            });
+            
+            // Clear estimate button functionality
+            $('#clearEstimateBtn').on('click', function() {
+                clearMenuEstimate();
+            });
+            
+            // Watch for quantity input changes
+            $(document).on('change', '.qty-input', function() {
+                var value = parseInt($(this).val());
+                if (isNaN(value) || value < 0) {
+                    $(this).val(0);
+                }
+            });
+            
+            function loadMenuItemsInModal() {
+                // Show loading indicator
+                $('#menuItemsTableBody').html('<tr><td colspan="5" class="text-center">Loading menu items...</td></tr>');
+                
+                // Fetch menu items from API
+                $.ajax({
+                    url: '/Menu/Index',
+                    method: 'GET',
+                    success: function(data) {
+                        // Extract menu items from the response
+                        var menuItems = $(data).find('.table tbody tr');
+                        var tableBody = $('#menuItemsTableBody');
+                        
+                        if (menuItems.length > 0) {
+                            tableBody.empty();
+                            
+                            // Process and add menu items to modal table
+                            menuItems.each(function() {
+                                var pluCode = $(this).find('td:eq(0)').text().trim();
+                                var name = $(this).find('td:eq(2)').text().trim();
+                                var category = $(this).find('td:eq(3)').text().trim();
+                                var price = $(this).find('td:eq(4)').text().trim();
+                                
+                                // Extract numeric price value
+                                var numericPrice = price.replace(/[^\d.]/g, ''); // Remove all non-numeric characters except decimal
+                                
+                                tableBody.append(`
+                                    <tr data-price="${numericPrice}">
+                                        <td>${name}</td>
+                                        <td>${price}</td>
+                                        <td>${category}</td>
+                                        <td>${pluCode}</td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm qty-input" min="0" value="0" step="1">
+                                        </td>
+                                    </tr>
+                                `);
+                                
+                                // Add category to filter if not already present
+                                if ($('#categoryFilter option[value="' + category.toLowerCase() + '"]').length === 0) {
+                                    $('#categoryFilter').append(`<option value="${category.toLowerCase()}">${category}</option>`);
+                                }
+                            });
+                        } else {
+                            tableBody.html('<tr><td colspan="5" class="text-center">No menu items found</td></tr>');
+                        }
+                    },
+                    error: function() {
+                        $('#menuItemsTableBody').html('<tr><td colspan="5" class="text-center text-danger">Error loading menu items</td></tr>');
+                    }
+                });
+            }
+            
+            // Function to generate estimate
+            function generateMenuEstimate() {
+                var selectedItems = [];
+                var total = 0;
+                var hasSelectedItems = false;
+                
+                // Collect all items with quantity > 0
+                $('#menuItemsTable tbody tr').each(function() {
+                    var qtyInput = $(this).find('.qty-input');
+                    var qty = parseInt(qtyInput.val());
+                    
+                    if (qty > 0) {
+                        var name = $(this).find('td:eq(0)').text().trim();
+                        var priceText = $(this).find('td:eq(1)').text().trim();
+                        var dataPrice = $(this).data('price');
+                        
+                        // Use data-price attribute if available, otherwise parse the text
+                        var price = parseFloat(dataPrice) || parseFloat(priceText.replace(/[^\d.]/g, ''));
+                        
+                        if (!isNaN(price) && price > 0) {
+                            var subtotal = qty * price;
+                            
+                            selectedItems.push({
+                                name: name,
+                                price: price,
+                                qty: qty,
+                                subtotal: subtotal
+                            });
+                            
+                            total += subtotal;
+                            hasSelectedItems = true;
+                        }
+                    }
+                });
+                
+                // Update estimation table
+                var estimationBody = $('#estimationTableBody');
+                estimationBody.empty();
+                
+                if (hasSelectedItems) {
+                    selectedItems.forEach(function(item) {
+                        estimationBody.append(`
+                            <tr>
+                                <td class="fw-bold">${item.name}</td>
+                                <td class="text-end">₹${item.price.toFixed(2)}</td>
+                                <td class="text-center">${item.qty}</td>
+                                <td class="text-end fw-bold">₹${item.subtotal.toFixed(2)}</td>
+                            </tr>
+                        `);
+                    });
+                    
+                    // Add tax calculation (assuming 5% GST)
+                    var tax = total * 0.05;
+                    var grandTotal = total + tax;
+                    
+                    // Add tax and total rows
+                    estimationBody.append(`
+                        <tr class="border-top">
+                            <td colspan="3" class="text-end fw-bold">Subtotal:</td>
+                            <td class="text-end fw-bold">₹${total.toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="text-end">GST (5%):</td>
+                            <td class="text-end">₹${tax.toFixed(2)}</td>
+                        </tr>
+                        <tr class="table-success">
+                            <td colspan="3" class="text-end fw-bold fs-5">Grand Total:</td>
+                            <td class="text-end fw-bold fs-5">₹${grandTotal.toFixed(2)}</td>
+                        </tr>
+                    `);
+                    
+                    // Show estimation section and buttons
+                    $('.estimation-section').show();
+                    $('#printEstimateBtn').show();
+                    $('#clearEstimateBtn').show();
+                    
+                    // Success message
+                    showMenuToast('Estimate generated successfully!', 'success');
+                } else {
+                    // No items selected
+                    estimationBody.append(`
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                <i class="fas fa-shopping-cart me-2"></i>
+                                Please select items and quantities to generate an estimate
+                            </td>
+                        </tr>
+                    `);
+                    $('.estimation-section').show();
+                    $('#printEstimateBtn').hide();
+                    $('#clearEstimateBtn').hide();
+                    
+                    // Warning message
+                    showMenuToast('Please select items and enter quantities to generate estimate', 'warning');
+                }
+            }
+            
+            // Function to print estimate
+            function printMenuEstimate() {
+                var currentDate = new Date();
+                var estimateNumber = 'EST-' + currentDate.getFullYear() + (currentDate.getMonth() + 1).toString().padStart(2, '0') + currentDate.getDate().toString().padStart(2, '0') + '-' + Math.floor(Math.random() * 1000);
+                
+                var printContents = `
+                    <html>
+                    <head>
+                        <title>Order Estimate - ${estimateNumber}</title>
+                        <style>
+                            body { 
+                                font-family: Arial, sans-serif; 
+                                margin: 20px;
+                                line-height: 1.4;
+                            }
+                            .header { 
+                                text-align: center; 
+                                margin-bottom: 30px;
+                                border-bottom: 2px solid #007bff;
+                                padding-bottom: 15px;
+                            }
+                            .company-name {
+                                font-size: 24px;
+                                font-weight: bold;
+                                color: #007bff;
+                                margin-bottom: 5px;
+                            }
+                            .estimate-title {
+                                font-size: 18px;
+                                color: #333;
+                                margin-bottom: 10px;
+                            }
+                            .estimate-info {
+                                display: flex;
+                                justify-content: space-between;
+                                margin-bottom: 20px;
+                                font-size: 14px;
+                            }
+                            table { 
+                                width: 100%; 
+                                border-collapse: collapse;
+                                margin-bottom: 20px;
+                            }
+                            th, td { 
+                                border: 1px solid #ddd; 
+                                padding: 12px 8px; 
+                                text-align: left; 
+                            }
+                            th { 
+                                background-color: #f8f9fa;
+                                font-weight: bold;
+                                color: #333;
+                            }
+                            .text-right { text-align: right; }
+                            .text-center { text-align: center; }
+                            .total-row { 
+                                background-color: #e8f5e8;
+                                font-weight: bold;
+                            }
+                            .footer { 
+                                margin-top: 30px; 
+                                text-align: center; 
+                                font-style: italic;
+                                color: #666;
+                                border-top: 1px solid #ddd;
+                                padding-top: 15px;
+                            }
+                            .terms {
+                                margin-top: 20px;
+                                font-size: 12px;
+                                color: #666;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <div class="company-name">Restaurant Management System</div>
+                            <div class="estimate-title">ORDER ESTIMATE</div>
+                        </div>
+                        
+                        <div class="estimate-info">
+                            <div>
+                                <strong>Estimate #:</strong> ${estimateNumber}<br>
+                                <strong>Date:</strong> ${currentDate.toLocaleDateString('en-IN')}<br>
+                                <strong>Time:</strong> ${currentDate.toLocaleTimeString('en-IN')}
+                            </div>
+                            <div>
+                                <strong>Valid Until:</strong> ${new Date(currentDate.getTime() + 7*24*60*60*1000).toLocaleDateString('en-IN')}<br>
+                                <strong>Prepared By:</strong> System User
+                            </div>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 50%;">Item Description</th>
+                                    <th style="width: 15%;" class="text-right">Unit Price</th>
+                                    <th style="width: 10%;" class="text-center">Qty</th>
+                                    <th style="width: 15%;" class="text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                // Add all rows from the estimation table
+                $('#estimationTableBody tr').each(function() {
+                    if ($(this).find('td').length === 4) {
+                        var cells = $(this).find('td');
+                        var isTotal = $(this).hasClass('table-success') || $(this).find('td:first').text().includes('Grand Total');
+                        var rowClass = isTotal ? 'total-row' : '';
+                        
+                        printContents += `<tr class="${rowClass}">`;
+                        cells.each(function(index) {
+                            var cellClass = '';
+                            if (index === 1 || index === 3) cellClass = 'text-right';
+                            if (index === 2) cellClass = 'text-center';
+                            
+                            printContents += `<td class="${cellClass}">${$(this).text()}</td>`;
+                        });
+                        printContents += '</tr>';
+                    }
+                });
+                
+                printContents += `
+                            </tbody>
+                        </table>
+                        
+                        <div class="terms">
+                            <strong>Terms & Conditions:</strong><br>
+                            1. This is an estimate only. Final prices may vary.<br>
+                            2. Prices are subject to change without notice.<br>
+                            3. All prices include applicable taxes.<br>
+                            4. This estimate is valid for 7 days from the date of issue.
+                        </div>
+                        
+                        <div class="footer">
+                            <p><strong>Thank you for choosing our restaurant!</strong></p>
+                            <p>For any queries, please contact our management team.</p>
+                        </div>
+                    </body>
+                    </html>
+                `;
+                
+                // Create a new window for printing
+                var printWindow = window.open('', '_blank', 'width=800,height=600');
+                printWindow.document.write(printContents);
+                printWindow.document.close();
+                printWindow.focus();
+                
+                // Print after a short delay to ensure content is loaded
+                setTimeout(function() {
+                    printWindow.print();
+                }, 500);
+                
+                showMenuToast('Estimate prepared for printing', 'success');
+            }
+            
+            // Function to clear estimate
+            function clearMenuEstimate() {
+                // Reset all quantity inputs to 0
+                $('.qty-input').val(0);
+                
+                // Clear estimation table
+                $('#estimationTableBody').empty();
+                
+                // Hide estimation section and buttons
+                $('.estimation-section').hide();
+                $('#printEstimateBtn').hide();
+                $('#clearEstimateBtn').hide();
+                
+                showMenuToast('Estimate cleared successfully', 'info');
+            }
+            
+            // Toast notification function
+            function showMenuToast(message, type = 'info') {
+                // Remove existing toasts
+                $('.toast-notification').remove();
+                
+                var bgClass = 'bg-info';
+                var icon = 'fa-info-circle';
+                
+                switch(type) {
+                    case 'success':
+                        bgClass = 'bg-success';
+                        icon = 'fa-check-circle';
+                        break;
+                    case 'warning':
+                        bgClass = 'bg-warning';
+                        icon = 'fa-exclamation-triangle';
+                        break;
+                    case 'error':
+                        bgClass = 'bg-danger';
+                        icon = 'fa-times-circle';
+                        break;
+                }
+                
+                var toast = $(`
+                    <div class="toast-notification position-fixed top-0 end-0 m-3 ${bgClass} text-white p-3 rounded shadow" style="z-index: 9999;">
+                        <i class="fas ${icon} me-2"></i>${message}
+                    </div>
+                `);
+                
+                $('body').append(toast);
+                
+                // Auto-hide after 3 seconds
+                setTimeout(function() {
+                    toast.fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
