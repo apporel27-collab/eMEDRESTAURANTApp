@@ -19,6 +19,41 @@ namespace RestaurantManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult Save([FromForm] Category model)
         {
+            // Normalize boolean coming from checkbox (handle legacy forms that post 'on')
+            try
+            {
+                if (Request.HasFormContentType && Request.Form.ContainsKey("IsActive"))
+                {
+                    var rawValues = Request.Form["IsActive"].ToArray();
+                    // Pattern 1 (current): hidden false + checkbox true -> values length 2 when checked
+                    // Pattern 2 (legacy): single value "on" when checked, absent when unchecked
+                    bool parsed = model.IsActive; // start with bound value
+                    if (rawValues.Length > 0)
+                    {
+                        // If we have multiple values, take last truthy one
+                        string last = rawValues.Last();
+                        if (rawValues.Length == 1)
+                        {
+                            // Could be "on", "true", "false", "1", "0"
+                            parsed = last.Equals("on", StringComparison.OrdinalIgnoreCase) ||
+                                     last.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                                     last == "1";
+                        }
+                        else
+                        {
+                            // Hidden false + true when checked
+                            parsed = rawValues.Any(v => v.Equals("true", StringComparison.OrdinalIgnoreCase) || v == "1" || v.Equals("on", StringComparison.OrdinalIgnoreCase));
+                        }
+                    }
+                    model.IsActive = parsed;
+                    // Remove model state error for IsActive if any (e.g., 'on' parse failure)
+                    if (ModelState.ContainsKey(nameof(Category.IsActive)))
+                    {
+                        ModelState[nameof(Category.IsActive)]!.Errors.Clear();
+                    }
+                }
+            }
+            catch { /* Non-fatal; continue with best-effort value */ }
             // Manual validation (avoid silent model binding issues)
             if (string.IsNullOrWhiteSpace(model.Name))
             {

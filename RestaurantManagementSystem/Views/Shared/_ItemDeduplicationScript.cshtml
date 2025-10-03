@@ -1,0 +1,520 @@
+@* This partial view contains scripts to deduplicate menu items and improve order saving *@
+
+<script>
+        $(document).ready(function() {
+        console.log('Item deduplication script loaded');
+        
+        // Initialize the item tracking
+        if (!window.orderItemsMap) {
+            initializeOrderItemsMap();
+        }
+        
+        // Initialize nextTempId if not already set
+        if (typeof window.nextTempId === 'undefined') {
+            window.nextTempId = -1;
+            console.log('Initialized nextTempId to', window.nextTempId);
+        }
+        
+        // Initialize newOrderItems array if not already set
+        if (!window.newOrderItems) {
+            window.newOrderItems = [];
+            console.log('Initialized newOrderItems array');
+        }
+        
+        // Call when page loads to update the order items map
+        updateOrderItemsMapFromDOM();
+    });    // Initialize the order items map to track items by menu item ID
+    function initializeOrderItemsMap() {
+        console.log('Initializing order items map');
+        
+        // Maps menuItemId to { orderItemId, quantity, price, name, row }
+        window.orderItemsMap = {};
+        
+        // Track overall total
+        window.orderTotal = 0;
+    }
+    
+    // Update order items map from current DOM state
+    function updateOrderItemsMapFromDOM() {
+        console.log('Updating order items map from DOM');
+        
+        // Reset the map
+        window.orderItemsMap = {};
+        
+        // Get all existing order items from the DOM
+        $('.order-item-edit-form').each(function() {
+            const form = $(this);
+            const orderItemId = form.find('input[name="orderItemId"]').val();
+            const menuItemId = form.find('input[name="menuItemId"]').val();
+            const quantity = parseInt(form.find('input[name="quantity"]').val()) || 1;
+            const price = parseFloat(form.find('input[name="unitPrice"]').val()) || 0;
+            const row = form.closest('tr');
+            
+            if (menuItemId && !isNaN(parseInt(menuItemId))) {
+                window.orderItemsMap[menuItemId] = {
+                    orderItemId: orderItemId,
+                    quantity: quantity,
+                    price: price,
+                    name: row.find('strong').first().text(),
+                    row: row
+                };
+            }
+        });
+        
+        console.log('Order items map updated:', window.orderItemsMap);
+    }
+    
+    // Modify the addMenuItem function to check for duplicates
+    // This is a wrapper around the original function
+    function checkAndAddMenuItem() {
+        const menuItemInput = $('#menuItemInput').val().trim();
+        const quantity = parseInt($('#quantity').val()) || 1;
+        
+        if (!menuItemInput || quantity < 1) {
+            toastr.error('Please enter a valid menu item and quantity');
+            return;
+        }
+        
+        // Find the menu item ID from input
+        let menuItemId = null;
+        let menuItemName = null;
+        let menuItemPrice = null;
+        let found = false;
+        
+        console.log("Looking for menu item:", menuItemInput);
+        
+        // Try direct lookup in the datalist first (most reliable)
+        $('#menuItems option').each(function() {
+            // Try exact match first
+            if ($(this).val().toLowerCase() === menuItemInput.toLowerCase()) {
+                menuItemId = $(this).data('id');
+                menuItemName = $(this).val();
+                menuItemPrice = parseFloat($(this).data('price'));
+                found = true;
+                console.log("Found exact match in datalist:", menuItemName);
+                return false; // break the loop
+            }
+        });
+        
+        // If not found, try menuItemsMap
+        if (!found && window.menuItemsMap) {
+            // Try direct lookup
+            if (window.menuItemsMap[menuItemInput.toLowerCase()]) {
+                const entry = window.menuItemsMap[menuItemInput.toLowerCase()];
+                menuItemId = entry.id;
+                menuItemName = entry.name;
+                menuItemPrice = entry.price;
+                found = true;
+                console.log("Found in menuItemsMap:", menuItemName);
+            }
+            // Try fuzzy matching if direct lookup fails
+            else {
+                const lowerInput = menuItemInput.toLowerCase();
+                
+                // First try startsWith
+                for (const key in window.menuItemsMap) {
+                    if (key.startsWith(lowerInput)) {
+                        const entry = window.menuItemsMap[key];
+                        menuItemId = entry.id;
+                        menuItemName = entry.name;
+                        menuItemPrice = entry.price;
+                        found = true;
+                        console.log("Found with startsWith in menuItemsMap:", menuItemName);
+                        break;
+                    }
+                }
+                
+                // Then try contains
+                if (!found) {
+                    for (const key in window.menuItemsMap) {
+                        if (key.indexOf(lowerInput) > -1) {
+                            const entry = window.menuItemsMap[key];
+                            menuItemId = entry.id;
+                            menuItemName = entry.name;
+                            menuItemPrice = entry.price;
+                            found = true;
+                            console.log("Found with contains in menuItemsMap:", menuItemName);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If still not found, try partial matching in the datalist
+        if (!found) {
+            $('#menuItems option').each(function() {
+                // Try contains match
+                if ($(this).val().toLowerCase().includes(menuItemInput.toLowerCase())) {
+                    menuItemId = $(this).data('id');
+                    menuItemName = $(this).val();
+                    menuItemPrice = parseFloat($(this).data('price'));
+                    found = true;
+                    console.log("Found partial match in datalist:", menuItemName);
+                    return false; // break the loop
+                }
+            });
+        }
+        
+        if (!menuItemId) {
+            console.error('Menu item not found:', menuItemInput);
+            toastr.warning('Menu item not found. Please select from the dropdown list.');
+            return;
+        }
+        
+        console.log("Selected menu item:", { id: menuItemId, name: menuItemName, price: menuItemPrice });
+        
+        // Check if this menu item already exists in the order
+        // First, ensure the orderItemsMap is updated
+        updateOrderItemsMapFromDOM();
+        
+        if (window.orderItemsMap && window.orderItemsMap[menuItemId]) {
+            // Item exists - update the quantity instead of adding new
+            console.log("Item already exists in order, updating quantity");
+            const existingItem = window.orderItemsMap[menuItemId];
+            const existingRow = existingItem.row;
+            const existingQtyField = existingRow.find('input[name="quantity"]');
+            const existingDisplayQty = existingRow.find('.qty-display');
+            const existingSubtotalDisplay = existingRow.find('.subtotal-display');
+            
+            // Update the quantity
+            const newQuantity = existingItem.quantity + quantity;
+            existingQtyField.val(newQuantity);
+            existingDisplayQty.text(newQuantity);
+            
+            // Update the subtotal
+            const newSubtotal = (newQuantity * existingItem.price).toFixed(2);
+            existingSubtotalDisplay.text('₹' + newSubtotal);
+            
+            // Update our tracking
+            window.orderItemsMap[menuItemId].quantity = newQuantity;
+            
+            // Show success message
+            toastr.success(`Updated ${menuItemName} quantity to ${newQuantity}`);
+            
+            // Highlight the row briefly
+            existingRow.addClass('highlight-update');
+            setTimeout(function() {
+                existingRow.removeClass('highlight-update');
+            }, 2000);
+            
+            // Update totals
+            updateOrderTotals();
+            
+            // Clear the input fields
+            $('#menuItemInput').val('').focus();
+            $('#quantity').val('1');
+            
+            return;
+        }
+        
+        // If item doesn't exist, proceed with regular add
+        if (typeof addMenuItem === 'function') {
+            addMenuItem();
+            
+            // Update our order items map after adding
+            setTimeout(updateOrderItemsMapFromDOM, 500);
+        } else {
+            toastr.error('Error: addMenuItem function not available');
+        }
+    }
+    
+    // Update the submitOrderWithEdits function to deduplicate items before sending
+    function deduplicateAndSubmitOrder() {
+        console.log('Deduplicating and submitting order');
+        
+        // First ensure our map is up-to-date
+        updateOrderItemsMapFromDOM();
+        
+        // Call the enhanced save function if available
+        if (typeof saveOrderDetailsEnhanced === 'function') {
+            console.log('Using saveOrderDetailsEnhanced function');
+            saveOrderDetailsEnhanced();
+        }
+        // Fall back to original function if enhanced version is not available
+        else if (typeof submitOrderWithEdits === 'function') {
+            console.log('Using submitOrderWithEdits function');
+            submitOrderWithEdits();
+        } else {
+            console.error('No order submission function available');
+            toastr.error('Error: Order submission function not available');
+        }
+    }
+    
+    // Update styling
+    $(document).ready(function() {
+        // Add CSS for highlighting updated rows
+        $('<style>')
+            .prop('type', 'text/css')
+            .html(`
+                .highlight-update {
+                    animation: highlightFade 2s;
+                }
+                
+                @@keyframes highlightFade {
+                    0% { background-color: rgba(255, 255, 0, 0.5); }
+                    100% { background-color: transparent; }
+                }
+            `)
+            .appendTo('head');
+            
+        // Fix empty order handling
+        function ensureAddMenuItemWorks() {
+            // This function ensures that the addMenuItem function properly handles both empty and non-empty orders
+            const menuItemInput = $('#menuItemInput').val().trim();
+            const quantity = parseInt($('#quantity').val()) || 1;
+            
+            if (!menuItemInput || quantity < 1) {
+                toastr.error('Please enter a valid menu item and quantity');
+                return false;
+            }
+            
+            // Find the menu item ID from input
+            let menuItemId = null;
+            let menuItemName = null;
+            let menuItemPrice = null;
+            
+            // Try to find in the menuItemsMap first
+            if (window.menuItemsMap && window.menuItemsMap[menuItemInput.toLowerCase()]) {
+                const entry = window.menuItemsMap[menuItemInput.toLowerCase()];
+                menuItemId = entry.id;
+                menuItemName = entry.name;
+                menuItemPrice = entry.price;
+            } else {
+                // Fallback to searching the datalist
+                $('#menuItems option').each(function() {
+                    if ($(this).val().toLowerCase() === menuItemInput.toLowerCase()) {
+                        menuItemId = $(this).data('id');
+                        menuItemName = $(this).val();
+                        menuItemPrice = parseFloat($(this).data('price'));
+                        return false; // break the loop
+                    }
+                });
+            }
+            
+            if (!menuItemId) {
+                toastr.error('Menu item not found. Please select from the dropdown list.');
+                return false;
+            }
+            
+            // Check if this menu item already exists in the order
+            if (window.orderItemsMap && window.orderItemsMap[menuItemId]) {
+                // Item exists - update the quantity instead of adding new
+                const existingItem = window.orderItemsMap[menuItemId];
+                const existingRow = existingItem.row;
+                const existingQtyField = existingRow.find('input[name="quantity"]');
+                const existingDisplayQty = existingRow.find('.qty-display');
+                const existingSubtotalDisplay = existingRow.find('.subtotal-display');
+                
+                // Update the quantity
+                const newQuantity = existingItem.quantity + quantity;
+                existingQtyField.val(newQuantity);
+                existingDisplayQty.text(newQuantity);
+                
+                // Update the subtotal
+                const newSubtotal = (newQuantity * existingItem.price).toFixed(2);
+                existingSubtotalDisplay.text('₹' + newSubtotal);
+                
+                // Update our tracking
+                window.orderItemsMap[menuItemId].quantity = newQuantity;
+                
+                // Show success message
+                toastr.success(`Updated ${menuItemName} quantity to ${newQuantity}`);
+                
+                // Highlight the row briefly
+                existingRow.addClass('highlight-update');
+                setTimeout(function() {
+                    existingRow.removeClass('highlight-update');
+                }, 2000);
+                
+                // Update totals
+                updateOrderTotals();
+                
+                // Clear the input fields
+                $('#menuItemInput').val('').focus();
+                $('#quantity').val('1');
+                
+                return true;
+            }
+            
+            // Calculate subtotal
+            const subtotal = (quantity * menuItemPrice).toFixed(2);
+            
+            // Create a new row in the table
+            const tempId = window.nextTempId ? window.nextTempId-- : -1;
+            
+            var newRow = `
+                <tr class="new-item-row" data-temp-id="${tempId}">
+                    <td>
+                        <input type="checkbox" class="fireItem new-item-checkbox" value="${tempId}" form="fireItemsForm" name="SelectedItems" data-is-new="true" />
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Remove Item" onclick="window.removeNewItem(${tempId})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </td>
+                    <td>
+                        <div><strong>${menuItemName}</strong></div>
+                        <form class="d-flex align-items-center gap-2 mt-1 order-item-edit-form new-item-form">
+                            <input type="hidden" name="orderId" value="${$('#orderId').val()}" />
+                            <input type="hidden" name="orderItemId" value="${tempId}" />
+                            <input type="hidden" name="menuItemId" value="${menuItemId}" />
+                            <input type="hidden" name="menuItemName" value="${menuItemName}" />
+                            <input type="hidden" name="unitPrice" value="${menuItemPrice}" />
+                            <input type="number" name="quantity" value="${quantity}" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" onchange="window.updateNewItemDetails(${tempId}, this.value, ${menuItemPrice})" />
+                            <input type="text" name="specialInstructions" value="" placeholder="Note" class="form-control form-control-sm w-auto item-note" style="max-width:120px;" />
+                        </form>
+                    </td>
+                    <td class="align-middle qty-display">${quantity}</td>
+                    <td class="align-middle">₹${menuItemPrice.toFixed(2)}</td>
+                    <td class="align-middle subtotal-display">₹${subtotal}</td>
+                    <td class="align-middle">
+                        <span class="badge bg-info">New (Unsaved)</span>
+                    </td>
+                </tr>
+            `;
+            
+            // Check if the table exists, if not create it
+            var orderTable = $('#orderItemsTable');
+            if (orderTable.length === 0) {
+                // Create table if it doesn't exist
+                var tableHtml = `
+                <div class="table-responsive">
+                    <table id="orderItemsTable" class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 90px">Actions</th>
+                                <th>Item</th>
+                                <th style="width: 80px">Qty</th>
+                                <th style="width: 100px">Unit Price</th>
+                                <th style="width: 100px">Subtotal</th>
+                                <th style="width: 120px">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="6" class="text-center">
+                                    <form id="submitOrderForm" action="/Order/UpdateMultipleOrderItems" method="post" style="display:inline;">
+                                        <input type="hidden" name="orderId" value="${$('#orderId').val()}" />
+                                        <input type="hidden" name="__RequestVerificationToken" value="${$('input[name="__RequestVerificationToken"]').val()}" />
+                                        <button type="button" class="btn btn-primary btn-lg" onclick="window.submitOrderWithEdits()" 
+                                                data-bs-toggle="tooltip" title="Save all order details, quantities, prices, and recalculate totals">
+                                            <i class="fas fa-save"></i> Save Order Details
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr class="table-light">
+                                <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
+                                <td colspan="2">
+                                    <strong class="order-subtotal">₹${subtotal}</strong>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>`;
+                
+                // Replace the alert with the table
+                $('.alert.alert-info:contains("No items added")').replaceWith(tableHtml);
+                
+                // Get the new tbody reference
+                var tbody = $('#orderItemsTable tbody');
+                tbody.append(newRow);
+            } else {
+                // Add the row to the existing table
+                var tbody = $('#orderItemsTable tbody');
+                
+                // If there's a table-secondary row at the start (course header), add after it
+                var firstRow = tbody.find('tr').first();
+                if (firstRow.hasClass('table-secondary')) {
+                    $(newRow).insertAfter(firstRow);
+                } else {
+                    tbody.prepend(newRow);
+                }
+            }
+            
+            // Store the new item data
+            if (!window.newOrderItems) {
+                window.newOrderItems = [];
+            }
+            
+            window.newOrderItems.push({
+                tempId: tempId,
+                menuItemId: menuItemId,
+                menuItemName: menuItemName,
+                quantity: quantity,
+                unitPrice: menuItemPrice,
+                specialInstructions: '',
+                isNew: true
+            });
+            
+            // Update our orderItemsMap
+            if (!window.orderItemsMap) {
+                window.orderItemsMap = {};
+            }
+            
+            window.orderItemsMap[menuItemId] = {
+                orderItemId: tempId,
+                quantity: quantity,
+                price: menuItemPrice,
+                name: menuItemName,
+                row: $(`tr[data-temp-id="${tempId}"]`)
+            };
+            
+            // Clear the form for next entry
+            $('#menuItemInput').val('').focus();
+            $('#quantity').val('1');
+            
+            // Update subtotal
+            if (typeof updateOrderTotals === 'function') {
+                updateOrderTotals();
+            }
+            
+            // Show notification
+            toastr.success('Item added. Remember to click "Save Order Details" to save to database.');
+            
+            return true;
+        }
+
+        // Override the quick add form's submit handler
+        $('#quickAddForm').off('submit').on('submit', function(e) {
+            e.preventDefault();
+            try { 
+                ensureAddMenuItemWorks();
+            } catch(err) {
+                console.error('Error in ensureAddMenuItemWorks:', err);
+                // Fall back to original method if something goes wrong
+                if (typeof addMenuItem === 'function') {
+                    addMenuItem();
+                } else if (typeof addMenuItemWithDOMFallback === 'function') {
+                    addMenuItemWithDOMFallback();
+                }
+            }
+            return false;
+        });
+        
+        // Override the quick add button's click handler
+        $('#quickAddButton').off('click').on('click', function(e) {
+            e.preventDefault();
+            try {
+                ensureAddMenuItemWorks();
+            } catch(err) {
+                console.error('Error in ensureAddMenuItemWorks:', err);
+                // Fall back to original method if something goes wrong
+                if (typeof addMenuItem === 'function') {
+                    addMenuItem();
+                } else if (typeof addMenuItemWithDOMFallback === 'function') {
+                    addMenuItemWithDOMFallback();
+                }
+            }
+            return false;
+        });
+        
+        // Override the Save Order Details button - handle all possible button selectors
+        $('#submitOrderForm button').off('click').on('click', function(e) {
+            e.preventDefault();
+            console.log('Save Order Details button clicked (from _ItemDeduplicationScript)');
+            deduplicateAndSubmitOrder();
+            return false;
+        });
+    });
+</script>

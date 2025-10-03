@@ -99,8 +99,12 @@
                                             <span asp-validation-for="DiscountPercentage" class="text-danger"></span>
                                         </div>
                                         
-                                        <div class="form-group">
-                                            <label asp-for="GSTPercentage" class="control-label"></label>
+                                        <div class="form-check form-switch mb-2">
+                                            <input asp-for="IsGstApplicable" class="form-check-input" id="IsGstApplicableEdit" />
+                                            <label class="form-check-label" for="IsGstApplicableEdit">Is GST Applicable</label>
+                                        </div>
+                                        <div class="form-group mb-2">
+                                            <label asp-for="GSTPercentage" class="control-label">GST Percentage</label>
                                             <input asp-for="GSTPercentage" class="form-control" type="number" step="0.01" />
                                             <span asp-validation-for="GSTPercentage" class="text-danger"></span>
                                         </div>
@@ -123,6 +127,10 @@
                                         <div class="form-check form-check-inline mt-3">
                                             <input asp-for="IsAvailable" class="form-check-input" />
                                             <label asp-for="IsAvailable" class="form-check-label"></label>
+                                        </div>
+                                        <div class="form-check form-check-inline mt-3 ms-2">
+                                            <input asp-for="NotAvailable" class="form-check-input" id="NotAvailableEdit" />
+                                            <label class="form-check-label" for="NotAvailableEdit">Not Available</label>
                                         </div>
                                         
                                         <div class="form-check form-check-inline">
@@ -314,5 +322,15 @@
                     }
                 }
             });
+            function toggleGstField(){
+                const gstApplicable = $('#IsGstApplicableEdit').is(':checked');
+                const gstInput = $('input[name="GSTPercentage"]');
+                gstInput.prop('disabled', !gstApplicable);
+                if(!gstApplicable){
+                    gstInput.val('');
+                }
+            }
+            $('#IsGstApplicableEdit').on('change', toggleGstField);
+            toggleGstField();
     </script>
 }

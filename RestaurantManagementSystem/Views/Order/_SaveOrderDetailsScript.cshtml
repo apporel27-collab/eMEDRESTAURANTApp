@@ -1,0 +1,256 @@
+@* _SaveOrderDetailsScript.cshtml - Script for improved Save Order Details functionality *@
+
+<script>
+    // Enhanced Save Order Details Button functionality
+    $(document).ready(function() {
+        console.log("Initializing enhanced Save Order Details functionality");
+        
+        // Add direct event handler to Save Order Details button
+        $('#submitOrderForm button').off('click').on('click', function(e) {
+            e.preventDefault();
+            console.log("Save Order Details button clicked");
+            saveOrderDetailsEnhanced();
+            return false;
+        });
+    });
+
+    function saveOrderDetailsEnhanced() {
+        console.log("Enhanced Save Order Details function called");
+        
+        // Show loading indicator on button
+        var submitButton = $('#submitOrderForm button');
+        submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+        
+        // Collect all items to update (both existing and new)
+        var itemsToUpdate = [];
+        var orderId = $('#orderId').val();
+        
+        console.log("Order ID:", orderId);
+        
+        // First, collect existing items from the table
+        console.log("Collecting existing items");
+        
+        // Look for rows with data-id attribute (existing items)
+        $('tr[data-id]').each(function() {
+            var row = $(this);
+            var orderItemId = row.data('id');
+            
+            if (!orderItemId) {
+                console.log("Skipping row without ID");
+                return; // Skip items without ID
+            }
+            
+            // Find quantity input either in edit form or display text
+            var quantityInput = row.find('input[name="quantity"]');
+            var quantity = quantityInput.length > 0 ? 
+                parseInt(quantityInput.val()) : 
+                parseInt(row.find('.qty-display').text());
+            
+            // Find special instructions if available
+            var specialInstructions = "";
+            var specialInstructionsInput = row.find('input[name="specialInstructions"]');
+            if (specialInstructionsInput.length > 0) {
+                specialInstructions = specialInstructionsInput.val() || "";
+            }
+            
+            if (!isNaN(orderItemId) && !isNaN(quantity) && quantity > 0) {
+                var item = {
+                    OrderItemId: parseInt(orderItemId),
+                    Quantity: quantity,
+                    SpecialInstructions: specialInstructions,
+                    IsNew: false
+                };
+                itemsToUpdate.push(item);
+                console.log("Added existing item:", item);
+            }
+        });
+        
+        // Also check for .order-item-row class if no data-id rows found
+        if ($('tr[data-id]').length === 0) {
+            $('.order-item-row').each(function() {
+                var row = $(this);
+                var orderItemId = row.data('id');
+                
+                if (!orderItemId) {
+                    console.log("Skipping row without ID");
+                    return; // Skip items without ID
+                }
+                
+                var quantityInput = row.find('input[name="quantity"]');
+                var quantity = quantityInput.length > 0 ? 
+                    parseInt(quantityInput.val()) : 
+                    parseInt(row.find('.qty-display').text());
+                
+                var specialInstructions = "";
+                var specialInstructionsInput = row.find('input[name="specialInstructions"]');
+                if (specialInstructionsInput.length > 0) {
+                    specialInstructions = specialInstructionsInput.val() || "";
+                }
+                
+                if (!isNaN(orderItemId) && !isNaN(quantity) && quantity > 0) {
+                    var item = {
+                        OrderItemId: parseInt(orderItemId),
+                        Quantity: quantity,
+                        SpecialInstructions: specialInstructions,
+                        IsNew: false
+                    };
+                    itemsToUpdate.push(item);
+                    console.log("Added existing item from .order-item-row:", item);
+                }
+            });
+        }
+        
+        // Then, collect new items from the table using data-temp-id attribute
+        console.log("Collecting new items from table");
+        $('tr[data-temp-id]').each(function() {
+            var row = $(this);
+            var tempId = row.data('temp-id');
+            
+            // Find the menu item ID
+            var menuItemIdInput = row.find('input[name="menuItemId"]');
+            if (menuItemIdInput.length === 0) {
+                console.log("Skipping row without menu item ID");
+                return;
+            }
+            
+            var menuItemId = parseInt(menuItemIdInput.val());
+            
+            // Get quantity and special instructions
+            var quantityInput = row.find('input[name="quantity"]');
+            var quantity = quantityInput.length > 0 ? 
+                parseInt(quantityInput.val()) : 
+                parseInt(row.find('.qty-display').text());
+            
+            var specialInstructions = "";
+            var specialInstructionsInput = row.find('input[name="specialInstructions"]');
+            if (specialInstructionsInput.length > 0) {
+                specialInstructions = specialInstructionsInput.val() || "";
+            }
+            
+            if (!isNaN(menuItemId) && !isNaN(quantity) && quantity > 0) {
+                var item = {
+                    OrderItemId: tempId,
+                    MenuItemId: menuItemId,
+                    Quantity: quantity,
+                    SpecialInstructions: specialInstructions,
+                    IsNew: true,
+                    TempId: tempId
+                };
+                itemsToUpdate.push(item);
+                console.log("Added new item from table:", item);
+            }
+        });
+        
+        // Also collect items from newOrderItems array as fallback
+        console.log("Collecting new items from array");
+        if (window.newOrderItems && window.newOrderItems.length > 0) {
+            window.newOrderItems.forEach(function(item) {
+                // Check if we already added this item from the table
+                var alreadyAdded = itemsToUpdate.some(function(existingItem) {
+                    return existingItem.TempId === item.tempId;
+                });
+                
+                if (alreadyAdded) {
+                    console.log("Skipping duplicate item:", item.tempId);
+                    return;
+                }
+                
+                // Find the row by temp ID
+                var row = $(`tr[data-temp-id="${item.tempId}"]`);
+                var currentQuantity = item.quantity;
+                var currentInstructions = "";
+                
+                if (row.length > 0) {
+                    // Get current values from form if available
+                    var quantityInput = row.find('input[name="quantity"]');
+                    if (quantityInput.length > 0) {
+                        currentQuantity = parseInt(quantityInput.val()) || item.quantity;
+                    }
+                    
+                    var instructionsInput = row.find('input[name="specialInstructions"]');
+                    if (instructionsInput.length > 0) {
+                        currentInstructions = instructionsInput.val() || "";
+                    }
+                }
+                
+                var newItem = {
+                    OrderItemId: item.tempId, // Use temp ID for tracking
+                    MenuItemId: parseInt(item.menuItemId),
+                    Quantity: currentQuantity,
+                    SpecialInstructions: currentInstructions,
+                    IsNew: true,
+                    TempId: item.tempId
+                };
+                
+                itemsToUpdate.push(newItem);
+                console.log("Added new item from array:", newItem);
+            });
+        }
+        
+        if (itemsToUpdate.length === 0) {
+            console.warn("No items to update");
+            toastr.info('No items to save.');
+            submitButton.prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+            return;
+        }
+        
+        // Get the CSRF token
+        var token = $('input[name="__RequestVerificationToken"]').val();
+        console.log("Found CSRF token:", token ? "Yes" : "No");
+        
+        // Make the AJAX request
+        console.log("Sending AJAX request with", itemsToUpdate.length, "items to update");
+        
+        $.ajax({
+            url: '/Order/UpdateMultipleOrderItems?orderId=' + orderId,
+            type: 'POST',
+            data: JSON.stringify(itemsToUpdate),
+            contentType: 'application/json',
+            headers: {
+                'RequestVerificationToken': token
+            },
+            success: function(response) {
+                console.log("Server response:", response);
+                
+                if (response && response.success) {
+                    toastr.success(response.message || 'Order updated successfully');
+                    
+                    // Clear the new items array
+                    if (window.newOrderItems) {
+                        window.newOrderItems = [];
+                        console.log("Cleared newOrderItems array");
+                    }
+                    
+                    // Reload the page
+                    console.log("Reloading page in 1 second...");
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    console.error("Update failed:", response);
+                    toastr.error(response ? response.message : 'Failed to update order');
+                    submitButton.prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX error:", status, error);
+                console.error("Status code:", xhr.status);
+                console.error("Response text:", xhr.responseText);
+                
+                var errorMessage = 'Failed to update order. Please try again.';
+                
+                try {
+                    var errorResponse = JSON.parse(xhr.responseText);
+                    if (errorResponse && errorResponse.message) {
+                        errorMessage = errorResponse.message;
+                    }
+                } catch (e) {
+                    console.error("Error parsing response:", e);
+                }
+                
+                toastr.error(errorMessage);
+                submitButton.prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+            }
+        });
+    }
+</script>

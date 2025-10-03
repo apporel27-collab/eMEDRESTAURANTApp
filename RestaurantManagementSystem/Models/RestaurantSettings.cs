@@ -67,6 +67,10 @@ namespace RestaurantManagementSystem.Models
         [Range(0, 100, ErrorMessage = "Default GST percentage must be between 0 and 100")]
         [Display(Name = "Default GST Percentage")]
         public decimal DefaultGSTPercentage { get; set; } = 5.00m;
+
+    [Range(0, 100, ErrorMessage = "Take Away GST percentage must be between 0 and 100")]
+    [Display(Name = "Take Away GST Percentage")]
+    public decimal TakeAwayGSTPercentage { get; set; } = 5.00m; // New field
         
         [Display(Name = "Created On")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;

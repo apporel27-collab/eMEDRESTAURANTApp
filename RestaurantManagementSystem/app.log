@@ -1,0 +1,73 @@
+Using launch settings from /Users/abhikporel/dev/Restaurantapp/RestaurantManagementSystem/Properties/launchSettings.json...
+Building...
+info: RestaurantManagementSystem.Services.AdminInitializationHostedService[0]
+      Admin initialization hosted service starting in background
+info: RestaurantManagementSystem.Services.AdminInitializationHostedService[0]
+      Ensuring admin user exists (background)...
+info: RestaurantManagementSystem.Services.AdminSetupService[0]
+      Connected to the database to check for admin user
+info: RestaurantManagementSystem.Services.AdminSetupService[0]
+      Admin user already exists
+info: RestaurantManagementSystem.Services.AdminInitializationHostedService[0]
+      Attempting admin password reset (background)...
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Checking database connection with string: Server=tcp:192.250.231.28,1433;Database=dev_Restaurant;User Id=purojit2_idmcbp;Password=45*8qce8E;Encrypt=False;TrustServerCertificate=True;Connection Timeout=60;ConnectRetryCount=3;ConnectRetryInterval=5;
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Database connection successful
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Retrieved hash for user admin: $2a$12$prqeBffbf5ZjjVbch00rj.mSBdIAk76GQ64DVBkRsEivONvFfqPvW
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Hash length: 60
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Hash starts with: $2a$12$prq
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Is BCrypt format: True
+info: RestaurantManagementSystem.Utilities.AdminPasswordReset[0]
+      Current admin password hash: $2a$12$prqeBffbf5ZjjVbch00rj.mSBdIAk76GQ64DVBkRsEivONvFfqPvW
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Generated new hash: $2a$12$DeB6fUD796FYGisHgtj8I.FToxXFJfOjPrQDyngJQzyA3Cv5sFGuO
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Hash length: 60
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Hash starts with: $2a$12$DeB
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Successfully reset password for user admin
+info: RestaurantManagementSystem.Utilities.AdminPasswordReset[0]
+      Successfully reset admin password to 'Admin@123'
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Retrieved hash for user admin: $2a$12$DeB6fUD796FYGisHgtj8I.FToxXFJfOjPrQDyngJQzyA3Cv5sFGuO
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Hash length: 60
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Hash starts with: $2a$12$DeB
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Is BCrypt format: True
+info: RestaurantManagementSystem.Utilities.AdminPasswordReset[0]
+      New admin password hash: $2a$12$DeB6fUD796FYGisHgtj8I.FToxXFJfOjPrQDyngJQzyA3Cv5sFGuO
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Retrieved hash for user admin: $2a$12$DeB6fUD796FYGisHgtj8I.FToxXFJfOjPrQDyngJQzyA3Cv5sFGuO
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Hash length: 60
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Hash starts with: $2a$12$DeB
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Is BCrypt format: True
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Attempting to verify password with BCrypt
+info: RestaurantManagementSystem.Utilities.PasswordResetTool[0]
+      Password verification result: True
+info: RestaurantManagementSystem.Utilities.AdminPasswordReset[0]
+      Password verification test: SUCCESS
+info: RestaurantManagementSystem.Services.AdminInitializationHostedService[0]
+      Admin initialization hosted service completed tasks
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+MenuItems table columns check complete.
+Categories table exists, checking columns...
+Ingredients table exists, checking columns...
+MenuItems table columns check complete.
+Categories table exists, checking columns...
+Ingredients table exists, checking columns...
+MenuItems table columns check complete.
+Categories table exists, checking columns...
+Ingredients table exists, checking columns...

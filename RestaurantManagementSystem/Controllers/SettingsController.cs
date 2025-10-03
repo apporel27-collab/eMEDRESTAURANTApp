@@ -163,6 +163,7 @@ namespace RestaurantManagementSystem.Controllers
                 LogoPath = model.LogoPath,
                 CurrencySymbol = model.CurrencySymbol,
                 DefaultGSTPercentage = model.DefaultGSTPercentage,
+                TakeAwayGSTPercentage = model.TakeAwayGSTPercentage,
                 CreatedAt = model.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
                 UpdatedAt = model.UpdatedAt.ToString("dd MMM yyyy, hh:mm tt")
             };
@@ -186,6 +187,7 @@ namespace RestaurantManagementSystem.Controllers
                 LogoPath = viewModel.LogoPath ?? "", // Use existing path if no new logo was uploaded
                 CurrencySymbol = viewModel.CurrencySymbol,
                 DefaultGSTPercentage = viewModel.DefaultGSTPercentage,
+                TakeAwayGSTPercentage = viewModel.TakeAwayGSTPercentage,
                 UpdatedAt = DateTime.Now
             };
         }

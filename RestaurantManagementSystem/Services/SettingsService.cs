@@ -42,7 +42,8 @@ namespace RestaurantManagementSystem.Services
                         Email = "info@myrestaurant.com",
                         Website = "https://www.myrestaurant.com",
                         CurrencySymbol = "₹",
-                        DefaultGSTPercentage = 5.00m
+                        DefaultGSTPercentage = 5.00m,
+                        TakeAwayGSTPercentage = 5.00m
                     };
                     
                     _dbContext.RestaurantSettings.Add(settings);
@@ -80,6 +81,7 @@ namespace RestaurantManagementSystem.Services
                     currentSettings.LogoPath = settings.LogoPath;
                     currentSettings.CurrencySymbol = settings.CurrencySymbol;
                     currentSettings.DefaultGSTPercentage = settings.DefaultGSTPercentage;
+                    currentSettings.TakeAwayGSTPercentage = settings.TakeAwayGSTPercentage;
                     currentSettings.UpdatedAt = DateTime.Now;
                     
                     await _dbContext.SaveChangesAsync();
@@ -136,6 +138,7 @@ namespace RestaurantManagementSystem.Services
                         [LogoPath] NVARCHAR(200) NULL,
                         [CurrencySymbol] NVARCHAR(50) NOT NULL DEFAULT N'₹',
                         [DefaultGSTPercentage] DECIMAL(5,2) NOT NULL DEFAULT 5.00,
+                        [TakeAwayGSTPercentage] DECIMAL(5,2) NOT NULL DEFAULT 5.00,
                         [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(),
                         [UpdatedAt] DATETIME NOT NULL DEFAULT GETDATE()
                     );
@@ -153,7 +156,8 @@ namespace RestaurantManagementSystem.Services
                         [Email],
                         [Website],
                         [CurrencySymbol],
-                        [DefaultGSTPercentage]
+                        [DefaultGSTPercentage],
+                        [TakeAwayGSTPercentage]
                     )
                     VALUES (
                         'My Restaurant',
@@ -167,6 +171,7 @@ namespace RestaurantManagementSystem.Services
                         'info@myrestaurant.com',
                         'https://www.myrestaurant.com',
                         '₹',
+                        5.00,
                         5.00
                     );", connection);
                     

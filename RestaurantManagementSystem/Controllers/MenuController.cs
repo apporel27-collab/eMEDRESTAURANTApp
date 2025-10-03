@@ -157,6 +157,17 @@ namespace RestaurantManagementSystem.Controllers
             {
                 try
                 {
+                    // New enhancement normalization
+                    // If GST not applicable, ignore GSTPercentage value
+                    if (!model.IsGstApplicable)
+                    {
+                        model.GSTPercentage = null;
+                    }
+                    // NotAvailable overrides IsAvailable
+                    if (model.NotAvailable)
+                    {
+                        model.IsAvailable = false;
+                    }
                     // Handle image upload if provided
                     if (model.ImageFile != null)
                     {
@@ -233,6 +244,7 @@ namespace RestaurantManagementSystem.Controllers
                 CategoryId = menuItem.CategoryId,
                 ImagePath = menuItem.ImagePath,
                 IsAvailable = menuItem.IsAvailable,
+                NotAvailable = menuItem.NotAvailable,
                 PreparationTimeMinutes = menuItem.PreparationTimeMinutes,
                 CalorieCount = menuItem.CalorieCount,
                 IsFeatured = menuItem.IsFeatured,
@@ -240,6 +252,7 @@ namespace RestaurantManagementSystem.Controllers
                 DiscountPercentage = menuItem.DiscountPercentage,
                 KitchenStationId = menuItem.KitchenStationId,
                 GSTPercentage = menuItem.GSTPercentage,
+                IsGstApplicable = menuItem.IsGstApplicable,
                 SelectedAllergens = menuItem.Allergens?.Select(a => a.AllergenId).ToList() ?? new List<int>(),
                 // Ingredients feature removed from Edit view model mapping
                 SelectedModifiers = menuItem.Modifiers?.Select(m => m.ModifierId).ToList() ?? new List<int>(),
@@ -270,6 +283,14 @@ namespace RestaurantManagementSystem.Controllers
             {
                 try
                 {
+                    if (!model.IsGstApplicable)
+                    {
+                        model.GSTPercentage = null;
+                    }
+                    if (model.NotAvailable)
+                    {
+                        model.IsAvailable = false;
+                    }
                     // Handle image upload if provided
                     if (model.ImageFile != null)
                     {
@@ -535,6 +556,7 @@ namespace RestaurantManagementSystem.Controllers
                         c.[Name] AS CategoryName,
                         m.[ImagePath], 
                         m.[IsAvailable], 
+                        m.[NotAvailable],
                         ISNULL(m.[PrepTime], 0) AS PreparationTimeMinutes,
                         m.[CalorieCount],
                         ISNULL(m.[IsFeatured], 0) AS IsFeatured,
@@ -575,6 +597,7 @@ namespace RestaurantManagementSystem.Controllers
                                         Category = new Category { Name = SafeGetString(reader, "CategoryName") ?? "Uncategorized" },
                                         ImagePath = SafeGetString(reader, "ImagePath"),
                                         IsAvailable = SafeGetBoolean(reader, "IsAvailable"),
+                                        NotAvailable = HasColumn(reader, "NotAvailable") ? SafeGetBoolean(reader, "NotAvailable") : false,
                                         PreparationTimeMinutes = SafeGetInt(reader, "PreparationTimeMinutes"),
                                         CalorieCount = SafeGetNullableInt(reader, "CalorieCount"),
                                         IsFeatured = SafeGetBoolean(reader, "IsFeatured"),
@@ -583,6 +606,8 @@ namespace RestaurantManagementSystem.Controllers
                                         KitchenStationId = SafeGetNullableInt(reader, "KitchenStationId"),
                                         TargetGP = SafeGetNullableDecimal(reader, "TargetGP"),
                                         ItemType = HasColumn(reader, "ItemType") ? SafeGetString(reader, "ItemType") : null,
+                                        IsGstApplicable = HasColumn(reader, "IsGstApplicable") ? SafeGetBoolean(reader, "IsGstApplicable") : true,
+                                        GSTPercentage = HasColumn(reader, "GSTPercentage") ? SafeGetNullableDecimal(reader, "GSTPercentage") : (decimal?)5.00m,
                                         Allergens = new List<MenuItemAllergen>(),
                                         // Ingredients list is no longer loaded
                                         Modifiers = new List<MenuItemModifier>()
@@ -635,7 +660,8 @@ namespace RestaurantManagementSystem.Controllers
                         m.[DiscountPercentage],
                         m.[KitchenStationId],
                         m.[TargetGP],
-                        m.[GSTPercentage]
+                        m.[GSTPercentage],
+                        m.[IsGstApplicable]
                     FROM [dbo].[MenuItems] m
                     INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
                     WHERE m.[Id] = @Id", connection))
@@ -657,6 +683,7 @@ namespace RestaurantManagementSystem.Controllers
                                 Category = new Category { Name = SafeGetString(reader, "CategoryName") ?? "Uncategorized" },
                                 ImagePath = SafeGetString(reader, "ImagePath"),
                                 IsAvailable = SafeGetBoolean(reader, "IsAvailable"),
+                                NotAvailable = HasColumn(reader, "NotAvailable") ? SafeGetBoolean(reader, "NotAvailable") : false,
                                 PreparationTimeMinutes = SafeGetInt(reader, "PreparationTimeMinutes"),
                                 CalorieCount = SafeGetNullableInt(reader, "CalorieCount"),
                                 IsFeatured = SafeGetBoolean(reader, "IsFeatured"),
@@ -665,6 +692,7 @@ namespace RestaurantManagementSystem.Controllers
                                 KitchenStationId = SafeGetNullableInt(reader, "KitchenStationId"),
                                 TargetGP = SafeGetNullableDecimal(reader, "TargetGP"),
                                 GSTPercentage = HasColumn(reader, "GSTPercentage") ? SafeGetNullableDecimal(reader, "GSTPercentage") : (decimal?)5.00m,
+                                IsGstApplicable = HasColumn(reader, "IsGstApplicable") ? SafeGetBoolean(reader, "IsGstApplicable") : true,
                                 Allergens = new List<MenuItemAllergen>(),
                                 // Ingredients list is no longer loaded
                                 Modifiers = new List<MenuItemModifier>()
@@ -751,12 +779,12 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
-                                          IsAvailable, PrepTime, CalorieCount, 
-                                          IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId, GSTPercentage)
+            INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
+                      IsAvailable, PrepTime, CalorieCount, 
+                      IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId, GSTPercentage, IsGstApplicable, NotAvailable)
                     VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @ImagePath,
-                            @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
-                            @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId, @GSTPercentage);
+                @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
+                @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId, @GSTPercentage, @IsGstApplicable, @NotAvailable);
                     SELECT SCOPE_IDENTITY();", connection))
                 {
                     command.Parameters.AddWithValue("@PLUCode", model.PLUCode);
@@ -791,10 +819,12 @@ namespace RestaurantManagementSystem.Controllers
                     else
                         command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
                     
-                    if (model.GSTPercentage.HasValue)
+                    if (model.GSTPercentage.HasValue && model.IsGstApplicable)
                         command.Parameters.AddWithValue("@GSTPercentage", model.GSTPercentage);
                     else
-                        command.Parameters.AddWithValue("@GSTPercentage", 5.00); // Default to 5% if not provided
+                        command.Parameters.AddWithValue("@GSTPercentage", DBNull.Value);
+                    command.Parameters.AddWithValue("@IsGstApplicable", model.IsGstApplicable);
+                    command.Parameters.AddWithValue("@NotAvailable", model.NotAvailable);
                     
                     var result = command.ExecuteScalar();
                     menuItemId = Convert.ToInt32(result);
@@ -825,7 +855,9 @@ namespace RestaurantManagementSystem.Controllers
                         IsSpecial = @IsSpecial,
                         DiscountPercentage = @DiscountPercentage,
                         KitchenStationId = @KitchenStationId,
-                        GSTPercentage = @GSTPercentage
+                        GSTPercentage = @GSTPercentage,
+                        IsGstApplicable = @IsGstApplicable,
+                        NotAvailable = @NotAvailable
                     WHERE Id = @Id", connection))
                 {
                     command.Parameters.AddWithValue("@Id", model.Id);
@@ -861,10 +893,12 @@ namespace RestaurantManagementSystem.Controllers
                     else
                         command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
                     
-                    if (model.GSTPercentage.HasValue)
+                    if (model.GSTPercentage.HasValue && model.IsGstApplicable)
                         command.Parameters.AddWithValue("@GSTPercentage", model.GSTPercentage);
                     else
-                        command.Parameters.AddWithValue("@GSTPercentage", 5.00); // Default to 5% if not provided
+                        command.Parameters.AddWithValue("@GSTPercentage", DBNull.Value);
+                    command.Parameters.AddWithValue("@IsGstApplicable", model.IsGstApplicable);
+                    command.Parameters.AddWithValue("@NotAvailable", model.NotAvailable);
                     
                     command.ExecuteNonQuery();
                 }

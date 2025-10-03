@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <!-- Global build optimizations -->
+    <UseSharedCompilation>true</UseSharedCompilation>
+    <BuildInParallel>true</BuildInParallel>
+    <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    
+    <!-- Suppress common warnings for faster builds -->
+    <NoWarn>$(NoWarn);NU1701;CS8632;CS0168;CS0219;CS1998;CS8073</NoWarn>
+    
+    <!-- Optimize NuGet -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+  </PropertyGroup>
+  
+  <!-- Development-specific optimizations -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
+</Project>

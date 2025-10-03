@@ -2,6 +2,15 @@
 @{
     ViewData["Title"] = "Order Details";
 }
+@section Styles {
+  <style>
+    /* Ensure top nav dropdowns appear above sticky side panels on order details page */
+    .navbar { z-index: 2000 !important; }
+    #orderDetailsApp .sticky-top { z-index: 100; }
+    /* Defensive: allow dropdown menus to overflow visible area */
+    .navbar .dropdown-menu { position: absolute; }
+  </style>
+}
 <div class="container-fluid py-3" id="orderDetailsApp" data-order-id="@Model.Id">
   <div class="row g-3">
     <div class="col-lg-8 col-12">
@@ -80,8 +89,16 @@
               <td colspan="3" class="text-end" id="orderSubtotalCell">₹@((Model.Items.Where(i=>i.Status!=5).Sum(i=>i.Subtotal)).ToString("F2"))</td>
             </tr>
             <tr>
-              <td colspan="4" class="text-end">Tax:</td>
+              <td colspan="4" class="text-end">GST (@Model.GSTPercentage.ToString("F2")%):</td>
               <td colspan="3" class="text-end" id="orderTaxCell">₹@Model.TaxAmount.ToString("F2")</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-end small text-muted">&nbsp;&nbsp;CGST (@( (Model.GSTPercentage/2).ToString("F2") )%):</td>
+              <td colspan="3" class="text-end small text-muted">₹@Model.CGSTAmount.ToString("F2")</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-end small text-muted">&nbsp;&nbsp;SGST (@( (Model.GSTPercentage/2).ToString("F2") )%):</td>
+              <td colspan="3" class="text-end small text-muted">₹@Model.SGSTAmount.ToString("F2")</td>
             </tr>
             <tr>
               <td colspan="4" class="text-end fw-semibold">Total:</td>
@@ -122,7 +139,9 @@
             <table class="table table-sm mb-0">
               <tbody class="small">
                 <tr><td class="text-muted">Subtotal</td><td class="text-end" id="orderSubtotalCell">₹@Model.Subtotal.ToString("F2")</td></tr>
-                <tr><td class="text-muted">Tax</td><td class="text-end" id="orderTaxCell">₹@Model.TaxAmount.ToString("F2")</td></tr>
+                <tr><td class="text-muted">GST (@Model.GSTPercentage.ToString("F2")%)</td><td class="text-end" id="orderTaxCell">₹@Model.TaxAmount.ToString("F2")</td></tr>
+                <tr><td class="text-muted small ps-3">CGST (@( (Model.GSTPercentage/2).ToString("F2") )%)</td><td class="text-end small">₹@Model.CGSTAmount.ToString("F2")</td></tr>
+                <tr><td class="text-muted small ps-3">SGST (@( (Model.GSTPercentage/2).ToString("F2") )%)</td><td class="text-end small">₹@Model.SGSTAmount.ToString("F2")</td></tr>
                 <tr><td class="text-muted">Tip</td><td class="text-end">₹@Model.TipAmount.ToString("F2")</td></tr>
                 <tr><td class="text-muted">Discount</td><td class="text-end">₹@Model.DiscountAmount.ToString("F2")</td></tr>
                 <tr class="table-light"><th>Total</th><th class="text-end" id="orderTotalCell">₹@Model.TotalAmount.ToString("F2")</th></tr>

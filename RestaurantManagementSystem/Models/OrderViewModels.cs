@@ -90,6 +90,10 @@ namespace RestaurantManagementSystem.Models
             set { _subtotal = value; }
         }
         public decimal TaxAmount { get; set; }
+    // GST related breakdown (computed using Default GST % from settings)
+    public decimal GSTPercentage { get; set; }
+    public decimal CGSTAmount { get; set; }
+    public decimal SGSTAmount { get; set; }
         public decimal TipAmount { get; set; }
         public decimal DiscountAmount { get; set; }
         private decimal? _totalAmount;

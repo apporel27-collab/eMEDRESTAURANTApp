@@ -2351,6 +2351,42 @@ namespace RestaurantManagementSystem.Controllers
                 }
             }
             
+            // After loading all order core data and items, compute GST dynamically using settings
+            try
+            {
+                // Retrieve Default GST % from settings table (fallback 0 if not present)
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT TOP 1 DefaultGSTPercentage FROM RestaurantSettings ORDER BY Id", connection))
+                    {
+                        var gstObj = cmd.ExecuteScalar();
+                        decimal gstPercent = 0m;
+                        if (gstObj != null && gstObj != DBNull.Value)
+                        {
+                            decimal.TryParse(gstObj.ToString(), out gstPercent);
+                        }
+                        if (order != null)
+                        {
+                            order.GSTPercentage = gstPercent;
+                            // Recalculate subtotal from items (exclude cancelled status=5)
+                            var effectiveSubtotal = order.Items?.Where(i => i.Status != 5).Sum(i => i.Subtotal) ?? order.Subtotal;
+                            // Calculate GST amount (round to 2 decimals)
+                            var gstAmount = Math.Round(effectiveSubtotal * gstPercent / 100m, 2, MidpointRounding.AwayFromZero);
+                            order.TaxAmount = gstAmount; // maintain backward compatibility field
+                            order.CGSTAmount = Math.Round(gstAmount / 2m, 2, MidpointRounding.AwayFromZero);
+                            order.SGSTAmount = gstAmount - order.CGSTAmount; // ensure total matches after rounding
+                            order.TotalAmount = effectiveSubtotal + gstAmount + order.TipAmount - order.DiscountAmount;
+                            order.Subtotal = effectiveSubtotal; // ensure stored value aligns
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log and continue silently so page still loads
+                Console.WriteLine($"GST calculation error for order {id}: {ex.Message}");
+            }
             return order;
         }
         private int GetCurrentUserId()

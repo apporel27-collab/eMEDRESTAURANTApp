@@ -1,0 +1,87 @@
+@* This partial view ensures the "Save Order Details" button works consistently *@
+
+<script>
+    $(document).ready(function() {
+        console.log('Save order button fix script loaded');
+        
+        // Function to ensure the save button works
+        function setupSaveOrderButton() {
+            // First, remove any existing handlers to prevent duplicates
+            $(document).off('click', '.btn-save-order-details');
+            $('[onclick*="submitOrderWithEdits"]').off('click');
+            $('#submitOrderForm button').off('click');
+            
+            // Add a direct class to all save buttons for easier targeting
+            $('button:contains("Save Order Details")').addClass('btn-save-order-details');
+            
+            // Add our reliable handler to all save buttons
+            $(document).on('click', '.btn-save-order-details', function(e) {
+                e.preventDefault();
+                console.log('Save Order Details button clicked (from unified handler)');
+                
+                try {
+                    // First try the most specific implementation
+                    if (typeof submitOrderWithEdits === 'function') {
+                        console.log('Calling submitOrderWithEdits()');
+                        submitOrderWithEdits();
+                    }
+                    // If that doesn't exist, try the deduplication version
+                    else if (typeof deduplicateAndSubmitOrder === 'function') {
+                        console.log('Calling deduplicateAndSubmitOrder()');
+                        deduplicateAndSubmitOrder();
+                    }
+                    // Last resort - try to submit the form directly
+                    else {
+                        console.log('No save function found, submitting form directly');
+                        $('#submitOrderForm').submit();
+                    }
+                } catch (err) {
+                    console.error('Error saving order details:', err);
+                    toastr.error('There was an error saving the order. Please try again or contact support.');
+                }
+                
+                return false;
+            });
+            
+            // Also fix any buttons with direct onclick attributes
+            $('[onclick*="submitOrderWithEdits"]').each(function() {
+                const $this = $(this);
+                
+                // Remove the onclick attribute but preserve the button
+                const onclickValue = $this.attr('onclick');
+                $this.removeAttr('onclick');
+                
+                // Add our class for the delegated handler
+                $this.addClass('btn-save-order-details');
+                
+                console.log('Fixed button with onclick:', onclickValue);
+            });
+            
+            console.log('Save order button handlers configured successfully');
+        }
+        
+        // Run immediately and also after a short delay (in case of late DOM changes)
+        setupSaveOrderButton();
+        setTimeout(setupSaveOrderButton, 500);
+        
+        // Monitor for dynamic button additions and fix those too
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+                    for (let i = 0; i < mutation.addedNodes.length; i++) {
+                        const node = mutation.addedNodes[i];
+                        if (node.nodeType === 1 && node.tagName === 'BUTTON') {
+                            if ($(node).text().includes('Save Order Details')) {
+                                console.log('Detected dynamically added save button');
+                                setupSaveOrderButton();
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+    });
+</script>

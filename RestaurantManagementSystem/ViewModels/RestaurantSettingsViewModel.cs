@@ -74,6 +74,11 @@ namespace RestaurantManagementSystem.ViewModels
         [Display(Name = "Default GST Percentage")]
         public decimal DefaultGSTPercentage { get; set; } = 5.00m;
 
+    [Required]
+    [Range(0, 100, ErrorMessage = "Take Away GST percentage must be between 0 and 100")]
+    [Display(Name = "Take Away GST Percentage")]
+    public decimal TakeAwayGSTPercentage { get; set; } = 5.00m;
+
         // Additional display-only information
         [Display(Name = "Created On")]
         public string CreatedAt { get; set; }

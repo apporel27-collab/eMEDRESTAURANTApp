@@ -1,0 +1,213 @@
+@* _SaveOrderButtonFix.cshtml - Direct fix for the Save Order Details button *@
+
+<script>
+    // Direct fix for the Save Order Details button that works regardless of how the button is structured
+    $(document).ready(function() {
+        console.log("Applying direct Save Order Details button fix");
+        
+        // Universal selector to find Save Order Details button
+        var saveButtonSelectors = [
+            'button:contains("Save Order Details")',  // Standard button
+            'a:contains("Save Order Details")',       // Link styled as button
+            '#saveOrderDetailsBtn',                   // By ID
+            '#submitOrderForm button',                // By form and button
+            '[onclick*="saveOrderDetails"]',          // By onclick attribute
+            '[onclick*="submitOrder"]',               // By onclick attribute variation
+            '.btn-primary:contains("Save")',          // By class and partial text
+            'form#submitOrderForm button'             // By form ID and button
+        ];
+        
+        // Try each selector and bind to the first one that matches
+        var saveButton = null;
+        for (var i = 0; i < saveButtonSelectors.length; i++) {
+            var currentSelector = saveButtonSelectors[i];
+            var found = $(currentSelector);
+            if (found.length > 0) {
+                console.log("Found Save Order Details button with selector:", currentSelector);
+                saveButton = found;
+                break;
+            }
+        }
+        
+        if (saveButton && saveButton.length > 0) {
+            console.log("Found", saveButton.length, "Save Order Details buttons");
+            
+            // Create a direct save function that will always work
+            window.directSaveOrderDetails = function() {
+                console.log("Direct save order details function called");
+                
+                // Show loading state on all possible buttons
+                $('button:contains("Save Order Details")').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+                $('#saveOrderDetailsBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+                $('#submitOrderForm button').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+                
+                // Gather all items from the order table
+                var orderId = $('#orderId').val();
+                var itemsToUpdate = [];
+                
+                console.log("Order ID:", orderId);
+                
+                // Process existing items in the table
+                $('#orderItemsTable tbody tr').each(function() {
+                    var row = $(this);
+                    
+                    // Skip course header rows
+                    if (row.hasClass('table-secondary')) {
+                        return;
+                    }
+                    
+                    var isNew = false;
+                    var itemId = null;
+                    var menuItemId = null;
+                    
+                    // Check if this is a new item or existing item
+                    if (row.data('temp-id')) {
+                        isNew = true;
+                        itemId = row.data('temp-id');
+                        
+                        // Find menu item ID in the form
+                        var menuItemIdField = row.find('input[name="menuItemId"]');
+                        if (menuItemIdField.length > 0) {
+                            menuItemId = parseInt(menuItemIdField.val());
+                        }
+                    } else {
+                        itemId = row.data('id') || row.find('input[name="orderItemId"]').val();
+                    }
+                    
+                    // Get quantity either from input field or display text
+                    var quantityField = row.find('input[name="quantity"]');
+                    var quantity = 1;
+                    if (quantityField.length > 0) {
+                        quantity = parseInt(quantityField.val()) || 1;
+                    } else {
+                        var qtyDisplay = row.find('.qty-display');
+                        if (qtyDisplay.length > 0) {
+                            quantity = parseInt(qtyDisplay.text()) || 1;
+                        }
+                    }
+                    
+                    // Get special instructions if available
+                    var specialInstructions = "";
+                    var instructionsField = row.find('input[name="specialInstructions"]');
+                    if (instructionsField.length > 0) {
+                        specialInstructions = instructionsField.val() || "";
+                    }
+                    
+                    // Create the item object
+                    var item = {
+                        OrderItemId: itemId,
+                        Quantity: quantity,
+                        SpecialInstructions: specialInstructions,
+                        IsNew: isNew
+                    };
+                    
+                    // Add MenuItemId only for new items
+                    if (isNew && menuItemId) {
+                        item.MenuItemId = menuItemId;
+                    }
+                    
+                    itemsToUpdate.push(item);
+                    console.log("Added item:", item);
+                });
+                
+                if (itemsToUpdate.length === 0) {
+                    console.log("No items to update");
+                    toastr.warning("No items to save");
+                    
+                    // Reset button state
+                    $('button:contains("Save Order Details")').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                    $('#saveOrderDetailsBtn').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                    $('#submitOrderForm button').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                    
+                    return;
+                }
+                
+                // Get the CSRF token
+                var token = $('input[name="__RequestVerificationToken"]').val();
+                console.log("Found token:", token ? "Yes" : "No");
+                
+                // Make direct AJAX request to save the order
+                $.ajax({
+                    url: '/Order/UpdateMultipleOrderItems?orderId=' + orderId,
+                    type: 'POST',
+                    data: JSON.stringify(itemsToUpdate),
+                    contentType: 'application/json',
+                    headers: {
+                        'RequestVerificationToken': token
+                    },
+                    success: function(response) {
+                        console.log("Server response:", response);
+                        
+                        if (response && response.success) {
+                            toastr.success(response.message || "Order updated successfully");
+                            
+                            // Reset state
+                            if (window.newOrderItems) {
+                                window.newOrderItems = [];
+                            }
+                            
+                            // Reload page after delay
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            console.error("Update failed:", response);
+                            toastr.error(response && response.message ? response.message : "Failed to update order");
+                            
+                            // Reset button state
+                            $('button:contains("Save Order Details")').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                            $('#saveOrderDetailsBtn').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                            $('#submitOrderForm button').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("AJAX error:", xhr.status, error);
+                        console.error("Response text:", xhr.responseText);
+                        
+                        toastr.error("Failed to save order. Please try again.");
+                        
+                        // Reset button state
+                        $('button:contains("Save Order Details")').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                        $('#saveOrderDetailsBtn').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                        $('#submitOrderForm button').prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                    }
+                });
+            };
+            
+            // Bind the button with the direct save function
+            saveButton.off('click').on('click', function(e) {
+                e.preventDefault();
+                console.log("Save Order Details button clicked");
+                window.directSaveOrderDetails();
+                return false;
+            });
+            
+            console.log("Save Order Details button fixed successfully");
+        } else {
+            console.warn("No Save Order Details button found with any selector");
+        }
+        
+        // Add a global click handler for any element that looks like a save button
+        $(document).on('click', '.save-order-btn, button:contains("Save Order"), [data-save-order="true"]', function(e) {
+            e.preventDefault();
+            console.log("Save Order button clicked via global handler");
+            
+            if (typeof window.directSaveOrderDetails === 'function') {
+                window.directSaveOrderDetails();
+            }
+            
+            return false;
+        });
+        
+        // Add a direct click handler to the button in the blue box from the screenshot
+        // Use a more reliable selector targeting class and partial text
+        $('.btn-primary, .btn-lg').filter(function() {
+            return $(this).text().indexOf('Save') >= 0;
+        }).off('click').on('click', function(e) {
+            e.preventDefault();
+            console.log("Save button clicked via special handler");
+            window.directSaveOrderDetails();
+            return false;
+        });
+    });
+</script>

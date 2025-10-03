@@ -1,0 +1,411 @@
+@* This partial view contains scripts to fix the "Add Menu Item" button and "Save Order Details" button functionality *@
+
+<script>
+    // Fix for Add Menu Item button
+    $(document).ready(function() {
+        console.log("Initializing menu item add functionality...");
+        
+        // Make sure the menu items map is initialized
+        initializeMenuItemsMap();
+        
+        // Clear any existing event bindings and rebind the quick add button
+        $('#quickAddButton').off('click').on('click', function(e) {
+            e.preventDefault();
+            addMenuItem();
+            return false;
+        });
+        
+        // Also handle form submission properly
+        $('#quickAddForm').off('submit').on('submit', function(e) {
+            e.preventDefault();
+            addMenuItem();
+            return false;
+        });
+        
+        console.log("Menu item add functionality initialized");
+    });
+    
+    // Function to initialize menu items map for quick lookup
+    function initializeMenuItemsMap() {
+        if (window.menuItemsInitialized) {
+            console.log("Menu items map already initialized");
+            return true;
+        }
+        
+        try {
+            console.log("Initializing menu items map");
+            window.menuItemsMap = {};
+            window.nextTempId = -1;
+            window.newOrderItems = [];
+            
+            // Populate menu items map from datalist options
+            $('#menuItems option').each(function() {
+                const option = $(this);
+                const name = option.val().toLowerCase();
+                const id = option.data('id');
+                const price = parseFloat(option.data('price'));
+                
+                if (name && id) {
+                    window.menuItemsMap[name] = {
+                        id: id,
+                        name: option.val(),
+                        price: price
+                    };
+                }
+            });
+            
+            window.menuItemsInitialized = true;
+            console.log("Menu items map initialized with", Object.keys(window.menuItemsMap).length, "items");
+            return true;
+        } catch (error) {
+            console.error("Error initializing menu items map:", error);
+            return false;
+        }
+    }
+    
+    // Fix for Save Order Details button - completely rewritten
+    function submitOrderWithEdits() {
+        console.log('Submitting order with edits');
+        
+        // Show loading indicator
+        const submitButton = $('#submitOrderForm button[type="button"]');
+        const orderId = $('#orderId').val();
+        
+        if (!orderId) {
+            toastr.error("Order ID not found");
+            return;
+        }
+        
+        submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+        
+        // Collect all items to update (both existing and new)
+        const itemsToUpdate = [];
+        
+        // First, collect existing items
+        $('.order-item-edit-form').not('.new-item-form').each(function() {
+            const form = $(this);
+            const orderItemId = parseInt(form.find('input[name="orderItemId"]').val());
+            const quantity = parseInt(form.find('input[name="quantity"]').val()) || 1;
+            const specialInstructions = form.find('input[name="specialInstructions"]').val() || '';
+            
+            if (orderItemId && quantity > 0) {
+                itemsToUpdate.push({
+                    OrderItemId: orderItemId,
+                    Quantity: quantity,
+                    SpecialInstructions: specialInstructions,
+                    IsNew: false
+                });
+            }
+        });
+        
+        // Then, collect new items
+        if (window.newOrderItems && window.newOrderItems.length > 0) {
+            window.newOrderItems.forEach(function(item) {
+                // Get the current values from the form
+                const row = $(`tr[data-temp-id="${item.tempId}"]`);
+                const currentQuantity = parseInt(row.find('input[name="quantity"]').val()) || item.quantity;
+                const currentInstructions = row.find('input[name="specialInstructions"]').val() || '';
+                
+                itemsToUpdate.push({
+                    OrderItemId: item.tempId, // Use temp ID for tracking
+                    MenuItemId: parseInt(item.menuItemId),
+                    Quantity: currentQuantity,
+                    SpecialInstructions: currentInstructions,
+                    IsNew: true,
+                    TempId: item.tempId
+                });
+            });
+        }
+        
+        if (itemsToUpdate.length === 0) {
+            toastr.info('No items to save.');
+            submitButton.prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+            return;
+        }
+        
+        console.log('Items to update:', itemsToUpdate);
+        
+        // Send the AJAX request with properly formatted data
+        $.ajax({
+            url: '/Order/UpdateMultipleOrderItems?orderId=' + orderId,
+            type: 'POST',
+            data: JSON.stringify(itemsToUpdate),
+            contentType: 'application/json',
+            headers: {
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            },
+            success: function(response) {
+                console.log('Server response:', response);
+                
+                if (response && response.success) {
+                    toastr.success(response.message || 'Order updated successfully');
+                    
+                    // Clear the new items array since they're now saved
+                    window.newOrderItems = [];
+                    
+                    // Reload the page to show the updated order
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    console.error('Server returned error:', response);
+                    toastr.error(response ? response.message : 'Failed to update order');
+                    submitButton.prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX error:', xhr.responseText);
+                
+                let errorMessage = 'Failed to update order. Please try again.';
+                try {
+                    const errorResponse = JSON.parse(xhr.responseText);
+                    if (errorResponse && errorResponse.message) {
+                        errorMessage = errorResponse.message;
+                    }
+                } catch (e) {
+                    // Use default error message if JSON parsing fails
+                }
+                
+                toastr.error(errorMessage);
+                submitButton.prop('disabled', false).html('<i class="fas fa-save"></i> Save Order Details');
+            }
+        });
+    }
+    
+    // Edit button functionality for order items
+    function enableEdit(button) {
+        const form = $(button).closest('form');
+        const qtyField = form.find('input[name="quantity"]');
+        const noteField = form.find('input[name="specialInstructions"]');
+        
+        // Store original values for cancel
+        qtyField.data('original-value', qtyField.val());
+        noteField.data('original-value', noteField.val());
+        
+        // Enable fields
+        qtyField.prop('readonly', false).prop('disabled', false).focus();
+        noteField.prop('readonly', false).prop('disabled', false);
+        
+        // Show save/cancel buttons
+        form.find('.edit-item-btn').addClass('d-none');
+        form.find('.save-item-btn').removeClass('d-none');
+        form.find('.cancel-edit-btn').removeClass('d-none');
+        
+        // Add edit active class for visual feedback
+        form.closest('tr').addClass('item-edit-active');
+        
+        console.log('Edit enabled for item:', form.find('input[name="orderItemId"]').val());
+    }
+    
+    function saveEdit(button) {
+        const form = $(button).closest('form');
+        const orderItemId = form.find('input[name="orderItemId"]').val();
+        const quantity = parseInt(form.find('input[name="quantity"]').val());
+        const specialInstructions = form.find('input[name="specialInstructions"]').val();
+        
+        if (isNaN(quantity) || quantity < 1) {
+            toastr.error('Quantity must be at least 1');
+            return;
+        }
+        
+        // Update the displayed quantity in the row
+        const row = form.closest('tr');
+        row.find('td:eq(2)').text(quantity);
+        
+        // Update the form fields
+        form.find('input[name="quantity"]').prop('readonly', true).prop('disabled', true);
+        form.find('input[name="specialInstructions"]').prop('readonly', true).prop('disabled', true);
+        
+        // Show edit button, hide save/cancel
+        form.find('.edit-item-btn').removeClass('d-none');
+        form.find('.save-item-btn').addClass('d-none');
+        form.find('.cancel-edit-btn').addClass('d-none');
+        
+        // Remove edit active class
+        row.removeClass('item-edit-active');
+        
+        // Show notification
+        toastr.success('Changes saved. Click "Save Order Details" to update the database.');
+        
+        console.log('Edit saved for item:', orderItemId, 'New quantity:', quantity, 'New notes:', specialInstructions);
+    }
+    
+    function cancelEdit(button) {
+        const form = $(button).closest('form');
+        const qtyField = form.find('input[name="quantity"]');
+        const noteField = form.find('input[name="specialInstructions"]');
+        
+        // Restore original values
+        qtyField.val(qtyField.data('original-value'));
+        noteField.val(noteField.data('original-value'));
+        
+        // Disable fields
+        qtyField.prop('readonly', true).prop('disabled', true);
+        noteField.prop('readonly', true).prop('disabled', true);
+        
+        // Show edit button, hide save/cancel
+        form.find('.edit-item-btn').removeClass('d-none');
+        form.find('.save-item-btn').addClass('d-none');
+        form.find('.cancel-edit-btn').addClass('d-none');
+        
+        // Remove edit active class
+        form.closest('tr').removeClass('item-edit-active');
+        
+        console.log('Edit cancelled for item:', form.find('input[name="orderItemId"]').val());
+    }
+
+    // Add a DOM method fallback for older browsers or if jQuery fails
+    function addMenuItemWithDOMFallback() {
+        console.log('Using DOM fallback for adding menu item');
+        
+        try {
+            const menuItemInput = document.getElementById('menuItemInput').value;
+            const qtyInput = document.getElementById('quantity').value;
+            const qty = parseInt(qtyInput) || 1;
+            
+            if (!menuItemInput) {
+                if (typeof toastr !== 'undefined') {
+                    toastr.error('Please select a menu item');
+                } else {
+                    console.error('Please select a menu item');
+                }
+                return;
+            }
+            
+            if (qty < 1) {
+                if (typeof toastr !== 'undefined') {
+                    toastr.error('Quantity must be at least 1');
+                } else {
+                    console.error('Quantity must be at least 1');
+                }
+                return;
+            }
+            
+            // Find the item in the datalist
+            let menuItemId = null;
+            let menuItemName = null;
+            let menuItemPrice = null;
+            
+            const options = document.getElementById('menuItems').options;
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                if (option.value.toLowerCase() === menuItemInput.toLowerCase()) {
+                    menuItemId = option.dataset.id;
+                    menuItemName = option.value;
+                    menuItemPrice = parseFloat(option.dataset.price);
+                    break;
+                }
+            }
+            
+            if (!menuItemId) {
+                // Try partial match
+                for (let i = 0; i < options.length; i++) {
+                    const option = options[i];
+                    if (option.value.toLowerCase().includes(menuItemInput.toLowerCase())) {
+                        menuItemId = option.dataset.id;
+                        menuItemName = option.value;
+                        menuItemPrice = parseFloat(option.dataset.price);
+                        break;
+                    }
+                }
+            }
+            
+            if (!menuItemId) {
+                if (typeof toastr !== 'undefined') {
+                    toastr.error('Menu item not found. Please select from the dropdown list.');
+                } else {
+                    console.error('Menu item not found. Please select from the dropdown list.');
+                }
+                return;
+            }
+            
+            // Create a row and add it to the table
+            const tempId = window.nextTempId--;
+            const subtotal = (qty * menuItemPrice).toFixed(2);
+            const orderId = document.getElementById('orderId').value;
+            
+            // Create a new row for the table
+            const newRow = document.createElement('tr');
+            newRow.className = 'new-item-row';
+            newRow.dataset.tempId = tempId;
+            
+            newRow.innerHTML = `
+                <td>
+                    <input type="checkbox" class="fireItem new-item-checkbox" value="${tempId}" form="fireItemsForm" name="SelectedItems" data-is-new="true" />
+                    <button type="button" class="btn btn-sm btn-outline-danger" title="Remove Item" onclick="removeNewItem(${tempId})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </td>
+                <td>
+                    <div><strong>${menuItemName}</strong></div>
+                    <form class="d-flex align-items-center gap-2 mt-1 order-item-edit-form new-item-form">
+                        <input type="hidden" name="orderId" value="${orderId}" />
+                        <input type="hidden" name="orderItemId" value="${tempId}" />
+                        <input type="hidden" name="menuItemId" value="${menuItemId}" />
+                        <input type="hidden" name="menuItemName" value="${menuItemName}" />
+                        <input type="hidden" name="unitPrice" value="${menuItemPrice}" />
+                        <input type="number" name="quantity" value="${qty}" min="1" class="form-control form-control-sm w-auto item-qty" style="max-width:60px;" onchange="updateNewItemDetails(${tempId}, this.value, ${menuItemPrice})" />
+                        <input type="text" name="specialInstructions" value="" placeholder="Note" class="form-control form-control-sm w-auto item-note" style="max-width:120px;" />
+                    </form>
+                </td>
+                <td class="align-middle qty-display">${qty}</td>
+                <td class="align-middle">₹${menuItemPrice.toFixed(2)}</td>
+                <td class="align-middle subtotal-display">₹${subtotal}</td>
+                <td class="align-middle">
+                    <span class="badge bg-info">New (Unsaved)</span>
+                </td>
+            `;
+            
+            // Add the row to the table
+            const tbody = document.querySelector('#orderItemsTable tbody');
+            if (tbody) {
+                tbody.insertBefore(newRow, tbody.firstChild);
+                
+                // Store the new item
+                if (!window.newOrderItems) {
+                    window.newOrderItems = [];
+                }
+                
+                window.newOrderItems.push({
+                    tempId: tempId,
+                    menuItemId: menuItemId,
+                    menuItemName: menuItemName,
+                    quantity: qty,
+                    unitPrice: menuItemPrice,
+                    specialInstructions: '',
+                    isNew: true
+                });
+                
+                // Clear the form
+                document.getElementById('menuItemInput').value = '';
+                document.getElementById('quantity').value = '1';
+                
+                // Show success message
+                if (typeof toastr !== 'undefined') {
+                    toastr.success(menuItemName + ' added to order. Remember to click "Save Order Details" to save to database.');
+                } else {
+                    console.log(menuItemName + ' added to order. Remember to click "Save Order Details" to save to database.');
+                }
+            } else {
+                if (typeof toastr !== 'undefined') {
+                    toastr.error('Error: Order table not found. Please refresh the page and try again.');
+                } else {
+                    console.error('Error: Order table not found. Please refresh the page and try again.');
+                }
+            }
+            
+        } catch (error) {
+            console.error("Error in DOM fallback method:", error);
+            if (typeof toastr !== 'undefined') {
+                toastr.error("Error adding menu item: " + error.message);
+            } else {
+                console.error("Error adding menu item: " + error.message);
+            }
+        }
+    }
+    
+    // Make functions globally available
+    window.enableEdit = enableEdit;
+    window.saveEdit = saveEdit;
+    window.cancelEdit = cancelEdit;
+</script>

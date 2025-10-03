@@ -67,6 +67,12 @@ namespace RestaurantManagementSystem.ViewModels
         [Range(0, 100, ErrorMessage = "GST Percentage must be between 0% and 100%")]
         public decimal? GSTPercentage { get; set; }
 
+    [Display(Name = "Is GST Applicable")]
+    public bool IsGstApplicable { get; set; } = true; // Controls whether GSTPercentage value is used
+
+    [Display(Name = "Not Available")]
+    public bool NotAvailable { get; set; } = false; // Inverse-style flag separate from IsAvailable for clarity
+
         // Related data
         [Display(Name = "Allergens")]
         public List<int> SelectedAllergens { get; set; } = new List<int>();

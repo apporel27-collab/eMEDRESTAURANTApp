@@ -191,6 +191,17 @@
                                             <div class="help-text">Default GST rate for new menu items</div>
                                         </div>
                                     </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-3">
+                                            <label asp-for="TakeAwayGSTPercentage" class="control-label"></label>
+                                            <div class="input-group">
+                                                <input asp-for="TakeAwayGSTPercentage" class="form-control" />
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                            <span asp-validation-for="TakeAwayGSTPercentage" class="field-validation-error"></span>
+                                            <div class="help-text">GST rate applied to take away orders</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
