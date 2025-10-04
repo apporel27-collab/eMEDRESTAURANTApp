@@ -419,5 +419,77 @@ namespace RestaurantManagementSystem.Controllers
                 viewModel.Summary = new OrderReportSummary();
             }
         }
+
+        [HttpGet]
+        public async Task<IActionResult> DiscountReport()
+        {
+            ViewData["Title"] = "Discount Report";
+            var model = new DiscountReportViewModel();
+            await LoadDiscountReportAsync(model);
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DiscountReport(DiscountReportFilter filter)
+        {
+            ViewData["Title"] = "Discount Report";
+            var model = new DiscountReportViewModel { Filter = filter };
+            await LoadDiscountReportAsync(model);
+            return View(model);
+        }
+
+        private async Task LoadDiscountReportAsync(DiscountReportViewModel model)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+                using var command = new SqlCommand("usp_GetDiscountReport", connection)
+                { CommandType = CommandType.StoredProcedure };
+                command.Parameters.AddWithValue("@StartDate", (object?)model.Filter.StartDate?.Date ?? DBNull.Value);
+                command.Parameters.AddWithValue("@EndDate", (object?)model.Filter.EndDate?.Date ?? DBNull.Value);
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    model.Summary = new DiscountReportSummary
+                    {
+                        TotalDiscountedOrders = reader.GetInt32(reader.GetOrdinal("TotalDiscountedOrders")),
+                        TotalDiscountAmount = reader.GetDecimal(reader.GetOrdinal("TotalDiscountAmount")),
+                        AvgDiscountPerOrder = reader.GetDecimal(reader.GetOrdinal("AvgDiscountPerOrder")),
+                        MaxDiscount = reader.GetDecimal(reader.GetOrdinal("MaxDiscount")),
+                        MinDiscount = reader.GetDecimal(reader.GetOrdinal("MinDiscount")),
+                        TotalGrossBeforeDiscount = reader.GetDecimal(reader.GetOrdinal("TotalGrossBeforeDiscount")),
+                        NetAfterDiscount = reader.GetDecimal(reader.GetOrdinal("NetAfterDiscount"))
+                    };
+                }
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        model.Rows.Add(new DiscountReportRow
+                        {
+                            OrderId = reader.GetInt32(reader.GetOrdinal("OrderId")),
+                            OrderNumber = reader.GetString(reader.GetOrdinal("OrderNumber")),
+                            CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                            DiscountAmount = reader.GetDecimal(reader.GetOrdinal("DiscountAmount")),
+                            Subtotal = reader.GetDecimal(reader.GetOrdinal("Subtotal")),
+                            TaxAmount = reader.GetDecimal(reader.GetOrdinal("TaxAmount")),
+                            TipAmount = reader.GetDecimal(reader.GetOrdinal("TipAmount")),
+                            TotalAmount = reader.GetDecimal(reader.GetOrdinal("TotalAmount")),
+                            GrossAmount = reader.GetDecimal(reader.GetOrdinal("GrossAmount")),
+                            DiscountApplied = reader.GetDecimal(reader.GetOrdinal("DiscountApplied")),
+                            Username = reader.IsDBNull(reader.GetOrdinal("Username")) ? string.Empty : reader.GetString(reader.GetOrdinal("Username")),
+                            FirstName = reader.IsDBNull(reader.GetOrdinal("FirstName")) ? string.Empty : reader.GetString(reader.GetOrdinal("FirstName")),
+                            LastName = reader.IsDBNull(reader.GetOrdinal("LastName")) ? string.Empty : reader.GetString(reader.GetOrdinal("LastName")),
+                            Status = reader.GetInt32(reader.GetOrdinal("Status"))
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading discount report: {ex.Message}");
+            }
+        }
     }
 }
