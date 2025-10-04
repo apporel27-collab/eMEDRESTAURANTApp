@@ -77,51 +77,32 @@
                                 <td>@(reservation.TableId.HasValue ? $"Table {reservation.TableId}" : "-")</td>
                                 <td>@reservation.Status</td>
                                 <td>@(string.IsNullOrEmpty(reservation.SpecialRequests) ? "-" : reservation.SpecialRequests)</td>
-                                <td>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                            Actions
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" asp-action="Edit" asp-route-id="@reservation.Id">Edit</a></li>
-                                            @if (reservation.Status == ReservationStatus.Confirmed)
-                                            {
-                                                <li>
-                                                    <form asp-action="ChangeStatus" method="post">
-                                                        <input type="hidden" name="id" value="@reservation.Id" />
-                                                        <input type="hidden" name="status" value="@((int)ReservationStatus.Seated)" />
-                                                        <button type="submit" class="dropdown-item">Seat Guest</button>
-                                                    </form>
-                                                </li>
-                                                <li>
-                                                    <form asp-action="ChangeStatus" method="post">
-                                                        <input type="hidden" name="id" value="@reservation.Id" />
-                                                        <input type="hidden" name="status" value="@((int)ReservationStatus.NoShow)" />
-                                                        <button type="submit" class="dropdown-item">Mark No-Show</button>
-                                                    </form>
-                                                </li>
-                                                <li>
-                                                    <form asp-action="ChangeStatus" method="post">
-                                                        <input type="hidden" name="id" value="@reservation.Id" />
-                                                        <input type="hidden" name="status" value="@((int)ReservationStatus.Cancelled)" />
-                                                        <button type="submit" class="dropdown-item">Cancel</button>
-                                                    </form>
-                                                </li>
-                                            }
-                                            @if (reservation.Status == ReservationStatus.Seated)
-                                            {
-                                                <li>
-                                                    <form asp-action="ChangeStatus" method="post">
-                                                        <input type="hidden" name="id" value="@reservation.Id" />
-                                                        <input type="hidden" name="status" value="@((int)ReservationStatus.Completed)" />
-                                                        <button type="submit" class="dropdown-item">Complete</button>
-                                                    </form>
-                                                </li>
-                                            }
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><a class="dropdown-item text-danger" asp-action="DeleteConfirm" asp-route-id="@reservation.Id">Delete</a></li>
-                                        </ul>
-                                    </div>
+                                <td class="text-center">
+                                    <!-- Test: Simple visible buttons -->
+                                    <a href="@Url.Action("Edit", new { id = reservation.Id })" class="btn btn-primary btn-sm">Edit</a>
+                                    
+                                    @if (reservation.Status == ReservationStatus.Confirmed)
+                                    {
+                                        <form asp-action="ChangeStatus" method="post" class="d-inline ms-1">
+                                            <input type="hidden" name="id" value="@reservation.Id" />
+                                            <input type="hidden" name="status" value="@((int)ReservationStatus.Seated)" />
+                                            <button type="submit" class="btn btn-success btn-sm">Seat</button>
+                                        </form>
+                                        <form asp-action="ChangeStatus" method="post" class="d-inline ms-1">
+                                            <input type="hidden" name="id" value="@reservation.Id" />
+                                            <input type="hidden" name="status" value="@((int)ReservationStatus.NoShow)" />
+                                            <button type="submit" class="btn btn-warning btn-sm">No-Show</button>
+                                        </form>
+                                    }
+                                    
+                                    @if (reservation.Status == ReservationStatus.Seated)
+                                    {
+                                        <form asp-action="ChangeStatus" method="post" class="d-inline ms-1">
+                                            <input type="hidden" name="id" value="@reservation.Id" />
+                                            <input type="hidden" name="status" value="@((int)ReservationStatus.Completed)" />
+                                            <button type="submit" class="btn btn-info btn-sm">Complete</button>
+                                        </form>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -157,6 +138,66 @@
     }
 }
 
+@section Styles {
+    <style>
+        /* Ensure Actions column is properly sized for dropdown */
+        .table th:last-child,
+        .table td:last-child {
+            min-width: 120px !important;
+            width: 120px !important;
+            text-align: center;
+        }
+        
+        /* Style dropdown buttons to match table design */
+        .dropdown .btn {
+            font-size: 0.875rem;
+            padding: 0.25rem 0.5rem;
+        }
+        
+        /* Ensure dropdown items have consistent styling */
+        .dropdown-menu .dropdown-item {
+            font-size: 0.875rem;
+            padding: 0.5rem 1rem;
+        }
+        
+        /* Style form buttons in dropdown to look like dropdown items */
+        .dropdown-menu form button.dropdown-item {
+            width: 100%;
+            text-align: left;
+            border: none;
+            background: none;
+            color: inherit;
+            font-size: inherit;
+            line-height: inherit;
+            padding: 0.5rem 1rem;
+        }
+        
+        .dropdown-menu form button.dropdown-item:hover {
+            background-color: #e9ecef;
+            color: #16181b;
+        }
+        
+        /* Ensure dropdown is visible and properly positioned */
+        .btn-group .dropdown-menu {
+            z-index: 1050;
+        }
+        
+        /* Force dropdown to show when debugging */
+        .debug-dropdown .dropdown-menu {
+            display: block !important;
+            position: relative !important;
+        }
+        
+        /* Fix for small screen responsiveness */
+        @@media (max-width: 768px) {
+            .table th:last-child,
+            .table td:last-child {
+                min-width: 100px !important;
+            }
+        }
+    </style>
+}
+
 @section Scripts {
     <script>
         $(document).ready(function () {
@@ -171,7 +212,7 @@
                     "searching": true,
                     "columnDefs": [
                         // Disable sorting and searching on the Actions column (last column)
-                        { "orderable": false, "searchable": false, "targets": 7 }
+                        { "orderable": false, "searchable": false, "targets": 7, "width": "120px" }
                     ],
                     "columns": [
                         { "data": "0" }, // Time
@@ -181,7 +222,7 @@
                         { "data": "4" }, // Table
                         { "data": "5" }, // Status
                         { "data": "6" }, // Special Requests
-                        { "data": null, "defaultContent": "" } // Actions column - don't try to extract data
+                        { "data": null, "defaultContent": "", "className": "text-center" } // Actions column - don't try to extract data
                     ],
                     "language": {
                         "emptyTable": "No reservations found for this date"
