@@ -36,6 +36,8 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
+    
+
 
     <div class="row">
         <div class="col-lg-8">
@@ -139,6 +141,13 @@
                                 <a asp-action="PrintBill" asp-route-orderId="@Model.OrderId" class="btn btn-outline-success btn-lg" target="_blank">
                                     <i class="fas fa-print me-1"></i> Final Bill
                                 </a>
+                                
+                                @if (Model.RemainingAmount == 0 && Model.OrderStatus < 3)
+                                {
+                                    <a asp-action="FixPaidOrderStatus" asp-route-orderId="@Model.OrderId" class="btn btn-warning btn-lg">
+                                        <i class="fas fa-check-circle me-1"></i> Mark as Completed
+                                    </a>
+                                }
                             </div>
                         }
                     </div>

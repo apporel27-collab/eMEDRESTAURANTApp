@@ -13,6 +13,8 @@ namespace RestaurantManagementSystem.ViewModels
         public List<KitchenTicket> NewTickets { get; set; } = new List<KitchenTicket>();
         public List<KitchenTicket> InProgressTickets { get; set; } = new List<KitchenTicket>();
         public List<KitchenTicket> ReadyTickets { get; set; } = new List<KitchenTicket>();
+        // Newly delivered (today) tickets
+        public List<KitchenTicket> DeliveredTickets { get; set; } = new List<KitchenTicket>();
         public KitchenDashboardStats Stats { get; set; } = new KitchenDashboardStats();
         
         public int SelectedStationId { get; set; }

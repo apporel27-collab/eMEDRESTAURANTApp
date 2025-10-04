@@ -1,4 +1,5 @@
 @model IEnumerable<RestaurantManagementSystem.Models.Table>
+@using RestaurantManagementSystem.Models
 @{
     ViewData["Title"] = "Table Management";
 }
@@ -22,6 +23,11 @@
     {
         <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
     }
+    
+    @if (ViewBag.ErrorMessage != null)
+    {
+        <div class="alert alert-danger">@ViewBag.ErrorMessage</div>
+    }
 
     <div class="card">
         <div class="card-body">
@@ -33,6 +39,7 @@
                             <th>Capacity</th>
                             <th>Section</th>
                             <th>Status</th>
+                            <th>Merged With</th>
                             <th>Min Party Size</th>
                             <th>Last Occupied</th>
                             <th>Active</th>
@@ -43,13 +50,33 @@
                         @foreach (var table in Model)
                         {
                             <tr>
-                                <td>@table.TableNumber</td>
+                                <td>
+                                    @table.TableNumber
+                                    @if (table.IsPartOfMergedOrder)
+                                    {
+                                        <span class="badge bg-info ms-1">Merged</span>
+                                    }
+                                </td>
                                 <td>@table.Capacity</td>
                                 <td>@(string.IsNullOrEmpty(table.Section) ? "-" : table.Section)</td>
                                 <td>
                                     <span class="badge @GetStatusBadgeClass(table.Status)">
                                         @table.StatusDescription
                                     </span>
+                                    @if (table.IsPartOfMergedOrder && table.Status == TableStatus.Occupied)
+                                    {
+                                        <small class="text-muted d-block">via Merge</small>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(table.MergedTableNames))
+                                    {
+                                        <span class="text-primary">@table.MergedTableNames</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
                                 </td>
                                 <td>@table.MinPartySize</td>
                                 <td>@(table.LastOccupiedAt.HasValue ? table.LastOccupiedAt.Value.ToString("MMM dd, yyyy h:mm tt") : "-")</td>
@@ -104,7 +131,7 @@
                         @if (!Model.Any())
                         {
                             <tr>
-                                <td colspan="8" class="text-center">No tables found</td>
+                                <td colspan="9" class="text-center">No tables found</td>
                             </tr>
                         }
                     </tbody>

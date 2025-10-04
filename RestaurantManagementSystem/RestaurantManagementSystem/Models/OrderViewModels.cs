@@ -41,6 +41,9 @@ namespace RestaurantManagementSystem.Models
     {
         public List<TableViewModel> AvailableTables { get; set; } = new List<TableViewModel>();
         public List<ActiveTableViewModel> OccupiedTables { get; set; } = new List<ActiveTableViewModel>();
+        // For merged table selection (multiple tables assigned to a single order)
+        [Display(Name = "Merged Tables")]
+        public List<int> SelectedTableIds { get; set; } = new List<int>();
         
         [Display(Name = "Table")]
         public int? TableTurnoverId { get; set; }

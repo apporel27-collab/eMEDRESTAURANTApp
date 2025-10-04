@@ -44,6 +44,10 @@ namespace RestaurantManagementSystem.Models
         [Display(Name = "Is Active")]
         public bool IsActive { get; set; } = true;
 
+        // Merged table properties
+        public string? MergedTableNames { get; set; }
+        public bool IsPartOfMergedOrder { get; set; } = false;
+
         // Calculated property to check if the table is suitable for a given party size
         public bool IsSuitableFor(int partySize)
         {

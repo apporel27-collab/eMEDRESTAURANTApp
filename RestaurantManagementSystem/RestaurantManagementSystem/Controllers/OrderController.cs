@@ -152,6 +152,56 @@ namespace RestaurantManagementSystem.Controllers
                                                 kitchenCommand.Parameters.AddWithValue("@OrderId", orderId);
                                                 kitchenCommand.ExecuteNonQuery();
                                             }
+
+                                            // Add primary table to OrderTables (for both single and merged orders)
+                                            int? primaryTableId = null;
+                                            
+                                            if (model.SelectedTableId.HasValue)
+                                            {
+                                                primaryTableId = model.SelectedTableId.Value;
+                                            }
+                                            else if (model.TableTurnoverId.HasValue)
+                                            {
+                                                // Get table ID from TableTurnover
+                                                using (var getTableCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT TableId FROM TableTurnovers WHERE Id = @TurnoverId", connection, transaction))
+                                                {
+                                                    getTableCmd.Parameters.AddWithValue("@TurnoverId", model.TableTurnoverId.Value);
+                                                    var result = getTableCmd.ExecuteScalar();
+                                                    if (result != null && result != DBNull.Value)
+                                                    {
+                                                        primaryTableId = (int)result;
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if (primaryTableId.HasValue)
+                                            {
+                                                using (var insertPrimary = new Microsoft.Data.SqlClient.SqlCommand(@"IF NOT EXISTS (SELECT 1 FROM OrderTables WHERE OrderId=@OrderId AND TableId=@TableId)
+                                                    INSERT INTO OrderTables (OrderId, TableId, CreatedAt) VALUES (@OrderId, @TableId, GETDATE());", connection, transaction))
+                                                {
+                                                    insertPrimary.Parameters.AddWithValue("@OrderId", orderId);
+                                                    insertPrimary.Parameters.AddWithValue("@TableId", primaryTableId.Value);
+                                                    insertPrimary.ExecuteNonQuery();
+                                                }
+                                            }
+                                            
+                                            // Persist merged tables (additional tables beyond the primary)
+                                            if (model.SelectedTableIds != null && model.SelectedTableIds.Count > 0)
+                                            {
+                                                foreach (var mergedTableId in model.SelectedTableIds.Distinct())
+                                                {
+                                                    // Skip if this table is already the primary selected table
+                                                    if (model.SelectedTableId.HasValue && model.SelectedTableId.Value == mergedTableId)
+                                                        continue;
+                                                    using (var insertMerge = new Microsoft.Data.SqlClient.SqlCommand(@"IF NOT EXISTS (SELECT 1 FROM OrderTables WHERE OrderId=@OrderId AND TableId=@TableId)
+                                                        INSERT INTO OrderTables (OrderId, TableId, CreatedAt) VALUES (@OrderId, @TableId, GETDATE());", connection, transaction))
+                                                    {
+                                                        insertMerge.Parameters.AddWithValue("@OrderId", orderId);
+                                                        insertMerge.Parameters.AddWithValue("@TableId", mergedTableId);
+                                                        insertMerge.ExecuteNonQuery();
+                                                    }
+                                                }
+                                            }
                                             transaction.Commit();
                                             TempData["SuccessMessage"] = $"Order {orderNumber} created successfully.";
                                             return RedirectToAction("Details", new { id = orderId });
@@ -873,9 +923,6 @@ namespace RestaurantManagementSystem.Controllers
                             {
                                 try
                                 {
-                                    // Debug message to track execution
-                                    
-                                    
                                     // Generate unique ticket number
                                     string ticketNumberSql = @"
                                         SELECT 'KOT-' + CONVERT(NVARCHAR(8), GETDATE(), 112) + '-' + 
@@ -1504,14 +1551,13 @@ namespace RestaurantManagementSystem.Controllers
                 // Get order counts and total sales for today
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT
-                        SUM(CASE WHEN Status = 0 THEN 1 ELSE 0 END) AS OpenCount,
-                        SUM(CASE WHEN Status = 1 THEN 1 ELSE 0 END) AS InProgressCount,
-                        SUM(CASE WHEN Status = 2 THEN 1 ELSE 0 END) AS ReadyCount,
-                        SUM(CASE WHEN Status = 3 THEN 1 ELSE 0 END) AS CompletedCount,
-                        SUM(CASE WHEN Status = 3 THEN TotalAmount ELSE 0 END) AS TotalSales,
-                        SUM(CASE WHEN Status = 4 THEN 1 ELSE 0 END) AS CancelledCount
-                    FROM Orders
-                    WHERE CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE)", connection))
+                        SUM(CASE WHEN Status = 0 AND CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS OpenCount,
+                        SUM(CASE WHEN Status = 1 AND CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS InProgressCount,
+                        SUM(CASE WHEN Status = 2 AND CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS ReadyCount,
+                        SUM(CASE WHEN Status = 3 AND CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS CompletedCount,
+                        SUM(CASE WHEN Status = 3 AND CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE) THEN TotalAmount ELSE 0 END) AS TotalSales,
+                        SUM(CASE WHEN Status = 4 AND CAST(ISNULL(UpdatedAt, CreatedAt) AS DATE) = CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS CancelledCount
+                    FROM Orders", connection))
                 {
                     using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
@@ -1579,7 +1625,7 @@ namespace RestaurantManagementSystem.Controllers
                                 _ => "Unknown"
                             };
                             
-                            model.ActiveOrders.Add(new OrderSummary
+                            var summary = new OrderSummary
                             {
                                 Id = reader.GetInt32(0),
                                 OrderNumber = reader.GetString(1),
@@ -1594,7 +1640,11 @@ namespace RestaurantManagementSystem.Controllers
                                 TotalAmount = reader.GetDecimal(8),
                                 CreatedAt = reader.GetDateTime(9),
                                 Duration = TimeSpan.FromMinutes(reader.GetInt32(10))
-                            });
+                            };
+                            
+                            // Override with merged table names if available
+                            summary.TableName = GetMergedTableDisplayName(summary.Id, summary.TableName);
+                            model.ActiveOrders.Add(summary);
                         }
                     }
                 }
@@ -1641,7 +1691,7 @@ namespace RestaurantManagementSystem.Controllers
                                 _ => "Unknown"
                             };
                             
-                            model.CompletedOrders.Add(new OrderSummary
+                            var completedSummary = new OrderSummary
                             {
                                 Id = reader.GetInt32(0),
                                 OrderNumber = reader.GetString(1),
@@ -1656,12 +1706,16 @@ namespace RestaurantManagementSystem.Controllers
                                 TotalAmount = reader.GetDecimal(8),
                                 CreatedAt = reader.GetDateTime(9),
                                 Duration = TimeSpan.FromMinutes(reader.IsDBNull(10) ? 0 : reader.GetInt32(10))
-                            });
+                            };
+                            
+                            // Override with merged table names if available
+                            completedSummary.TableName = GetMergedTableDisplayName(completedSummary.Id, completedSummary.TableName);
+                            model.CompletedOrders.Add(completedSummary);
                         }
                     }
                 }
                 
-                // Get cancelled orders for today
+                // Get cancelled orders for today (filtered by cancellation date)
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
                         o.Id,
@@ -1686,7 +1740,7 @@ namespace RestaurantManagementSystem.Controllers
                     LEFT JOIN Tables t ON tt.TableId = t.Id
                     LEFT JOIN Users u ON o.UserId = u.Id
                     WHERE o.Status = 4 -- Cancelled
-                    AND CAST(o.CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
+                    AND CAST(ISNULL(o.UpdatedAt, o.CreatedAt) AS DATE) = CAST(GETDATE() AS DATE) -- Filter by cancellation date
                     ORDER BY ISNULL(o.UpdatedAt, o.CreatedAt) DESC", connection))
                 {
                     using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
@@ -1703,7 +1757,7 @@ namespace RestaurantManagementSystem.Controllers
                                 _ => "Unknown"
                             };
                             
-                            model.CancelledOrders.Add(new OrderSummary
+                            var cancelledSummary = new OrderSummary
                             {
                                 Id = reader.GetInt32(0),
                                 OrderNumber = reader.GetString(1),
@@ -1718,7 +1772,11 @@ namespace RestaurantManagementSystem.Controllers
                                 TotalAmount = reader.GetDecimal(8),
                                 CreatedAt = reader.GetDateTime(9),
                                 Duration = TimeSpan.FromMinutes(reader.IsDBNull(10) ? 0 : reader.GetInt32(10))
-                            });
+                            };
+                            
+                            // Override with merged table names if available
+                            cancelledSummary.TableName = GetMergedTableDisplayName(cancelledSummary.Id, cancelledSummary.TableName);
+                            model.CancelledOrders.Add(cancelledSummary);
                         }
                     }
                 }
@@ -1891,6 +1949,38 @@ namespace RestaurantManagementSystem.Controllers
             // Return the base name as fallback
             return baseTableName;
         }
+
+        // Helper to get merged table display name for an order
+        private string GetMergedTableDisplayName(int orderId, string existingTableName)
+        {
+            try
+            {
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        SELECT STRING_AGG(t.TableName, ' + ') WITHIN GROUP (ORDER BY t.TableName)
+                        FROM OrderTables ot
+                        INNER JOIN Tables t ON ot.TableId = t.Id
+                        WHERE ot.OrderId = @OrderId", connection);
+                    cmd.Parameters.AddWithValue("@OrderId", orderId);
+                    var aggregated = cmd.ExecuteScalar() as string;
+                    
+                    if (string.IsNullOrWhiteSpace(aggregated))
+                        return existingTableName; // No merged tables, return original
+                    
+                    // If there's both a primary table and merged tables, combine without duplicates
+                    if (!string.IsNullOrWhiteSpace(existingTableName) && !aggregated.Contains(existingTableName))
+                        return existingTableName + " + " + aggregated;
+                    
+                    return aggregated; // Return merged table names
+                }
+            }
+            catch
+            {
+                return existingTableName; // Fallback to existing if error
+            }
+        }
         
         private OrderViewModel GetOrderDetails(int id)
         {
@@ -2014,6 +2104,9 @@ namespace RestaurantManagementSystem.Controllers
                                 KitchenTickets = new List<KitchenTicketViewModel>(),
                                 AvailableCourses = new List<CourseType>()
                             };
+                            
+                            // Override with merged table names if available
+                            order.TableName = GetMergedTableDisplayName(order.Id, order.TableName);
                         }
                         else
                         {

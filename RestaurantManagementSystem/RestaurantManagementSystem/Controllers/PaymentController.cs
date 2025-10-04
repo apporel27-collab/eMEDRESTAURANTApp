@@ -16,7 +16,39 @@ namespace RestaurantManagementSystem.Controllers
         private readonly IConfiguration _configuration;
         private readonly string _connectionString;
         private readonly ILogger<PaymentController> _logger;
-        
+
+        // Helper to get merged table display name for an order
+        private string GetMergedTableDisplayName(int orderId, string existingTableName)
+        {
+            try
+            {
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        SELECT STRING_AGG(t.TableName, ' + ') WITHIN GROUP (ORDER BY t.TableName)
+                        FROM OrderTables ot
+                        INNER JOIN Tables t ON ot.TableId = t.Id
+                        WHERE ot.OrderId = @OrderId", connection);
+                    cmd.Parameters.AddWithValue("@OrderId", orderId);
+                    var aggregated = cmd.ExecuteScalar() as string;
+                    
+                    if (string.IsNullOrWhiteSpace(aggregated))
+                        return existingTableName; // No merged tables, return original
+                    
+                    // If there's both a primary table and merged tables, combine without duplicates
+                    if (!string.IsNullOrWhiteSpace(existingTableName) && !aggregated.Contains(existingTableName))
+                        return existingTableName + " + " + aggregated;
+                    
+                    return aggregated; // Return merged table names
+                }
+            }
+            catch
+            {
+                return existingTableName; // Fallback to existing if error
+            }
+        }
+
         public PaymentController(IConfiguration configuration, ILogger<PaymentController> logger)
         {
             _configuration = configuration;
@@ -34,7 +66,90 @@ namespace RestaurantManagementSystem.Controllers
                 return NotFound();
             }
             
+
+            
             return View(model);
+        }
+        
+        // Fix fully paid orders that are stuck in active status
+        public IActionResult FixPaidOrderStatus(int orderId)
+        {
+            try
+            {
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Orders 
+                        SET Status = 3, -- Completed
+                            CompletedAt = GETDATE(),
+                            UpdatedAt = GETDATE()
+                        WHERE Id = @OrderId 
+                        AND Status < 3 -- Not already completed
+                        AND (
+                            SELECT ISNULL(SUM(Amount + TipAmount), 0) 
+                            FROM Payments 
+                            WHERE OrderId = @OrderId AND Status = 1
+                        ) >= TotalAmount", connection))
+                    {
+                        cmd.Parameters.AddWithValue("@OrderId", orderId);
+                        int rowsAffected = cmd.ExecuteNonQuery();
+                        
+                        if (rowsAffected > 0)
+                        {
+                            TempData["SuccessMessage"] = "Order status updated to Completed successfully.";
+                        }
+                        else
+                        {
+                            TempData["InfoMessage"] = "Order is either already completed or not fully paid.";
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error updating order status: {ex.Message}";
+            }
+            
+            return RedirectToAction("Index", new { id = orderId });
+        }
+        
+        // Fix all fully paid orders that are stuck in active status
+        public IActionResult FixAllPaidOrders()
+        {
+            try
+            {
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Orders 
+                        SET Status = 3, -- Completed
+                            CompletedAt = GETDATE(),
+                            UpdatedAt = GETDATE()
+                        WHERE Status < 3 -- Not already completed
+                        AND Id IN (
+                            SELECT o.Id
+                            FROM Orders o
+                            WHERE o.Status < 3
+                            AND (
+                                SELECT ISNULL(SUM(p.Amount + p.TipAmount), 0) 
+                                FROM Payments p 
+                                WHERE p.OrderId = o.Id AND p.Status = 1
+                            ) >= o.TotalAmount
+                        )", connection))
+                    {
+                        int rowsAffected = cmd.ExecuteNonQuery();
+                        TempData["SuccessMessage"] = $"Fixed {rowsAffected} fully paid orders that were stuck in active status.";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error fixing paid orders: {ex.Message}";
+            }
+            
+            return RedirectToAction("Dashboard", "Order");
         }
         
         // Process Payment
@@ -807,7 +922,7 @@ END", connection))
                             {
                                 OrderId = reader.GetInt32("OrderId"),
                                 OrderNumber = reader.GetString("OrderNumber"),
-                                TableName = reader.GetString("TableName"),
+                                TableName = GetMergedTableDisplayName((int)reader["OrderId"], reader.GetString("TableName")),
                                 TotalPayable = Convert.ToDecimal(reader["TotalPayable"]),
                                 TotalPaid = Convert.ToDecimal(reader["TotalPaid"]),
                                 DueAmount = Convert.ToDecimal(reader["DueAmount"]),
@@ -854,6 +969,8 @@ END", connection))
                             model.PaidAmount = reader.GetDecimal(7);
                             model.RemainingAmount = reader.GetDecimal(8);
                             model.TableName = reader.GetString(9);
+                            // Override with merged table names if available
+                            model.TableName = GetMergedTableDisplayName(orderId, model.TableName);
                             model.OrderStatus = reader.GetInt32(10);
                             model.OrderStatusDisplay = model.OrderStatus switch
                             {

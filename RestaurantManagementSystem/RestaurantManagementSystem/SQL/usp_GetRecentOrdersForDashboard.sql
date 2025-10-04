@@ -16,6 +16,7 @@ BEGIN
         ISNULL(o.OrderNumber, 'ORD-' + CAST(o.Id AS VARCHAR(10))) as OrderNumber,
         ISNULL(o.CustomerName, 'Walk-in Customer') as CustomerName,
         CASE 
+            WHEN merged.MergedTableNames IS NOT NULL THEN merged.MergedTableNames
             WHEN t.TableNumber IS NOT NULL THEN CAST(t.TableNumber AS VARCHAR(10))
             WHEN o.TableTurnoverId IS NULL THEN 'Takeout'
             ELSE 'Table ' + CAST(ISNULL(t.TableNumber, 'N/A') AS VARCHAR(10))
@@ -33,6 +34,14 @@ BEGIN
     FROM Orders o
     LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
     LEFT JOIN Tables t ON tt.TableId = t.Id
+    LEFT JOIN (
+        SELECT 
+            ot.OrderId,
+            STRING_AGG(t2.TableName, ' + ') WITHIN GROUP (ORDER BY t2.TableName) AS MergedTableNames
+        FROM OrderTables ot
+        INNER JOIN Tables t2 ON ot.TableId = t2.Id
+        GROUP BY ot.OrderId
+    ) merged ON o.Id = merged.OrderId
     WHERE CAST(o.CreatedAt AS DATE) = CAST(GETDATE() AS DATE) -- Today's orders only
       AND o.TotalAmount > 0 -- Exclude incomplete orders
     ORDER BY o.CreatedAt DESC;

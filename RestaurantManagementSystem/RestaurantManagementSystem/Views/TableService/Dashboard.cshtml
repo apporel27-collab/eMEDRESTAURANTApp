@@ -13,6 +13,14 @@
             <a asp-action="ActiveTables" class="btn btn-outline-primary ms-2">
                 <i class="fas fa-list"></i> View All Active Tables
             </a>
+            <a asp-action="CleanupStaleTurnovers" class="btn btn-outline-warning ms-2" 
+               onclick="return confirm('This will clean up old table turnovers and reset available tables. Continue?')">
+                <i class="fas fa-broom"></i> Cleanup Stale Tables
+            </a>
+            <a asp-action="ForceResetAllTables" class="btn btn-outline-danger ms-2" 
+               onclick="return confirm('This will FORCE RESET all tables to available and clear all turnovers. Are you sure?')">
+                <i class="fas fa-power-off"></i> Force Reset All Tables
+            </a>
         </div>
     </div>
 

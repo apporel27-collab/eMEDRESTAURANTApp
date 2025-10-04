@@ -132,15 +132,15 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                var result = UpdateTableTurnoverStatus(turnoverId, newStatus);
+                var result = UpdateOrderStatusForAllMergedTables(turnoverId, newStatus);
                 
                 if (result.Success)
                 {
-                    TempData["SuccessMessage"] = "Table status updated successfully.";
+                    TempData["SuccessMessage"] = result.Message;
                 }
                 else
                 {
-                    TempData["ErrorMessage"] = $"Error updating table status: {result.Message}";
+                    TempData["ErrorMessage"] = $"Error updating status: {result.Message}";
                 }
             }
             catch (Exception ex)
@@ -149,6 +149,117 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             return RedirectToAction(nameof(ActiveTables));
+        }
+        
+        // Clean up stale table turnovers and reset table statuses
+        public IActionResult CleanupStaleTurnovers()
+        {
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    int cleanedTurnovers = 0;
+                    int resetTables = 0;
+                    
+                    // First, mark old turnovers as departed if they don't have active orders
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE TableTurnovers 
+                        SET Status = 5, -- Departed
+                            DepartedAt = GETDATE(),
+                            UpdatedAt = GETDATE()
+                        WHERE Status < 5 -- Not already departed
+                        AND DATEDIFF(MINUTE, SeatedAt, GETDATE()) > 480 -- More than 8 hours old
+                        AND NOT EXISTS (
+                            SELECT 1 FROM Orders o 
+                            WHERE o.TableTurnoverId = TableTurnovers.Id 
+                            AND o.Status < 3 -- Active orders
+                        )", connection))
+                    {
+                        cleanedTurnovers = command.ExecuteNonQuery();
+                    }
+                    
+                    // Reset table status to Available for tables without active turnovers
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Tables 
+                        SET Status = 0, -- Available
+                            LastOccupiedAt = GETDATE(),
+                            IsAvailable = 1
+                        WHERE Id NOT IN (
+                            SELECT DISTINCT tt.TableId 
+                            FROM TableTurnovers tt 
+                            WHERE tt.Status < 5 -- Active turnovers
+                        )
+                        AND Status != 0", connection))
+                    {
+                        resetTables = command.ExecuteNonQuery();
+                    }
+                    
+                    TempData["SuccessMessage"] = $"Cleanup completed: {cleanedTurnovers} stale turnovers departed, {resetTables} tables reset to available.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error during cleanup: {ex.Message}";
+            }
+            
+            return RedirectToAction(nameof(Dashboard));
+        }
+        
+        // Force reset all tables to available status (aggressive cleanup)
+        public IActionResult ForceResetAllTables()
+        {
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    int departedTurnovers = 0;
+                    int resetTables = 0;
+                    
+                    // Mark ALL active turnovers as departed
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE TableTurnovers 
+                        SET Status = 5, -- Departed
+                            DepartedAt = GETDATE(),
+                            UpdatedAt = GETDATE()
+                        WHERE Status < 5", connection))
+                    {
+                        departedTurnovers = command.ExecuteNonQuery();
+                    }
+                    
+                    // Reset ALL tables to Available status
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Tables 
+                        SET Status = 0, -- Available
+                            LastOccupiedAt = GETDATE(),
+                            IsAvailable = 1
+                        WHERE IsActive = 1", connection))
+                    {
+                        resetTables = command.ExecuteNonQuery();
+                    }
+                    
+                    // Clear any server assignments
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE ServerAssignments 
+                        SET IsActive = 0,
+                            UpdatedAt = GETDATE()
+                        WHERE IsActive = 1", connection))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                    
+                    TempData["SuccessMessage"] = $"Force reset completed: {departedTurnovers} turnovers departed, {resetTables} tables reset to available. All server assignments cleared.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error during force reset: {ex.Message}";
+            }
+            
+            return RedirectToAction(nameof(Dashboard));
         }
         
         // Helper Methods
@@ -169,13 +280,19 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                // Get table counts
+                // Get table counts including merged table logic
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT
-                        SUM(CASE WHEN Status = 0 THEN 1 ELSE 0 END) AS AvailableCount,
-                        SUM(CASE WHEN Status = 2 THEN 1 ELSE 0 END) AS OccupiedCount,
-                        SUM(CASE WHEN Status = 3 THEN 1 ELSE 0 END) AS DirtyCount
-                    FROM Tables", connection))
+                        SUM(CASE WHEN (ot.TableId IS NULL AND t.Status = 0) THEN 1 ELSE 0 END) AS AvailableCount,
+                        SUM(CASE WHEN (ot.TableId IS NOT NULL OR t.Status = 2) THEN 1 ELSE 0 END) AS OccupiedCount,
+                        SUM(CASE WHEN (ot.TableId IS NULL AND t.Status = 3) THEN 1 ELSE 0 END) AS DirtyCount
+                    FROM Tables t
+                    LEFT JOIN (
+                        SELECT DISTINCT ot.TableId
+                        FROM OrderTables ot
+                        INNER JOIN Orders o ON ot.OrderId = o.Id AND o.Status IN (0, 1, 2)
+                    ) ot ON t.Id = ot.TableId
+                    WHERE t.IsActive = 1", connection))
                 {
                     using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
@@ -246,12 +363,17 @@ namespace RestaurantManagementSystem.Controllers
                     }
                 }
                 
-                // Get unoccupied tables
+                // Get unoccupied tables (available tables, not part of active orders)
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    SELECT Id, TableName, Capacity, Status
-                    FROM Tables
-                    WHERE Status = 0  -- Available
-                    ORDER BY TableName", connection))
+                    SELECT t.Id, t.TableName, t.Capacity, t.Status
+                    FROM Tables t
+                    LEFT JOIN (
+                        SELECT DISTINCT ot.TableId
+                        FROM OrderTables ot
+                        INNER JOIN Orders o ON ot.OrderId = o.Id AND o.Status IN (0, 1, 2)
+                    ) ot ON t.Id = ot.TableId
+                    WHERE t.Status = 0 AND t.IsActive = 1 AND ot.TableId IS NULL -- Available and not in active order
+                    ORDER BY t.TableName", connection))
                 {
                     using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
@@ -281,10 +403,12 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    SELECT Id, TableName, Capacity, Status
-                    FROM Tables
-                    WHERE Status = 0 -- Available
-                    ORDER BY TableName", connection))
+                    SELECT t.Id, t.TableName, t.Capacity, t.Status
+                    FROM Tables t
+                    LEFT JOIN OrderTables ot ON t.Id = ot.TableId
+                    LEFT JOIN Orders o ON ot.OrderId = o.Id AND o.Status IN (0, 1, 2)
+                    WHERE t.Status = 0 AND ot.TableId IS NULL -- Available and not assigned to active order
+                    ORDER BY t.TableName", connection))
                 {
                     using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
@@ -545,36 +669,54 @@ namespace RestaurantManagementSystem.Controllers
                 connection.Open();
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT
-                        t.Id AS TurnoverId,
-                        tb.Id AS TableId,
-                        tb.TableName,
-                        t.GuestName,
-                        t.PartySize,
-                        t.SeatedAt,
-                        t.StartedServiceAt,
-                        t.CompletedAt,
-                        t.Status,
+                        o.Id AS OrderId,
+                        t.Id AS TableId,
+                        t.TableName,
+                        o.CustomerName,
+                        1 AS PartySize, -- Default party size, could be enhanced
+                        o.CreatedAt AS SeatedAt,
+                        o.CreatedAt AS StartedServiceAt,
+                        o.CompletedAt,
+                        o.Status,
                         CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')) AS ServerName,
                         u.Id AS ServerId,
-                        DATEDIFF(MINUTE, t.SeatedAt, GETDATE()) AS MinutesSinceSeated,
-                        t.TargetTurnTimeMinutes
-                    FROM TableTurnovers t
-                    INNER JOIN Tables tb ON t.TableId = tb.Id
-                    LEFT JOIN ServerAssignments sa ON tb.Id = sa.TableId AND sa.IsActive = 1
+                        DATEDIFF(MINUTE, o.CreatedAt, GETDATE()) AS MinutesSinceSeated,
+                        60 AS TargetTurnTimeMinutes, -- Default target time
+                        merged.MergedTableNames,
+                        merged.TableCount,
+                        CASE WHEN merged.TableCount > 1 THEN 1 ELSE 0 END AS IsPartOfMergedOrder
+                    FROM Orders o
+                    INNER JOIN OrderTables ot ON o.Id = ot.OrderId
+                    INNER JOIN Tables t ON ot.TableId = t.Id
+                    LEFT JOIN ServerAssignments sa ON t.Id = sa.TableId AND sa.IsActive = 1
                     LEFT JOIN Users u ON sa.ServerId = u.Id
-                    WHERE t.Status < 5 -- Not departed
-                    ORDER BY tb.TableName", connection))
+                    LEFT JOIN (
+                        SELECT 
+                            ot2.OrderId,
+                            STRING_AGG(t2.TableName, ' + ') WITHIN GROUP (ORDER BY t2.TableName) AS MergedTableNames,
+                            COUNT(*) AS TableCount
+                        FROM OrderTables ot2
+                        INNER JOIN Tables t2 ON ot2.TableId = t2.Id
+                        GROUP BY ot2.OrderId
+                    ) merged ON o.Id = merged.OrderId
+                    WHERE o.Status IN (0, 1, 2) -- Active orders: New, In Progress, Ready
+                    ORDER BY t.TableName", connection))
                 {
                     using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
                         while (reader.Read())
                         {
+                            var tableName = reader.GetString(2);
+                            var mergedTableNames = reader.IsDBNull(13) ? null : reader.GetString(13);
+                            var tableCount = reader.IsDBNull(14) ? 1 : reader.GetInt32(14);
+                            var isPartOfMerged = reader.GetInt32(15) == 1;
+                            
                             activeTables.Add(new ActiveTableViewModel
                             {
-                                TurnoverId = reader.GetInt32(0),
+                                TurnoverId = reader.GetInt32(0), // Using OrderId as TurnoverId
                                 TableId = reader.GetInt32(1),
-                                TableName = reader.GetString(2),
-                                GuestName = reader.GetString(3),
+                                TableName = tableName, // Keep individual table name
+                                GuestName = reader.IsDBNull(3) ? "Unknown" : reader.GetString(3),
                                 PartySize = reader.GetInt32(4),
                                 SeatedAt = reader.GetDateTime(5),
                                 StartedServiceAt = reader.IsDBNull(6) ? null : (DateTime?)reader.GetDateTime(6),
@@ -583,7 +725,10 @@ namespace RestaurantManagementSystem.Controllers
                                 ServerName = reader.IsDBNull(9) ? "Unassigned" : reader.GetString(9),
                                 ServerId = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
                                 Duration = reader.GetInt32(11),
-                                TargetTurnTime = reader.GetInt32(12)
+                                TargetTurnTime = reader.GetInt32(12),
+                                // Store merged table info for display
+                                MergedTableNames = mergedTableNames,
+                                IsPartOfMergedOrder = isPartOfMerged
                             });
                         }
                     }
@@ -591,6 +736,80 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             return activeTables;
+        }
+        
+        private (bool Success, string Message) UpdateOrderStatusForAllMergedTables(int orderId, int newStatus)
+        {
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    // First, get the order and check if it's merged
+                    string checkOrderSql = @"
+                        SELECT o.Id, o.CustomerName, COUNT(ot.TableId) as TableCount,
+                               STRING_AGG(t.TableName, ' + ') WITHIN GROUP (ORDER BY t.TableName) AS MergedTables
+                        FROM Orders o
+                        INNER JOIN OrderTables ot ON o.Id = ot.OrderId
+                        INNER JOIN Tables t ON ot.TableId = t.Id
+                        WHERE o.Id = @OrderId
+                        GROUP BY o.Id, o.CustomerName";
+                    
+                    using (Microsoft.Data.SqlClient.SqlCommand checkCmd = new Microsoft.Data.SqlClient.SqlCommand(checkOrderSql, connection))
+                    {
+                        checkCmd.Parameters.AddWithValue("@OrderId", orderId);
+                        
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = checkCmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                var tableCount = reader.GetInt32("TableCount");
+                                var mergedTables = reader.GetString("MergedTables");
+                                var customerName = reader.IsDBNull("CustomerName") ? "Unknown" : reader.GetString("CustomerName");
+                                
+                                reader.Close();
+                                
+                                // Update order status
+                                string updateOrderSql = "UPDATE Orders SET Status = @NewStatus WHERE Id = @OrderId";
+                                using (Microsoft.Data.SqlClient.SqlCommand updateCmd = new Microsoft.Data.SqlClient.SqlCommand(updateOrderSql, connection))
+                                {
+                                    updateCmd.Parameters.AddWithValue("@NewStatus", newStatus);
+                                    updateCmd.Parameters.AddWithValue("@OrderId", orderId);
+                                    updateCmd.ExecuteNonQuery();
+                                }
+                                
+                                var statusText = newStatus switch
+                                {
+                                    0 => "Seated",
+                                    1 => "In Service", 
+                                    2 => "Check Requested",
+                                    3 => "Paid",
+                                    4 => "Completed",
+                                    _ => "Updated"
+                                };
+                                
+                                if (tableCount > 1)
+                                {
+                                    return (true, $"Status updated to '{statusText}' for all merged tables ({mergedTables}) - Customer: {customerName}");
+                                }
+                                else
+                                {
+                                    return (true, $"Status updated to '{statusText}' for table {mergedTables} - Customer: {customerName}");
+                                }
+                            }
+                            else
+                            {
+                                return (false, "Order not found");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Database error: {ex.Message}");
+            }
         }
         
         private (bool Success, string Message) StartTableTurnover(int tableId, int? reservationId, int? waitlistId, string guestName, int partySize, string notes, int targetTurnTime)

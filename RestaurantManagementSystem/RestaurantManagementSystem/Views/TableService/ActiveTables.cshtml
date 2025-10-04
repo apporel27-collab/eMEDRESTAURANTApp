@@ -42,7 +42,7 @@
                             <table class="table table-striped table-hover" id="activeTables">
                                 <thead>
                                     <tr>
-                                        <th>Table</th>
+                                        <th>Table <small class="text-muted">(+ Merged)</small></th>
                                         <th>Guest</th>
                                         <th>Party Size</th>
                                         <th>Server</th>
@@ -56,8 +56,22 @@
                                 <tbody>
                                     @foreach (var table in Model)
                                     {
-                                        <tr class="@(table.IsOverTargetTime ? "table-danger" : "")">
-                                            <td>@table.TableName</td>
+                                        <tr class="@(table.IsOverTargetTime ? "table-danger" : "") @(table.IsPartOfMergedOrder ? "table-info" : "")">
+                                            <td>
+                                                @if (table.IsPartOfMergedOrder)
+                                                {
+                                                    <span class="badge bg-primary me-1">
+                                                        <i class="fas fa-link"></i> MERGED
+                                                    </span>
+                                                }
+                                                <strong>@table.TableName</strong>
+                                                @if (table.IsPartOfMergedOrder && !string.IsNullOrEmpty(table.MergedTableNames))
+                                                {
+                                                    <br><small class="text-primary fw-bold">
+                                                        <i class="fas fa-table"></i> Combined: @table.MergedTableNames
+                                                    </small>
+                                                }
+                                            </td>
                                             <td>@table.GuestName</td>
                                             <td>@table.PartySize</td>
                                             <td>@table.ServerName</td>
@@ -67,8 +81,13 @@
                                             <td>@(table.StartedServiceAt.HasValue ? table.StartedServiceAt.Value.ToString("HH:mm") : "-")</td>
                                             <td>
                                                 <div class="btn-group">
-                                                    <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
+                                                            title="@(table.IsPartOfMergedOrder ? "Actions will affect all merged tables: " + table.MergedTableNames : "Update table status")">
                                                         Update Status
+                                                        @if (table.IsPartOfMergedOrder)
+                                                        {
+                                                            <i class="fas fa-link ms-1" style="font-size: 0.8em;"></i>
+                                                        }
                                                     </button>
                                                     <ul class="dropdown-menu">
                                                         @if (table.Status < 1)

@@ -50,6 +50,13 @@ namespace RestaurantManagementSystem.Controllers
                 viewModel.NewTickets = GetTicketsByStatus(connection, 0, stationId);
                 viewModel.InProgressTickets = GetTicketsByStatus(connection, 1, stationId);
                 viewModel.ReadyTickets = GetTicketsByStatus(connection, 2, stationId);
+                // Delivered tickets (today only)
+                var deliveredAll = GetTicketsByStatus(connection, 3, stationId);
+                var today = DateTime.Today;
+                viewModel.DeliveredTickets = deliveredAll
+                    .Where(t => t.CompletedAt.HasValue && t.CompletedAt.Value.Date == today)
+                    .OrderByDescending(t => t.CompletedAt)
+                    .ToList();
                 
                 // Get dashboard statistics
                 viewModel.Stats = GetKitchenStats(connection, stationId);
@@ -529,6 +536,12 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     while (reader.Read())
                     {
+                        string tableName = reader["TableName"].ToString();
+                        if (string.IsNullOrWhiteSpace(tableName))
+                        {
+                            // Fallback lookup
+                            tableName = GetTableNameForOrder(connection, (int)reader["OrderId"]);
+                        }
                         tickets.Add(new KitchenTicket
                         {
                             Id = (int)reader["Id"],
@@ -537,7 +550,7 @@ namespace RestaurantManagementSystem.Controllers
                             OrderNumber = reader["OrderNumber"].ToString(),
                             KitchenStationId = reader["KitchenStationId"] as int?,
                             StationName = reader["StationName"].ToString(),
-                            TableName = reader["TableName"].ToString(),
+                            TableName = tableName,
                             Status = (int)reader["Status"],
                             CreatedAt = (DateTime)reader["CreatedAt"],
                             CompletedAt = reader["CompletedAt"] as DateTime?,
@@ -598,6 +611,11 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     while (reader.Read())
                     {
+                        string tableName = reader["TableName"].ToString();
+                        if (string.IsNullOrWhiteSpace(tableName))
+                        {
+                            tableName = GetTableNameForOrder(connection, (int)reader["OrderId"]);
+                        }
                         tickets.Add(new KitchenTicket
                         {
                             Id = (int)reader["Id"],
@@ -606,7 +624,7 @@ namespace RestaurantManagementSystem.Controllers
                             OrderNumber = reader["OrderNumber"].ToString(),
                             KitchenStationId = reader["KitchenStationId"] as int?,
                             StationName = reader["StationName"].ToString(),
-                            TableName = reader["TableName"].ToString(),
+                            TableName = tableName,
                             Status = (int)reader["Status"],
                             CreatedAt = (DateTime)reader["CreatedAt"],
                             CompletedAt = reader["CompletedAt"] as DateTime?,
@@ -617,6 +635,88 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             return tickets;
+        }
+
+        // Attempts to retrieve a table name for an order if it was not populated in the KitchenTickets row
+        private string GetTableNameForOrder(Microsoft.Data.SqlClient.SqlConnection connection, int orderId)
+        {
+            try
+            {
+                // Unified query: only return a table display value for dine‑in orders (OrderType = 0)
+                // Tries multiple possible column naming conventions gracefully.
+                var primarySql = @"SELECT TOP 1 
+                        CASE 
+                            WHEN o.OrderType = 0 THEN COALESCE(t.TableName, t.TableNumber, CONCAT('Table ', t.Id))
+                            ELSE NULL 
+                        END AS TableDisplay
+                    FROM Orders o
+                    LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
+                    LEFT JOIN Tables t ON tt.TableId = t.Id
+                    WHERE o.Id = @OrderId";
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(primarySql, connection))
+                {
+                    cmd.Parameters.AddWithValue("@OrderId", orderId);
+                    var result = cmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        var display = result.ToString();
+                        if (!string.IsNullOrWhiteSpace(display)) return display;
+                    }
+                }
+
+                // Attempt to aggregate merged tables (OrderTables) if present
+                var mergedSql = @"SELECT STRING_AGG(t.TableName, ' + ') WITHIN GROUP (ORDER BY t.TableName)
+                                   FROM OrderTables ot
+                                   INNER JOIN Tables t ON ot.TableId = t.Id
+                                   WHERE ot.OrderId = @OrderId";
+                using (var cmdMerged = new Microsoft.Data.SqlClient.SqlCommand(mergedSql, connection))
+                {
+                    cmdMerged.Parameters.AddWithValue("@OrderId", orderId);
+                    var merged = cmdMerged.ExecuteScalar();
+                    if (merged != null && merged != DBNull.Value)
+                    {
+                        var mergedDisplay = merged.ToString();
+                        if (!string.IsNullOrWhiteSpace(mergedDisplay)) return mergedDisplay;
+                    }
+                }
+
+                // Secondary attempt: Some schemas might store a display text directly on TableTurnovers
+                var turnoverSql = @"SELECT TOP 1 
+                        CASE WHEN o.OrderType = 0 THEN 
+                            COALESCE(tt.TableName, tt.TableNumber, CONCAT('Table ', tt.Id)) ELSE NULL END AS TableDisplay
+                    FROM Orders o
+                    LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
+                    WHERE o.Id = @OrderId";
+                using (var cmd2 = new Microsoft.Data.SqlClient.SqlCommand(turnoverSql, connection))
+                {
+                    cmd2.Parameters.AddWithValue("@OrderId", orderId);
+                    var result2 = cmd2.ExecuteScalar();
+                    if (result2 != null && result2 != DBNull.Value)
+                    {
+                        var display2 = result2.ToString();
+                        if (!string.IsNullOrWhiteSpace(display2)) return display2;
+                    }
+                }
+
+                // Final attempt: fallback to any existing KitchenTickets row that already captured a table name for the same order
+                var ktFallbackSql = @"SELECT TOP 1 TableName FROM KitchenTickets WHERE OrderId = @OrderId AND TableName IS NOT NULL AND LTRIM(RTRIM(TableName)) <> ''";
+                using (var cmd3 = new Microsoft.Data.SqlClient.SqlCommand(ktFallbackSql, connection))
+                {
+                    cmd3.Parameters.AddWithValue("@OrderId", orderId);
+                    var result3 = cmd3.ExecuteScalar();
+                    if (result3 != null && result3 != DBNull.Value)
+                    {
+                        var display3 = result3.ToString();
+                        if (!string.IsNullOrWhiteSpace(display3)) return display3;
+                    }
+                }
+            }
+            catch
+            {
+                // Swallow and return null – dashboard should not break if schema differs
+            }
+            System.Diagnostics.Debug.WriteLine($"[Kitchen] Table lookup failed for order {orderId}");
+            return null;
         }
         
         private KitchenDashboardStats GetKitchenStats(Microsoft.Data.SqlClient.SqlConnection connection, int? stationId)

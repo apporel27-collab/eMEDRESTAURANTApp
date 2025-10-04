@@ -46,8 +46,8 @@
                                 </select>
                                 <span asp-validation-for="OrderType" class="text-danger"></span>
                                 <div id="tableSection" class="mt-3">
-                                    <label asp-for="TableTurnoverId" class="form-label">Table</label>
-                                    <div class="form-text mb-2">Select a table with guests already seated, or create a new order without table assignment.</div>
+                                    <label asp-for="TableTurnoverId" class="form-label">Table (Primary)</label>
+                                    <div class="form-text mb-2">Select a primary table (or none). You can also merge multiple tables below.</div>
                                     
                                     @if (Model.SelectedTableId.HasValue)
                                     {
@@ -83,6 +83,38 @@
                                         </select>
                                     }
                                     <span asp-validation-for="TableTurnoverId" class="text-danger"></span>
+                                    <div class="mt-3" id="mergeTablesWrapper">
+                                        <label class="form-label">Merge Additional Tables</label>
+                                        <div class="form-text mb-2">Check any extra tables to merge into this order (capacity combined).</div>
+                                        <div class="border rounded p-2" style="max-height:180px; overflow-y:auto; background:#fdfdfd;">
+                                            @if (Model.AvailableTables.Any())
+                                            {
+                                                <div class="fw-bold small text-uppercase text-secondary mb-1">Available</div>
+                                                @foreach (var table in Model.AvailableTables)
+                                                {
+                                                    <div class="form-check form-check-sm">
+                                                        <input class="form-check-input" type="checkbox" name="SelectedTableIds" value="@table.Id" id="merge_avail_@table.Id" />
+                                                        <label class="form-check-label" for="merge_avail_@table.Id">@table.TableName <span class="text-muted">(seats @table.Capacity)</span></label>
+                                                    </div>
+                                                }
+                                            }
+                                            @if (Model.OccupiedTables.Any())
+                                            {
+                                                <div class="fw-bold small text-uppercase text-secondary mt-2 mb-1">Seated</div>
+                                                @foreach (var table in Model.OccupiedTables)
+                                                {
+                                                    <div class="form-check form-check-sm">
+                                                        <input class="form-check-input" type="checkbox" name="SelectedTableIds" value="@table.TableId" id="merge_occ_@table.TableId" />
+                                                        <label class="form-check-label" for="merge_occ_@table.TableId">@table.TableName <span class="text-muted">(@table.GuestName, @table.PartySize guests)</span></label>
+                                                    </div>
+                                                }
+                                            }
+                                            @if (!Model.AvailableTables.Any() && !Model.OccupiedTables.Any())
+                                            {
+                                                <div class="text-muted small">No tables found.</div>
+                                            }
+                                        </div>
+                                    </div>
                                 </div>
                                 <div id="customerSection" class="mt-3 d-none">
                                     <label asp-for="CustomerName" class="form-label">Customer Name</label>
@@ -125,10 +157,12 @@
                     $('#tableSection').removeClass('d-none');
                     $('#customerSection').addClass('d-none');
                     $('#phoneSection').addClass('d-none');
+                    $('#mergeTablesWrapper').removeClass('d-none');
                 } else {
                     $('#tableSection').addClass('d-none');
                     $('#customerSection').removeClass('d-none');
                     $('#phoneSection').removeClass('d-none');
+                    $('#mergeTablesWrapper').addClass('d-none');
                 }
             });
             $('#orderType').trigger('change');

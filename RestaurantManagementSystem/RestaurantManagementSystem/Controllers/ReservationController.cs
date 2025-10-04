@@ -507,8 +507,16 @@ namespace RestaurantManagementSystem.Controllers
         // GET: Tables List
         public IActionResult Tables()
         {
-            var tables = GetAllTables();
-            return View(tables);
+            try
+            {
+                var tables = GetAllTables();
+                return View(tables);
+            }
+            catch (Exception ex)
+            {
+                ViewBag.ErrorMessage = $"Error loading tables: {ex.Message}";
+                return View(new List<Table>());
+            }
         }
 
         // GET: Create/Edit Table Form
@@ -975,22 +983,43 @@ namespace RestaurantManagementSystem.Controllers
             {
                 using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
                 {
-                    // Add timeout to connection open
-                    var connectionTimeout = 60; // seconds
-                    var connectionTask = Task.Run(() => con.Open());
-                    if (!connectionTask.Wait(TimeSpan.FromSeconds(connectionTimeout)))
-                    {
-                        throw new TimeoutException($"Connection timeout after {connectionTimeout} seconds");
-                    }
+                    con.Open();
                     
-                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(
-                        @"SELECT Id, TableNumber, Capacity, Section, IsAvailable, Status, 
-                        MinPartySize, LastOccupiedAt, IsActive 
-                        FROM Tables 
-                        WHERE IsActive = 1
-                        ORDER BY TableNumber", con))
+                    // Query with merged table support
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        SELECT 
+                            t.Id, 
+                            t.TableNumber, 
+                            t.Capacity, 
+                            t.Section, 
+                            t.IsAvailable,
+                            CASE 
+                                WHEN ot.TableId IS NOT NULL THEN 2  -- Occupied if part of active order
+                                ELSE t.Status 
+                            END as Status,
+                            t.MinPartySize, 
+                            t.LastOccupiedAt, 
+                            t.IsActive,
+                            ISNULL(merged.MergedTableNames, '') as MergedTableNames,
+                            CASE WHEN ot.TableId IS NOT NULL THEN 1 ELSE 0 END as IsPartOfMergedOrder
+                        FROM Tables t
+                        LEFT JOIN (
+                            SELECT DISTINCT ot.TableId
+                            FROM OrderTables ot
+                            INNER JOIN Orders o ON ot.OrderId = o.Id AND o.Status IN (0, 1, 2)
+                        ) ot ON t.Id = ot.TableId
+                        LEFT JOIN (
+                            SELECT 
+                                ot2.TableId,
+                                STRING_AGG(CAST(t2.TableNumber AS VARCHAR(50)), ' + ') WITHIN GROUP (ORDER BY t2.TableNumber) AS MergedTableNames
+                            FROM OrderTables ot2
+                            INNER JOIN Tables t2 ON ot2.TableId = t2.Id
+                            INNER JOIN Orders o2 ON ot2.OrderId = o2.Id AND o2.Status IN (0, 1, 2)
+                            GROUP BY ot2.TableId
+                        ) merged ON t.Id = merged.TableId
+                        WHERE t.IsActive = 1
+                        ORDER BY t.TableNumber", con))
                     {
-                        // Set command timeout to 30 seconds
                         cmd.CommandTimeout = 30;
                         
                         using (var reader = cmd.ExecuteReader())
@@ -999,32 +1028,22 @@ namespace RestaurantManagementSystem.Controllers
                             {
                                 tables.Add(new Table
                                 {
-                                    Id = reader.GetInt32(0),
-                                    TableNumber = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                                    Capacity = reader.GetInt32(2),
-                                    Section = reader.IsDBNull(3) ? null : reader.GetString(3),
-                                    IsAvailable = reader.GetBoolean(4),
-                                    Status = (TableStatus)reader.GetInt32(5),
-                                    MinPartySize = reader.GetInt32(6),
-                                    LastOccupiedAt = reader.IsDBNull(7) ? null : (DateTime?)reader.GetDateTime(7),
-                                    IsActive = reader.GetBoolean(8)
+                                    Id = reader.GetInt32("Id"),
+                                    TableNumber = reader.IsDBNull("TableNumber") ? string.Empty : reader.GetString("TableNumber"),
+                                    Capacity = reader.GetInt32("Capacity"),
+                                    Section = reader.IsDBNull("Section") ? null : reader.GetString("Section"),
+                                    IsAvailable = reader.GetBoolean("IsAvailable"),
+                                    Status = (TableStatus)reader.GetInt32("Status"),
+                                    MinPartySize = reader.GetInt32("MinPartySize"),
+                                    LastOccupiedAt = reader.IsDBNull("LastOccupiedAt") ? null : (DateTime?)reader.GetDateTime("LastOccupiedAt"),
+                                    IsActive = reader.GetBoolean("IsActive"),
+                                    MergedTableNames = reader.IsDBNull("MergedTableNames") ? null : reader.GetString("MergedTableNames"),
+                                    IsPartOfMergedOrder = reader.GetInt32("IsPartOfMergedOrder") == 1
                                 });
                             }
                         }
                     }
                 }
-            }
-            catch (SqlException ex)
-            {
-                // Log the SQL error
-                
-                // We'll handle the error at the action level
-            }
-            catch (TimeoutException ex)
-            {
-                // Handle timeout specifically
-                
-                // We'll handle the error at the action level
             }
             catch (Exception ex)
             {

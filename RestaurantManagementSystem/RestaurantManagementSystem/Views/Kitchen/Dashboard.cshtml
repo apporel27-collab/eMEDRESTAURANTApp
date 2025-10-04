@@ -93,13 +93,19 @@
                             foreach (var ticket in Model.NewTickets)
                             {
                                 <a href="@Url.Action("TicketDetails", "Kitchen", new { id = ticket.Id })" class="list-group-item list-group-item-action">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h5 class="mb-1">#@ticket.TicketNumber - @ticket.TableName</h5>
-                                        <small class="text-muted">@ticket.MinutesSinceCreated min</small>
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h5 class="mb-1">KOT #@ticket.TicketNumber</h5>
+                                            <div class="ticket-meta text-muted">
+                                                Order @ticket.OrderNumber | Table @(!string.IsNullOrWhiteSpace(ticket.TableName) ? ticket.TableName : "-")
+                                                @if(!string.IsNullOrWhiteSpace(ticket.TableName) && ticket.TableName.Contains("+")) {<span class="badge bg-secondary ms-1">Merged</span>}
+                                            </div>
+                                            <p class="mb-1 small text-muted mb-1">Station: @ticket.StationName</p>
+                                        </div>
+                                        <small class="text-muted text-end">@ticket.MinutesSinceCreated min<br /><span class="text-nowrap">@ticket.CreatedAt.ToString("MM/dd HH:mm")</span></small>
                                     </div>
-                                    <p class="mb-1">Station: @ticket.StationName</p>
                                     <div class="d-flex justify-content-between">
-                                        <small class="text-muted">@ticket.CreatedAt.ToString("MM/dd HH:mm")</small>
+                                        <small class="text-muted">&nbsp;</small>
                                         <form method="post" action="@Url.Action("UpdateTicketStatus", "Kitchen")">
                                             <input type="hidden" name="TicketId" value="@ticket.Id" />
                                             <input type="hidden" name="Status" value="1" />
@@ -133,15 +139,22 @@
                             foreach (var ticket in Model.InProgressTickets)
                             {
                                 <a href="@Url.Action("TicketDetails", "Kitchen", new { id = ticket.Id })" class="list-group-item list-group-item-action">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h5 class="mb-1">#@ticket.TicketNumber - @ticket.TableName</h5>
-                                        <small class="text-@(ticket.MinutesSinceCreated > 15 ? "danger" : "muted")">
-                                            <strong>@ticket.MinutesSinceCreated min</strong>
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h5 class="mb-1">KOT #@ticket.TicketNumber</h5>
+                                            <div class="ticket-meta text-muted">
+                                                Order @ticket.OrderNumber | Table @(!string.IsNullOrWhiteSpace(ticket.TableName) ? ticket.TableName : "-")
+                                                @if(!string.IsNullOrWhiteSpace(ticket.TableName) && ticket.TableName.Contains("+")) {<span class="badge bg-secondary ms-1">Merged</span>}
+                                            </div>
+                                            <p class="mb-1 small text-muted mb-1">Station: @ticket.StationName</p>
+                                        </div>
+                                        <small class="text-@(ticket.MinutesSinceCreated > 15 ? "danger" : "muted") text-end">
+                                            <strong>@ticket.MinutesSinceCreated min</strong><br />
+                                            <span class="text-nowrap">@ticket.CreatedAt.ToString("MM/dd HH:mm")</span>
                                         </small>
                                     </div>
-                                    <p class="mb-1">Station: @ticket.StationName</p>
                                     <div class="d-flex justify-content-between">
-                                        <small class="text-muted">@ticket.CreatedAt.ToString("MM/dd HH:mm")</small>
+                                        <small class="text-muted">&nbsp;</small>
                                         <form method="post" action="@Url.Action("UpdateTicketStatus", "Kitchen")">
                                             <input type="hidden" name="TicketId" value="@ticket.Id" />
                                             <input type="hidden" name="Status" value="2" />
@@ -175,15 +188,22 @@
                             foreach (var ticket in Model.ReadyTickets)
                             {
                                 <a href="@Url.Action("TicketDetails", "Kitchen", new { id = ticket.Id })" class="list-group-item list-group-item-action">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h5 class="mb-1">#@ticket.TicketNumber - @ticket.TableName</h5>
-                                        <small class="text-@(ticket.MinutesSinceCreated > 5 ? "danger" : "muted")">
-                                            <strong>@ticket.MinutesSinceCreated min</strong>
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h5 class="mb-1">KOT #@ticket.TicketNumber</h5>
+                                            <div class="ticket-meta text-muted">
+                                                Order @ticket.OrderNumber | Table @(!string.IsNullOrWhiteSpace(ticket.TableName) ? ticket.TableName : "-")
+                                                @if(!string.IsNullOrWhiteSpace(ticket.TableName) && ticket.TableName.Contains("+")) {<span class="badge bg-secondary ms-1">Merged</span>}
+                                            </div>
+                                            <p class="mb-1 small text-muted mb-1">Station: @ticket.StationName</p>
+                                        </div>
+                                        <small class="text-@(ticket.MinutesSinceCreated > 5 ? "danger" : "muted") text-end">
+                                            <strong>@ticket.MinutesSinceCreated min</strong><br />
+                                            <span class="text-nowrap">@ticket.CreatedAt.ToString("MM/dd HH:mm")</span>
                                         </small>
                                     </div>
-                                    <p class="mb-1">Station: @ticket.StationName</p>
                                     <div class="d-flex justify-content-between">
-                                        <small class="text-muted">@ticket.CreatedAt.ToString("MM/dd HH:mm")</small>
+                                        <small class="text-muted">&nbsp;</small>
                                         <form method="post" action="@Url.Action("UpdateTicketStatus", "Kitchen")">
                                             <input type="hidden" name="TicketId" value="@ticket.Id" />
                                             <input type="hidden" name="Status" value="3" />
@@ -197,6 +217,42 @@
                         {
                             <div class="list-group-item">
                                 <p class="mb-0 text-center text-muted">No orders ready for service</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Delivered Today Tickets -->
+        <div class="col-md-12">
+            <div class="card border-secondary mb-4">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Delivered Today (@Model.DeliveredTickets.Count)</h5>
+                    <small>Showing only tickets delivered today</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush kitchen-ticket-list">
+                        @if (Model.DeliveredTickets.Any())
+                        {
+                            foreach (var ticket in Model.DeliveredTickets)
+                            {
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-1">KOT #@ticket.TicketNumber</h6>
+                                        <div class="ticket-meta text-muted">Order @ticket.OrderNumber | Table @(!string.IsNullOrWhiteSpace(ticket.TableName) ? ticket.TableName : "-") @if(!string.IsNullOrWhiteSpace(ticket.TableName) && ticket.TableName.Contains("+")) {<span class="badge bg-secondary ms-1">Merged</span>}</div>
+                                        <small class="text-muted">Delivered @ticket.CompletedAt?.ToString("HH:mm")</small>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">Created @ticket.CreatedAt.ToString("MM/dd HH:mm")</small>
+                                        <small class="text-muted">Prep: @ticket.MinutesSinceCreated min</small>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="list-group-item">
+                                <p class="mb-0 text-center text-muted">No tickets delivered today</p>
                             </div>
                         }
                     </div>
@@ -225,6 +281,12 @@
         }
         .kitchen-ticket-list .list-group-item:hover {
             background-color: #f8f9fa;
+        }
+        .ticket-meta {
+            font-size: 0.8rem;
+            line-height: 1.1rem;
+            margin-top: -0.25rem;
+            margin-bottom: 0.25rem;
         }
     </style>
 }

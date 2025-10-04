@@ -58,6 +58,8 @@ namespace RestaurantManagementSystem.Models
         public int ServerId { get; set; }
         public int Duration { get; set; } // Minutes since seated
         public int TargetTurnTime { get; set; } // Target turn time in minutes
+        public string MergedTableNames { get; set; } // For merged table display
+        public bool IsPartOfMergedOrder { get; set; } // Indicates if table is part of merged order
         
         public string StatusText
         {
