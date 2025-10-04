@@ -1,0 +1,459 @@
+@model PublicMenuViewModel
+@{
+    ViewData["Title"] = "Menu - " + Model.RestaurantInfo.Name;
+    Layout = null; // Use a clean layout for public view
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" />
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+        
+        .restaurant-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 1.5rem 0;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .restaurant-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.2);
+            object-fit: cover;
+        }
+        
+        .restaurant-info h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            letter-spacing: -0.5px;
+        }
+        
+        .contact-info {
+            font-size: 0.85rem;
+            opacity: 0.95;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .contact-info i {
+            margin-right: 0.4rem;
+            width: 14px;
+            text-align: center;
+        }
+        
+        .table-info {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(231,76,60,0.3);
+        }
+        
+        .menu-category {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 1rem;
+            overflow: hidden;
+            border: 1px solid #e9ecef;
+        }
+        
+        .category-header {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .category-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+        
+        .category-description {
+            margin-top: 0.3rem;
+            opacity: 0.9;
+            font-size: 0.8rem;
+            font-weight: 400;
+        }
+        
+        .menu-items {
+            padding: 0;
+        }
+        
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid #f1f3f4;
+            transition: background-color 0.2s ease;
+        }
+        
+        .menu-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+        
+        .menu-item-info {
+            flex: 1;
+            margin-right: 1rem;
+        }
+        
+        .menu-item-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.2rem;
+            display: flex;
+            align-items: center;
+            line-height: 1.3;
+        }
+        
+        .menu-item-badges {
+            margin-left: 0.5rem;
+        }
+        
+        .badge-veg {
+            background: #27ae60;
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.15rem 0.35rem;
+            border-radius: 8px;
+            margin-left: 0.25rem;
+            font-weight: 600;
+        }
+        
+        .badge-spicy {
+            background: #e74c3c;
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.15rem 0.35rem;
+            border-radius: 8px;
+            margin-left: 0.25rem;
+            font-weight: 600;
+        }
+        
+        .menu-item-description {
+            color: #6c757d;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            margin-bottom: 0;
+        }
+        
+        .menu-item-price {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #27ae60;
+            white-space: nowrap;
+            background: #e8f5e8;
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            border: 1px solid #d4edda;
+        }
+        
+        .menu-item-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            object-fit: cover;
+            margin-left: 0.75rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        
+        .no-items {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 2rem 1.25rem;
+            font-size: 0.9rem;
+        }
+        
+        .footer-info {
+            background: white;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+        }
+        
+        .footer-info h5 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .footer-info p {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-bottom: 0.5rem;
+        }
+        
+        .qr-timestamp {
+            font-size: 0.75rem;
+            color: #95a5a6;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #ecf0f1;
+        }
+        
+        .container {
+            max-width: 600px;
+            padding: 0 1rem;
+        }
+        
+        .restaurant-header {
+            background: white;
+            border-bottom: 2px solid #f8f9fa;
+            padding: 1.5rem 0;
+            margin-bottom: 1.5rem;
+        }
+        
+        .restaurant-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            object-fit: cover;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        .restaurant-info h1 {
+            color: #2c3e50;
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.3px;
+        }
+        
+        .contact-info {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .contact-info > div {
+            margin-bottom: 0.3rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .contact-info i {
+            margin-right: 0.5rem;
+            width: 14px;
+            color: #3498db;
+        }
+        
+        .table-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-top: 0.75rem;
+            text-align: center;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        @@media (max-width: 768px) {
+            .restaurant-info h1 {
+                font-size: 1.8rem;
+            }
+            
+            .menu-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .menu-item-price {
+                margin-top: 0.5rem;
+                font-size: 1.1rem;
+            }
+            
+            .menu-item-image {
+                margin-left: 0;
+                margin-top: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="restaurant-header sticky-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    @if (!string.IsNullOrEmpty(Model.RestaurantInfo.LogoUrl))
+                    {
+                        <img src="@Model.RestaurantInfo.LogoUrl" alt="Restaurant Logo" class="restaurant-logo" />
+                    }
+                    else
+                    {
+                        <div class="restaurant-logo bg-light d-flex align-items-center justify-content-center">
+                            <i class="fas fa-utensils fa-2x text-primary"></i>
+                        </div>
+                    }
+                </div>
+                <div class="col">
+                    <div class="restaurant-info">
+                        <h1>@Model.RestaurantInfo.Name</h1>
+                        <div class="contact-info">
+                            <div><i class="fas fa-phone"></i>@Model.RestaurantInfo.ContactNumber</div>
+                            <div><i class="fas fa-map-marker-alt"></i>@Model.RestaurantInfo.Address</div>
+                            @if (!string.IsNullOrEmpty(Model.RestaurantInfo.Description))
+                            {
+                                <div class="mt-2"><i class="fas fa-quote-left"></i>@Model.RestaurantInfo.Description</div>
+                            }
+                        </div>
+                        
+                        @if (Model.IsTableSpecific && !string.IsNullOrEmpty(Model.TableName))
+                        {
+                            <div class="table-info">
+                                <i class="fas fa-table me-2"></i>
+                                <strong>@Model.TableName</strong>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        @if (Model.MenuCategories.Any())
+        {
+            @foreach (var category in Model.MenuCategories)
+            {
+                <div class="menu-category">
+                    <div class="category-header">
+                        <h3>@category.CategoryName</h3>
+                        @if (!string.IsNullOrEmpty(category.CategoryDescription))
+                        {
+                            <div class="category-description">@category.CategoryDescription</div>
+                        }
+                    </div>
+                    
+                    <div class="menu-items">
+                        @if (category.MenuItems.Any())
+                        {
+                            @foreach (var item in category.MenuItems)
+                            {
+                                <div class="menu-item">
+                                    <div class="menu-item-info">
+                                        <div class="menu-item-name">
+                                            @item.Name
+                                            <div class="menu-item-badges">
+                                                @if (item.IsVegetarian)
+                                                {
+                                                    <span class="badge-veg"><i class="fas fa-leaf"></i> VEG</span>
+                                                }
+                                                @if (item.IsSpicy)
+                                                {
+                                                    <span class="badge-spicy"><i class="fas fa-fire"></i> SPICY</span>
+                                                }
+                                            </div>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(item.Description))
+                                        {
+                                            <div class="menu-item-description">@item.Description</div>
+                                        }
+                                    </div>
+                                    <div class="menu-item-price">₹@item.Price.ToString("0.00")</div>
+                                    @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                    {
+                                        <img src="@item.ImageUrl" alt="@item.Name" class="menu-item-image" />
+                                    }
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="no-items">No items available in this category.</div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="menu-category">
+                <div class="menu-items">
+                    <div class="no-items">
+                        <i class="fas fa-utensils fa-3x mb-3 text-muted"></i>
+                        <h4>Menu Coming Soon</h4>
+                        <p>Our delicious menu will be available shortly. Please check back soon!</p>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="footer-info">
+            <h5><i class="fas fa-heart text-danger"></i> Thank you for choosing @Model.RestaurantInfo.Name!</h5>
+            <p class="mb-2">@Model.RestaurantInfo.Description</p>
+            
+            @if (!string.IsNullOrEmpty(Model.RestaurantInfo.Email))
+            {
+                <p class="mb-1"><i class="fas fa-envelope"></i> @Model.RestaurantInfo.Email</p>
+            }
+            
+            @if (!string.IsNullOrEmpty(Model.RestaurantInfo.Website))
+            {
+                <p class="mb-1"><i class="fas fa-globe"></i> @Model.RestaurantInfo.Website</p>
+            }
+            
+            <div class="qr-timestamp">
+                Menu accessed on @DateTime.Now.ToString("MMM dd, yyyy 'at' hh:mm tt")
+                @if (Model.IsTableSpecific)
+                {
+                    <br />@: via @Model.TableName QR Code
+                }
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-refresh menu every 5 minutes to get latest availability
+        setTimeout(function() {
+            location.reload();
+        }, 300000);
+        
+        // Add smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>
