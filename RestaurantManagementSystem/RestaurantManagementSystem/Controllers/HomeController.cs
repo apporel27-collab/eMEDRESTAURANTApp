@@ -99,38 +99,55 @@ namespace RestaurantManagementSystem.Controllers
 
         private async Task<(decimal TodaySales, int TodayOrders, int ActiveTables, int UpcomingReservations)> GetDashboardStatsAsync()
         {
+            // Prefer stored procedure for plan reuse and centralized logic. Using usp_GetHomeDashboardStatsEnhanced if present else fallback.
+            var procedureNamePrimary = "usp_GetHomeDashboardStatsEnhanced";
+            var procedureNameFallback = "usp_GetHomeDashboardStats";
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                // Try enhanced first
+                foreach (var proc in new [] { procedureNamePrimary, procedureNameFallback })
                 {
-                    await connection.OpenAsync();
-                    
-                    using (var command = new SqlCommand("usp_GetHomeDashboardStats", connection))
+                    try
                     {
-                        command.CommandType = System.Data.CommandType.StoredProcedure;
-                        
-                        using (var reader = await command.ExecuteReaderAsync())
+                        using var command = new SqlCommand(proc, connection) { CommandType = System.Data.CommandType.StoredProcedure };
+                        using var reader = await command.ExecuteReaderAsync();
+                        if (await reader.ReadAsync())
                         {
-                            if (await reader.ReadAsync())
-                            {
-                                return (
-                                    TodaySales: reader.GetDecimal("TodaySales"),
-                                    TodayOrders: reader.GetInt32("TodayOrders"),
-                                    ActiveTables: reader.GetInt32("ActiveTables"),
-                                    UpcomingReservations: reader.GetInt32("UpcomingReservations")
-                                );
-                            }
+                            // Enhanced version returns extra columns; we only map required if they exist.
+                            decimal todaySales = SafeGetDecimal(reader, "TodaySales");
+                            int todayOrders = SafeGetInt(reader, "TodayOrders");
+                            int activeTables = SafeGetInt(reader, "ActiveTables");
+                            int upcomingRes = SafeGetInt(reader, "UpcomingReservations");
+                            return (todaySales, todayOrders, activeTables, upcomingRes);
                         }
+                    }
+                    catch (SqlException sqlEx)
+                    {
+                        _logger?.LogWarning(sqlEx, "Stored procedure {Proc} failed, will attempt fallback if available", proc);
+                        // continue to next proc in sequence
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error getting dashboard stats");
+                _logger?.LogError(ex, "Error getting dashboard stats via stored procedure");
             }
-            
-            // Return default values if error occurs
-            return (TodaySales: 0m, TodayOrders: 0, ActiveTables: 0, UpcomingReservations: 0);
+            return (0m, 0, 0, 0);
+        }
+
+        private static decimal SafeGetDecimal(SqlDataReader reader, string name)
+        {
+            var ordinal = reader.GetOrdinal(name);
+            return reader.IsDBNull(ordinal) ? 0m : reader.GetDecimal(ordinal);
+        }
+
+        private static int SafeGetInt(SqlDataReader reader, string name)
+        {
+            var ordinal = reader.GetOrdinal(name);
+            return reader.IsDBNull(ordinal) ? 0 : reader.GetInt32(ordinal);
         }
 
         private async Task<List<DashboardOrderViewModel>> GetRecentOrdersAsync()

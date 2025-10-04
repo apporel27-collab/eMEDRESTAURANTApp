@@ -751,18 +751,27 @@ namespace RestaurantManagementSystem.Services
                 using (var connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
-                    
-                    using (var command = new SqlCommand(@"
-                        IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
-                                  WHERE TABLE_NAME = 'Users' AND COLUMN_NAME = 'LastLoginAt')
-                        BEGIN
-                            UPDATE Users SET LastLoginAt = @LastLoginAt WHERE Id = @UserId
-                        END", connection))
+                    // First check if the column exists (separate round-trip to avoid referencing a missing column in same batch)
+                    bool columnExists;
+                    using (var checkCmd = new SqlCommand(@"SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+                                                            WHERE TABLE_NAME = 'Users' AND COLUMN_NAME = 'LastLoginAt'", connection))
                     {
-                        command.Parameters.AddWithValue("@UserId", userId);
-                        command.Parameters.AddWithValue("@LastLoginAt", DateTime.UtcNow);
-                        
-                        await command.ExecuteNonQueryAsync();
+                        var result = await checkCmd.ExecuteScalarAsync();
+                        columnExists = result != null;
+                    }
+
+                    if (columnExists)
+                    {
+                        using (var updateCmd = new SqlCommand("UPDATE Users SET LastLoginAt = @LastLoginAt WHERE Id = @UserId", connection))
+                        {
+                            updateCmd.Parameters.AddWithValue("@UserId", userId);
+                            updateCmd.Parameters.AddWithValue("@LastLoginAt", DateTime.UtcNow);
+                            await updateCmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                    else
+                    {
+                        _logger?.LogDebug("Skipping LastLoginAt update because column does not exist on Users table.");
                     }
                 }
             }
