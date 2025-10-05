@@ -37,10 +37,13 @@ namespace RestaurantManagementSystem.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // Set default schema to dbo for all entities
+            modelBuilder.HasDefaultSchema("dbo");
+            
             // Configure Category entity
             modelBuilder.Entity<Category>(entity => 
             {
-                entity.ToTable("Categories");
+                entity.ToTable("Categories", "dbo");
                 entity.Property(e => e.Id).HasColumnName("Id").IsRequired();
                 entity.Property(e => e.Name).HasColumnName("Name").IsRequired();
                 entity.Property(e => e.IsActive).HasColumnName("IsActive").IsRequired();
@@ -52,7 +55,7 @@ namespace RestaurantManagementSystem.Data
             // Configure SubCategory entity
             modelBuilder.Entity<SubCategory>(entity =>
             {
-                entity.ToTable("SubCategories");
+                entity.ToTable("SubCategories", "dbo");
                 entity.Property(e => e.Id).HasColumnName("Id").IsRequired();
                 entity.Property(e => e.Name).HasColumnName("Name").IsRequired().HasMaxLength(100);
                 entity.Property(e => e.Description).HasColumnName("Description").HasMaxLength(500);
@@ -75,7 +78,7 @@ namespace RestaurantManagementSystem.Data
             // Configure MenuItem entity
             modelBuilder.Entity<MenuItem>(entity =>
             {
-                entity.ToTable("MenuItems");
+                entity.ToTable("MenuItems", "dbo");
                 
                 // Configure foreign key relationship with Category
                 entity.HasOne(m => m.Category)

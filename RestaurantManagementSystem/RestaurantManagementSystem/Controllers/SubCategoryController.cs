@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using RestaurantManagementSystem.Data;
 using RestaurantManagementSystem.Models;
 
@@ -9,10 +10,67 @@ namespace RestaurantManagementSystem.Controllers
     public class SubCategoryController : Controller
     {
         private readonly RestaurantDbContext _db;
+        private readonly IConfiguration _configuration;
+        private readonly string _connectionString;
         
-        public SubCategoryController(RestaurantDbContext db) 
+        public SubCategoryController(RestaurantDbContext db, IConfiguration configuration) 
         { 
-            _db = db; 
+            _db = db;
+            _configuration = configuration;
+            _connectionString = _configuration.GetConnectionString("DefaultConnection");
+        }
+
+        // Method to ensure SubCategories table exists in dbo schema
+        private bool EnsureDboSubCategoriesTableExists()
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                connection.Open();
+                
+                // Check if SubCategories table exists in dbo schema
+                var tableExistsQuery = @"
+                    SELECT COUNT(*) 
+                    FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_NAME = 'SubCategories' AND TABLE_SCHEMA = 'dbo'";
+                    
+                using var checkCommand = new SqlCommand(tableExistsQuery, connection);
+                var tableExists = (int)checkCommand.ExecuteScalar() > 0;
+                
+                if (!tableExists)
+                {
+                    // Create the SubCategories table in dbo schema
+                    var createTableSql = @"
+                        CREATE TABLE [dbo].[SubCategories] (
+                            Id int IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            Name nvarchar(100) NOT NULL,
+                            Description nvarchar(500) NULL,
+                            IsActive bit NOT NULL DEFAULT 1,
+                            CategoryId int NOT NULL,
+                            DisplayOrder int NOT NULL DEFAULT 0,
+                            CreatedAt datetime2 NOT NULL DEFAULT GETDATE(),
+                            UpdatedAt datetime2 NULL,
+                            CONSTRAINT FK_SubCategories_Categories 
+                                FOREIGN KEY (CategoryId) 
+                                REFERENCES [dbo].[Categories](Id)
+                        );
+                        
+                        CREATE INDEX IX_SubCategories_CategoryId ON [dbo].[SubCategories](CategoryId);
+                        CREATE INDEX IX_SubCategories_IsActive ON [dbo].[SubCategories](IsActive);";
+                    
+                    using var createCommand = new SqlCommand(createTableSql, connection);
+                    createCommand.ExecuteNonQuery();
+                    
+                    Console.WriteLine("Successfully created [dbo].[SubCategories] table");
+                }
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error ensuring dbo SubCategories table exists: {ex.Message}");
+                return false;
+            }
         }
 
         // Helper method to populate categories dropdown
@@ -31,13 +89,45 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
-                // Check if SubCategories table exists
-                var subCategories = _db.SubCategories
-                    .Include(s => s.Category)
-                    .OrderBy(s => s.Category.Name)
-                    .ThenBy(s => s.DisplayOrder)
-                    .ThenBy(s => s.Name)
-                    .ToList();
+                // Ensure dbo SubCategories table exists
+                EnsureDboSubCategoriesTableExists();
+
+                // Load SubCategories from dbo schema using raw SQL to avoid EF schema issues
+                var subCategories = new List<SubCategory>();
+                
+                using var connection = new SqlConnection(_connectionString);
+                connection.Open();
+                
+                var selectSql = @"
+                    SELECT s.Id, s.Name, s.Description, s.IsActive, s.CategoryId, s.DisplayOrder, s.CreatedAt, s.UpdatedAt,
+                           c.Name as CategoryName
+                    FROM [dbo].[SubCategories] s
+                    INNER JOIN [dbo].[Categories] c ON s.CategoryId = c.Id
+                    ORDER BY c.Name, s.DisplayOrder, s.Name";
+                
+                using var command = new SqlCommand(selectSql, connection);
+                using var reader = command.ExecuteReader();
+                
+                while (reader.Read())
+                {
+                    var subCategory = new SubCategory
+                    {
+                        Id = reader.GetInt32("Id"),
+                        Name = reader.GetString("Name"),
+                        Description = reader.IsDBNull("Description") ? string.Empty : reader.GetString("Description"),
+                        IsActive = reader.GetBoolean("IsActive"),
+                        CategoryId = reader.GetInt32("CategoryId"),
+                        DisplayOrder = reader.GetInt32("DisplayOrder"),
+                        CreatedAt = reader.GetDateTime("CreatedAt"),
+                        UpdatedAt = reader.IsDBNull("UpdatedAt") ? null : reader.GetDateTime("UpdatedAt"),
+                        Category = new Category 
+                        { 
+                            Id = reader.GetInt32("CategoryId"), 
+                            Name = reader.GetString("CategoryName") 
+                        }
+                    };
+                    subCategories.Add(subCategory);
+                }
                     
                 return View(subCategories);
             }
@@ -48,7 +138,18 @@ namespace RestaurantManagementSystem.Controllers
                     ex.Message.Contains("doesn't exist") || 
                     ex.Message.Contains("Could not find"))
                 {
-                    TempData["ErrorMessage"] = "SubCategories table not found. Please run the database setup script (create_subcategories_table.sql) to create the required table structure.";
+                    TempData["ErrorMessage"] = "SubCategories table not found. Attempting to create table automatically...";
+                    
+                    // Try to create the table
+                    if (EnsureDboSubCategoriesTableExists())
+                    {
+                        TempData["SuccessMessage"] = "SubCategories table created successfully in dbo schema! You can now create sub categories.";
+                        return View(new List<SubCategory>());
+                    }
+                    else
+                    {
+                        TempData["ErrorMessage"] = "Unable to create SubCategories table automatically in dbo schema. Please contact system administrator.";
+                    }
                 }
                 else
                 {
@@ -87,24 +188,54 @@ namespace RestaurantManagementSystem.Controllers
         {
             try
             {
+                // Ensure dbo SubCategories table exists before proceeding
+                if (!EnsureDboSubCategoriesTableExists())
+                {
+                    TempData["ErrorMessage"] = "Unable to create SubCategories table in dbo schema. Please contact system administrator.";
+                    PopulateCategoriesDropdown(model?.CategoryId);
+                    return View(model);
+                }
+
                 if (ModelState.IsValid)
                 {
-                    // Check if sub category name already exists within the same category
-                    var existingSubCategory = _db.SubCategories
-                        .FirstOrDefault(s => s.Name == model.Name && s.CategoryId == model.CategoryId);
-                        
-                    if (existingSubCategory != null)
+                    // Force Entity Framework to use dbo schema by executing raw SQL
+                    using var connection = new SqlConnection(_connectionString);
+                    connection.Open();
+                    
+                    // Check if sub category name already exists within the same category in dbo schema
+                    var duplicateCheckSql = @"
+                        SELECT COUNT(*) 
+                        FROM [dbo].[SubCategories] 
+                        WHERE Name = @Name AND CategoryId = @CategoryId";
+                    
+                    using var checkCommand = new SqlCommand(duplicateCheckSql, connection);
+                    checkCommand.Parameters.AddWithValue("@Name", model.Name);
+                    checkCommand.Parameters.AddWithValue("@CategoryId", model.CategoryId);
+                    
+                    var duplicateCount = (int)checkCommand.ExecuteScalar();
+                    
+                    if (duplicateCount > 0)
                     {
                         ModelState.AddModelError("Name", "A sub category with this name already exists in the selected category.");
                         PopulateCategoriesDropdown(model.CategoryId);
                         return View(model);
                     }
 
-                    model.CreatedAt = DateTime.Now;
-                    model.UpdatedAt = null; // Set as null for new records
+                    // Insert directly into dbo schema to bypass Entity Framework schema issues
+                    var insertSql = @"
+                        INSERT INTO [dbo].[SubCategories] (Name, Description, IsActive, CategoryId, DisplayOrder, CreatedAt, UpdatedAt)
+                        VALUES (@Name, @Description, @IsActive, @CategoryId, @DisplayOrder, @CreatedAt, @UpdatedAt)";
                     
-                    _db.SubCategories.Add(model);
-                    _db.SaveChanges();
+                    using var insertCommand = new SqlCommand(insertSql, connection);
+                    insertCommand.Parameters.AddWithValue("@Name", model.Name);
+                    insertCommand.Parameters.AddWithValue("@Description", model.Description ?? string.Empty);
+                    insertCommand.Parameters.AddWithValue("@IsActive", model.IsActive);
+                    insertCommand.Parameters.AddWithValue("@CategoryId", model.CategoryId);
+                    insertCommand.Parameters.AddWithValue("@DisplayOrder", model.DisplayOrder);
+                    insertCommand.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
+                    insertCommand.Parameters.AddWithValue("@UpdatedAt", DateTime.Now);
+                    
+                    insertCommand.ExecuteNonQuery();
                     
                     TempData["SuccessMessage"] = "Sub category created successfully!";
                     return RedirectToAction("Index");
@@ -115,7 +246,28 @@ namespace RestaurantManagementSystem.Controllers
             }
             catch (Exception ex)
             {
-                TempData["ErrorMessage"] = $"Error creating sub category: {ex.Message}";
+                // Get more detailed error information
+                string errorMessage = ex.Message;
+                if (ex.InnerException != null)
+                {
+                    errorMessage += $" Inner Exception: {ex.InnerException.Message}";
+                }
+                
+                // Check for specific database-related errors
+                if (ex.Message.Contains("Invalid object name") || 
+                    ex.InnerException?.Message.Contains("Invalid object name") == true)
+                {
+                    TempData["ErrorMessage"] = "SubCategories table does not exist in the dbo schema. Please contact system administrator.";
+                }
+                else if (ex.Message.Contains("FOREIGN KEY") || ex.InnerException?.Message.Contains("FOREIGN KEY") == true)
+                {
+                    TempData["ErrorMessage"] = "Invalid Category selected. Please select a valid category.";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = $"Error creating sub category: {errorMessage}";
+                }
+                
                 PopulateCategoriesDropdown(model?.CategoryId);
                 return View(model);
             }

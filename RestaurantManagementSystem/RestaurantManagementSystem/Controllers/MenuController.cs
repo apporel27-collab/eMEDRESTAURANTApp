@@ -116,6 +116,13 @@ namespace RestaurantManagementSystem.Controllers
                 return false;
             }
         }
+        
+        // Helper method to get the correct schema name for SubCategories table
+        // Always use dbo schema to match Entity Framework configuration
+        private string GetSubCategoriesTableReference()
+        {
+            return "[dbo].[SubCategories]";
+        }
 
         // GET: Menu
         public IActionResult Index()
@@ -200,7 +207,8 @@ namespace RestaurantManagementSystem.Controllers
                             
                             if (subCategoriesTableExists)
                             {
-                                using (var countCmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT COUNT(*) FROM SubCategories", connection))
+                                string subCategoriesTable = GetSubCategoriesTableReference();
+                                using (var countCmd = new Microsoft.Data.SqlClient.SqlCommand($"SELECT COUNT(*) FROM {subCategoriesTable}", connection))
                                 {
                                     var subCategoryCount = (int)countCmd.ExecuteScalar();
                                     diagnostics.Add($"📊 SubCategories count: {subCategoryCount}");
@@ -258,6 +266,36 @@ namespace RestaurantManagementSystem.Controllers
             {
                 try
                 {
+                    // Validate SubCategoryId before proceeding
+                    if (model.SubCategoryId.HasValue)
+                    {
+                        using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                        {
+                            connection.Open();
+                            string subCategoriesTable = GetSubCategoriesTableReference();
+                            using (var validateCommand = new Microsoft.Data.SqlClient.SqlCommand(
+                                $"SELECT COUNT(*) FROM {subCategoriesTable} WHERE Id = @SubCategoryId AND IsActive = 1", connection))
+                            {
+                                validateCommand.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId.Value);
+                                int count = (int)validateCommand.ExecuteScalar();
+                                
+                                if (count == 0)
+                                {
+                                    ModelState.AddModelError("SubCategoryId", $"Selected SubCategory (ID: {model.SubCategoryId}) does not exist or is not active.");
+                                    
+                                    // Repopulate ViewBag data for redisplay
+                                    ViewBag.Categories = GetCategorySelectList();
+                                    ViewBag.SubCategories = GetSubCategorySelectList(); // Empty list initially
+                                    ViewBag.Allergens = GetAllAllergens();
+                                    ViewBag.Modifiers = GetAllModifiers();
+                                    ViewBag.KitchenStations = GetKitchenStationSelectList();
+                                    
+                                    return View(model);
+                                }
+                            }
+                        }
+                    }
+                    
                     // New enhancement normalization
                     // If GST not applicable, ignore GSTPercentage value
                     if (!model.IsGstApplicable)
@@ -364,7 +402,36 @@ namespace RestaurantManagementSystem.Controllers
             };
 
             ViewBag.Categories = GetCategorySelectList();
-            ViewBag.SubCategories = GetSubCategorySelectList(viewModel.CategoryId);
+            
+            // Get subcategories for the current category and ensure the current subcategory is included
+            var subCategories = GetSubCategorySelectList(viewModel.CategoryId);
+            
+            // If the menu item has a subcategory but it's not in the list, add it
+            if (menuItem.SubCategoryId.HasValue && menuItem.SubCategory != null)
+            {
+                var currentSubCategoryExists = subCategories.Any(sc => sc.Value == menuItem.SubCategoryId.ToString());
+                if (!currentSubCategoryExists)
+                {
+                    // Add the current subcategory to the list
+                    subCategories.Add(new SelectListItem
+                    {
+                        Value = menuItem.SubCategoryId.ToString(),
+                        Text = menuItem.SubCategory.Name,
+                        Selected = true
+                    });
+                }
+                else
+                {
+                    // Mark the current subcategory as selected
+                    var existingItem = subCategories.FirstOrDefault(sc => sc.Value == menuItem.SubCategoryId.ToString());
+                    if (existingItem != null)
+                    {
+                        existingItem.Selected = true;
+                    }
+                }
+            }
+            
+            ViewBag.SubCategories = subCategories;
             ViewBag.Allergens = GetAllAllergens();
             // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
@@ -387,6 +454,36 @@ namespace RestaurantManagementSystem.Controllers
             {
                 try
                 {
+                    // Validate SubCategoryId before proceeding
+                    if (model.SubCategoryId.HasValue)
+                    {
+                        using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                        {
+                            connection.Open();
+                            string subCategoriesTable = GetSubCategoriesTableReference();
+                            using (var validateCommand = new Microsoft.Data.SqlClient.SqlCommand(
+                                $"SELECT COUNT(*) FROM {subCategoriesTable} WHERE Id = @SubCategoryId AND IsActive = 1", connection))
+                            {
+                                validateCommand.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId.Value);
+                                int count = (int)validateCommand.ExecuteScalar();
+                                
+                                if (count == 0)
+                                {
+                                    ModelState.AddModelError("SubCategoryId", $"Selected SubCategory (ID: {model.SubCategoryId}) does not exist or is not active.");
+                                    
+                                    // Repopulate ViewBag data for redisplay
+                                    ViewBag.Categories = GetCategorySelectList();
+                                    ViewBag.SubCategories = GetSubCategorySelectList(model.CategoryId);
+                                    ViewBag.Allergens = GetAllAllergens();
+                                    ViewBag.Modifiers = GetAllModifiers();
+                                    ViewBag.KitchenStations = GetKitchenStationSelectList();
+                                    
+                                    return View(model);
+                                }
+                            }
+                        }
+                    }
+                    
                     if (!model.IsGstApplicable)
                     {
                         model.GSTPercentage = null;
@@ -655,10 +752,11 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Build dynamic query based on available schema
+                string subCategoriesTable = GetSubCategoriesTableReference();
                 string query;
                 if (hasSubCategoryColumn && hasSubCategoriesTable)
                 {
-                    query = @"
+                    query = $@"
                         SELECT 
                             m.[Id], 
                             ISNULL(m.[PLUCode], '') AS PLUCode,
@@ -681,7 +779,7 @@ namespace RestaurantManagementSystem.Controllers
                             m.[TargetGP]
                         FROM [dbo].[MenuItems] m
                         INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
-                        LEFT JOIN [dbo].[SubCategories] sc ON m.[SubCategoryId] = sc.[Id]
+                        LEFT JOIN {subCategoriesTable} sc ON m.[SubCategoryId] = sc.[Id]
                         ORDER BY m.[Name]";
                 }
                 else
@@ -803,10 +901,11 @@ namespace RestaurantManagementSystem.Controllers
                 }
                 
                 // Build dynamic query based on available schema
+                string subCategoriesTable = GetSubCategoriesTableReference();
                 string query;
                 if (hasSubCategoryColumn && hasSubCategoriesTable)
                 {
-                    query = @"
+                    query = $@"
                         SELECT 
                             m.[Id], 
                             m.[PLUCode], 
@@ -830,7 +929,7 @@ namespace RestaurantManagementSystem.Controllers
                             m.[IsGstApplicable]
                         FROM [dbo].[MenuItems] m
                         INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
-                        LEFT JOIN [dbo].[SubCategories] sc ON m.[SubCategoryId] = sc.[Id]
+                        LEFT JOIN {subCategoriesTable} sc ON m.[SubCategoryId] = sc.[Id]
                         WHERE m.[Id] = @Id";
                 }
                 else
@@ -1025,9 +1124,29 @@ namespace RestaurantManagementSystem.Controllers
                     if (hasSubCategoryColumn)
                     {
                         if (model.SubCategoryId.HasValue)
-                            command.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId);
+                        {
+                            // Validate that SubCategoryId exists in SubCategories table
+                            using (var validateCommand = new Microsoft.Data.SqlClient.SqlCommand(
+                                "SELECT COUNT(*) FROM SubCategories WHERE Id = @SubCategoryId", connection))
+                            {
+                                validateCommand.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId.Value);
+                                int count = (int)validateCommand.ExecuteScalar();
+                                
+                                if (count > 0)
+                                {
+                                    command.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId);
+                                }
+                                else
+                                {
+                                    // SubCategory doesn't exist, set to NULL
+                                    command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                                }
+                            }
+                        }
                         else
+                        {
                             command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                        }
                     }
                     
                     if (!string.IsNullOrEmpty(model.ImagePath))
@@ -1071,7 +1190,7 @@ namespace RestaurantManagementSystem.Controllers
             return menuItemId;
         }
 
-        private void UpdateMenuItem(MenuItemViewModel model)
+        private void UpdateMenuItem_OLD(MenuItemViewModel model)
         {
             using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
@@ -1086,12 +1205,12 @@ namespace RestaurantManagementSystem.Controllers
                     hasSubCategoryColumn = (int)checkCommand.ExecuteScalar() > 0;
                 }
                 
-                // Build UPDATE query based on available schema
+                // Build UPDATE query based on available schema - use dbo schema for MenuItems
                 string updateQuery;
                 if (hasSubCategoryColumn)
                 {
                     updateQuery = @"
-                        UPDATE MenuItems
+                        UPDATE [dbo].[MenuItems]
                         SET Name = @Name,
                             PLUCode = @PLUCode,
                             Description = @Description,
@@ -1114,7 +1233,7 @@ namespace RestaurantManagementSystem.Controllers
                 else
                 {
                     updateQuery = @"
-                        UPDATE MenuItems
+                        UPDATE [dbo].[MenuItems]
                         SET Name = @Name,
                             PLUCode = @PLUCode,
                             Description = @Description,
@@ -1147,9 +1266,131 @@ namespace RestaurantManagementSystem.Controllers
                     if (hasSubCategoryColumn)
                     {
                         if (model.SubCategoryId.HasValue)
-                            command.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId);
+                        {
+                            // Validate that SubCategoryId exists in SubCategories table
+                            using (var validateCommand = new Microsoft.Data.SqlClient.SqlCommand(
+                                "SELECT COUNT(*) FROM SubCategories WHERE Id = @SubCategoryId", connection))
+                            {
+                                validateCommand.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId.Value);
+                                int count = (int)validateCommand.ExecuteScalar();
+                                
+                                if (count > 0)
+                                {
+                                    command.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId);
+                                }
+                                else
+                                {
+                                    // SubCategory doesn't exist, set to NULL
+                                    command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                                }
+                            }
+                        }
                         else
+                        {
                             command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                        }
+                    }
+                    
+                    if (!string.IsNullOrEmpty(model.ImagePath))
+                        command.Parameters.AddWithValue("@ImagePath", model.ImagePath);
+                    else
+                        command.Parameters.AddWithValue("@ImagePath", DBNull.Value);
+                    
+                    command.Parameters.AddWithValue("@IsAvailable", model.IsAvailable);
+                    command.Parameters.AddWithValue("@PreparationTimeMinutes", model.PreparationTimeMinutes);
+                    
+                    if (model.CalorieCount.HasValue)
+                        command.Parameters.AddWithValue("@CalorieCount", model.CalorieCount);
+                    else
+                        command.Parameters.AddWithValue("@CalorieCount", DBNull.Value);
+                        
+                    command.Parameters.AddWithValue("@IsFeatured", model.IsFeatured);
+                    command.Parameters.AddWithValue("@IsSpecial", model.IsSpecial);
+                    
+                    if (model.DiscountPercentage.HasValue)
+                        command.Parameters.AddWithValue("@DiscountPercentage", model.DiscountPercentage);
+                    else
+                        command.Parameters.AddWithValue("@DiscountPercentage", DBNull.Value);
+                        
+                    if (model.KitchenStationId.HasValue)
+                        command.Parameters.AddWithValue("@KitchenStationId", model.KitchenStationId);
+                    else
+                        command.Parameters.AddWithValue("@KitchenStationId", DBNull.Value);
+                    
+                    if (model.GSTPercentage.HasValue && model.IsGstApplicable)
+                        command.Parameters.AddWithValue("@GSTPercentage", model.GSTPercentage);
+                    else
+                        command.Parameters.AddWithValue("@GSTPercentage", DBNull.Value);
+                    command.Parameters.AddWithValue("@IsGstApplicable", model.IsGstApplicable);
+                    command.Parameters.AddWithValue("@NotAvailable", model.NotAvailable);
+                    
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        private void UpdateMenuItem(MenuItemViewModel model)
+        {
+            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+            {
+                connection.Open();
+                
+                // Build UPDATE query for dbo schema
+                string updateQuery = @"
+                    UPDATE [dbo].[MenuItems]
+                    SET Name = @Name,
+                        PLUCode = @PLUCode,
+                        Description = @Description,
+                        Price = @Price,
+                        CategoryId = @CategoryId,
+                        SubCategoryId = @SubCategoryId,
+                        ImagePath = @ImagePath,
+                        IsAvailable = @IsAvailable,
+                        PrepTime = @PreparationTimeMinutes,
+                        CalorieCount = @CalorieCount,
+                        IsFeatured = @IsFeatured,
+                        IsSpecial = @IsSpecial,
+                        DiscountPercentage = @DiscountPercentage,
+                        KitchenStationId = @KitchenStationId,
+                        GSTPercentage = @GSTPercentage,
+                        IsGstApplicable = @IsGstApplicable,
+                        NotAvailable = @NotAvailable
+                    WHERE Id = @Id";
+                
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(updateQuery, connection))
+                {
+                    command.Parameters.AddWithValue("@Id", model.Id);
+                    command.Parameters.AddWithValue("@PLUCode", model.PLUCode ?? string.Empty);
+                    command.Parameters.AddWithValue("@Name", model.Name);
+                    command.Parameters.AddWithValue("@Description", model.Description);
+                    command.Parameters.AddWithValue("@Price", model.Price);
+                    command.Parameters.AddWithValue("@CategoryId", model.CategoryId);
+                    
+                    // Handle SubCategoryId with proper validation against dbo.SubCategories
+                    if (model.SubCategoryId.HasValue)
+                    {
+                        // Validate that SubCategoryId exists in dbo.SubCategories table
+                        string subCategoriesTable = GetSubCategoriesTableReference();
+                        using (var validateCommand = new Microsoft.Data.SqlClient.SqlCommand(
+                            $"SELECT COUNT(*) FROM {subCategoriesTable} WHERE Id = @SubCategoryId AND IsActive = 1", connection))
+                        {
+                            validateCommand.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId.Value);
+                            int count = (int)validateCommand.ExecuteScalar();
+                            
+                            if (count > 0)
+                            {
+                                command.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId);
+                            }
+                            else
+                            {
+                                // SubCategory doesn't exist in dbo schema, set to NULL
+                                command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
                     }
                     
                     if (!string.IsNullOrEmpty(model.ImagePath))
@@ -1798,9 +2039,10 @@ namespace RestaurantManagementSystem.Controllers
                         }
                     }
                     
-                    string query = @"
+                    string subCategoriesTable = GetSubCategoriesTableReference();
+                    string query = $@"
                         SELECT Id, Name
-                        FROM SubCategories
+                        FROM {subCategoriesTable}
                         WHERE IsActive = 1";
                     
                     if (categoryId.HasValue)

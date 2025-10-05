@@ -342,14 +342,13 @@
             toggleGstField();
             
             // Load subcategories on page load if category is selected
-            loadSubCategories();
+            // The subcategories are already loaded by the server, only reload if category changes
         });
 
         // Load subcategories based on selected category
         function loadSubCategories() {
             var categoryId = $('#CategoryId').val();
             var subCategorySelect = $('#SubCategoryId');
-            var selectedSubCategory = '@Model.SubCategoryId';
             
             // Clear existing options except the first one
             subCategorySelect.find('option:not(:first)').remove();
@@ -362,14 +361,15 @@
                             subCategorySelect.append(option);
                         });
                         
-                        // Set the selected subcategory if editing
-                        if (selectedSubCategory) {
-                            subCategorySelect.val(selectedSubCategory);
-                        }
+                        // Note: Don't set selected value here as it will override server-side selection
+                        // The selected value should be maintained by the server-side ViewBag.SubCategories
                     })
                     .fail(function() {
                         console.log('Error loading subcategories');
                     });
+            } else {
+                // If no category selected, also clear the subcategory selection
+                subCategorySelect.val('');
             }
         }
     </script>
