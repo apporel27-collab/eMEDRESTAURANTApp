@@ -261,3 +261,4 @@ namespace RestaurantManagementSystem.Models
         public int Status { get; set; }
         public string StatusDisplay { get; set; }
     }
+}

@@ -1,3 +1,4 @@
+@model RestaurantManagementSystem.Models.EstimationViewModel
 @{
     ViewData["Title"] = "Menu Items & Estimation";
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -21,12 +22,17 @@
     <!-- Search and Filter Controls -->
     <div class="controls-section">
         <div class="row g-2">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <input type="text" id="menuItemSearch" class="form-control form-control-sm" placeholder="🔍 Search menu items...">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select id="categoryFilter" class="form-select form-select-sm">
                     <option value="all">All Categories</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select id="subCategoryFilter" class="form-select form-select-sm">
+                    <option value="all">All SubCategories</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -46,16 +52,17 @@
             <table id="menuItemsTable" class="table table-hover table-compact mb-0">
                 <thead>
                     <tr>
-                        <th width="40%">Item Name</th>
-                        <th width="15%">Price</th>
+                        <th width="30%">Item Name</th>
+                        <th width="12%">Price</th>
                         <th width="15%">Category</th>
-                        <th width="15%">PLU Code</th>
+                        <th width="15%">SubCategory</th>
+                        <th width="13%">PLU Code</th>
                         <th width="15%">Quantity</th>
                     </tr>
                 </thead>
                 <tbody id="menuItemsTableBody">
                     <tr>
-                        <td colspan="5" class="text-center py-4">
+                        <td colspan="6" class="text-center py-4">
                             <div class="loading-spinner mx-auto"></div>
                             <div class="mt-2">Loading menu items...</div>
                         </td>

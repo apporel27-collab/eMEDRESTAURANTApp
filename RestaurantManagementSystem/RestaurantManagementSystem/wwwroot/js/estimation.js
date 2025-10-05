@@ -1,13 +1,15 @@
-// Optimized Estimation JavaScript
+// Optimized Estimation JavaScript with SubCategory Support
 $(document).ready(function() {
     let menuData = [];
+    let allSubCategories = [];
     
     // Initialize page
-    loadMenuItems();
+    loadMenuData();
     
     // Event handlers
     $('#menuItemSearch').on('input', debounce(filterItems, 300));
-    $('#categoryFilter').on('change', filterItems);
+    $('#categoryFilter').on('change', onCategoryChange);
+    $('#subCategoryFilter').on('change', filterItems);
     $('#estimateBtn').on('click', generateEstimate);
     $('#clearEstimateBtn').on('click', clearEstimate);
     $('#printEstimateBtn').on('click', printEstimate);
@@ -25,25 +27,55 @@ $(document).ready(function() {
         };
     }
     
-    function loadMenuItems() {
+    function loadMenuData() {
         showLoading();
+        
+        // Load menu data from the Menu/Index endpoint with SubCategory support
         $.get('/Menu/Index')
             .done(function(data) {
                 const items = $(data).find('.table tbody tr');
                 menuData = [];
+                allSubCategories = [];
+                
                 items.each(function() {
                     const row = $(this);
-                    menuData.push({
-                        plu: row.find('td:eq(0)').text().trim(),
-                        name: row.find('td:eq(2)').text().trim(),
-                        category: row.find('td:eq(3)').text().trim(),
-                        price: parseFloat(row.find('td:eq(4)').text().replace(/[^\d.]/g, '')) || 0
-                    });
+                    const cells = row.find('td');
+                    if (cells.length >= 6) {
+                        // Check if this row has SubCategory column (6 columns total)
+                        const hasSubCategory = cells.length >= 6;
+                        
+                        const item = {
+                            plu: cells.eq(0).text().trim(),
+                            name: cells.eq(2).text().trim(),
+                            category: cells.eq(3).text().trim(),
+                            subCategory: hasSubCategory ? cells.eq(4).text().trim() : '',
+                            price: parseFloat(cells.eq(hasSubCategory ? 5 : 4).text().replace(/[^\d.]/g, '')) || 0,
+                            categoryId: null,
+                            subCategoryId: null
+                        };
+                        
+                        menuData.push(item);
+                        
+                        // Collect unique categories and subcategories
+                        if (item.subCategory && item.subCategory !== '') {
+                            const existing = allSubCategories.find(s => s.name === item.subCategory);
+                            if (!existing) {
+                                allSubCategories.push({
+                                    name: item.subCategory,
+                                    category: item.category
+                                });
+                            }
+                        }
+                    }
                 });
+                
                 renderMenuItems(menuData);
                 populateCategories();
+                populateSubCategoriesForAll();
             })
-            .fail(() => showError('Failed to load menu items'));
+            .fail(() => {
+                showError('Failed to load menu items');
+            });
     }
     
     function renderMenuItems(items) {
@@ -51,7 +83,7 @@ $(document).ready(function() {
         tbody.empty();
         
         if (items.length === 0) {
-            tbody.html('<tr><td colspan="5" class="text-center text-muted">No items found</td></tr>');
+            tbody.html('<tr><td colspan="6" class="text-center text-muted">No items found</td></tr>');
             return;
         }
         
@@ -61,6 +93,7 @@ $(document).ready(function() {
                     <td>${item.name}</td>
                     <td>₹${item.price.toFixed(2)}</td>
                     <td>${item.category}</td>
+                    <td>${item.subCategory || ''}</td>
                     <td>${item.plu}</td>
                     <td><input type="number" class="form-control form-control-sm qty-input" min="0" value="0"></td>
                 </tr>
@@ -75,13 +108,60 @@ $(document).ready(function() {
         categories.forEach(cat => select.append(`<option value="${cat.toLowerCase()}">${cat}</option>`));
     }
     
+    function populateSubCategoriesForAll() {
+        const select = $('#subCategoryFilter');
+        select.empty().append('<option value="all">All SubCategories</option>');
+        allSubCategories.forEach(sub => select.append(`<option value="${sub.name.toLowerCase()}" data-category="${sub.category.toLowerCase()}">${sub.name}</option>`));
+    }
+    
+    function onCategoryChange() {
+        const selectedCategory = $('#categoryFilter').val();
+        const subSelect = $('#subCategoryFilter');
+        
+        // Reset subcategory filter
+        subSelect.empty().append('<option value="all">All SubCategories</option>');
+        
+        if (selectedCategory === 'all') {
+            // Show all subcategories
+            allSubCategories.forEach(sub => {
+                subSelect.append(`<option value="${sub.name.toLowerCase()}" data-category="${sub.category.toLowerCase()}">${sub.name}</option>`);
+            });
+        } else {
+            // Show only subcategories for selected category
+            const filteredSubs = allSubCategories.filter(sub => sub.category.toLowerCase() === selectedCategory);
+            filteredSubs.forEach(sub => {
+                subSelect.append(`<option value="${sub.name.toLowerCase()}" data-category="${sub.category.toLowerCase()}">${sub.name}</option>`);
+            });
+        }
+        
+        // Apply filtering
+        filterItems();
+    }
+    
     function filterItems() {
         const search = $('#menuItemSearch').val().toLowerCase();
         const category = $('#categoryFilter').val();
+        const subCategory = $('#subCategoryFilter').val();
         
         let filtered = menuData;
-        if (search) filtered = filtered.filter(item => item.name.toLowerCase().includes(search));
-        if (category !== 'all') filtered = filtered.filter(item => item.category.toLowerCase() === category);
+        
+        // Filter by search text
+        if (search) {
+            filtered = filtered.filter(item => 
+                item.name.toLowerCase().includes(search) || 
+                item.plu.toLowerCase().includes(search)
+            );
+        }
+        
+        // Filter by category
+        if (category !== 'all') {
+            filtered = filtered.filter(item => item.category.toLowerCase() === category);
+        }
+        
+        // Filter by subcategory
+        if (subCategory !== 'all') {
+            filtered = filtered.filter(item => item.subCategory.toLowerCase() === subCategory);
+        }
         
         renderMenuItems(filtered);
     }

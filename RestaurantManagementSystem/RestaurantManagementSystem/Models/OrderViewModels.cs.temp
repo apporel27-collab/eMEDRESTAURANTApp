@@ -239,7 +239,7 @@ namespace RestaurantManagementSystem.Models
     public class ModifierViewModel
     {
         public int Id { get; set; }
-        public int ModifierId { get; set; } // Added to fix the errors
+        public int ModifierId { get; set; }
         public string Name { get; set; }
         public decimal Price { get; set; }
         public bool IsDefault { get; set; }
@@ -261,3 +261,9 @@ namespace RestaurantManagementSystem.Models
         public int Status { get; set; }
         public string StatusDisplay { get; set; }
     }
+}
+    }
+    
+    public class ModifierViewModel
+    {
+}
