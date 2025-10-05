@@ -1084,7 +1084,7 @@ END", connection))
                 try
                 {
                     using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(
-                        "SELECT DefaultGSTPercentage FROM RestaurantSettings", connection))
+                        "SELECT DefaultGSTPercentage FROM dbo.RestaurantSettings", connection))
                     {
                         var result = command.ExecuteScalar();
                         if (result != null && result != DBNull.Value)
@@ -1163,7 +1163,7 @@ END", connection))
                 using (var connection = new SqlConnection(_connectionString))
                 {
                     connection.Open();
-                    using (var command = new SqlCommand("SELECT * FROM RestaurantSettings", connection))
+                    using (var command = new SqlCommand("SELECT * FROM dbo.RestaurantSettings", connection))
                     {
                         using (var reader = command.ExecuteReader())
                         {

@@ -1,11 +1,11 @@
--- Ensure RestaurantSettings table has DefaultGSTPercentage column and default value
+-- Ensure dbo.RestaurantSettings table has DefaultGSTPercentage column and default value
 USE [dev_Restaurant]
 GO
 
--- Check if RestaurantSettings table exists
+-- Check if dbo.RestaurantSettings table exists
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[RestaurantSettings]') AND type in (N'U'))
 BEGIN
-    -- Create RestaurantSettings table if it doesn't exist
+    -- Create dbo.RestaurantSettings table if it doesn't exist
     CREATE TABLE [dbo].[RestaurantSettings](
         [Id] [int] IDENTITY(1,1) NOT NULL,
         [RestaurantName] [nvarchar](100) NULL,

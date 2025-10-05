@@ -151,6 +151,7 @@
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     <script>
         $(document).ready(function () {
+            // Order type change handler
             $('#orderType').change(function () {
                 var orderType = $(this).val();
                 if (orderType === '0') {
@@ -164,7 +165,82 @@
                     $('#phoneSection').removeClass('d-none');
                     $('#mergeTablesWrapper').addClass('d-none');
                 }
+                updateMergeTableOptions();
             });
+
+            // Primary table selection change handler
+            $('#TableTurnoverId').change(function () {
+                updateMergeTableOptions();
+            });
+
+            // Function to disable selected primary table in merge section
+            function updateMergeTableOptions() {
+                var orderType = $('#orderType').val();
+                var selectedTableId = $('#TableTurnoverId').val();
+                
+                if (orderType === '0') { // Dine-In only
+                    // Reset all merge checkboxes to enabled
+                    $('input[name="SelectedTableIds"]').prop('disabled', false);
+                    $('input[name="SelectedTableIds"]').closest('.form-check').removeClass('text-muted');
+                    
+                    if (selectedTableId && selectedTableId !== '') {
+                        var tableId;
+                        // Handle negative values for available tables
+                        if (selectedTableId.startsWith('-')) {
+                            tableId = selectedTableId.substring(1);
+                        } else {
+                            // For occupied tables, we need to find the corresponding table ID
+                            // This is a simplification - you might need to adjust based on your data structure
+                            tableId = selectedTableId;
+                        }
+                        
+                        // Disable the corresponding checkbox in merge section
+                        $('input[name="SelectedTableIds"][value="' + tableId + '"]').prop('disabled', true);
+                        $('input[name="SelectedTableIds"][value="' + tableId + '"]').prop('checked', false);
+                        $('input[name="SelectedTableIds"][value="' + tableId + '"]').closest('.form-check').addClass('text-muted');
+                    }
+                }
+            }
+
+            // Form validation before submission
+            $('form').on('submit', function (e) {
+                var orderType = $('#orderType').val();
+                var selectedTableId = $('#TableTurnoverId').val();
+                
+                // Validation for Dine-In orders
+                if (orderType === '0') { // Dine-In
+                    if (!selectedTableId || selectedTableId === '') {
+                        e.preventDefault();
+                        
+                        // Remove existing alerts
+                        $('.alert-danger.table-validation').remove();
+                        
+                        // Show validation alert
+                        var alertHtml = '<div class="alert alert-danger alert-dismissible fade show table-validation" role="alert">' +
+                            '<i class="fas fa-exclamation-triangle me-2"></i>' +
+                            '<strong>Primary Table Required!</strong> Please select a primary table for Dine-In orders.' +
+                            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
+                            '</div>';
+                        
+                        // Insert alert at the top of the form
+                        $('form .row').first().before(alertHtml);
+                        
+                        // Scroll to top to show the alert
+                        $('html, body').animate({
+                            scrollTop: $('.alert-danger.table-validation').offset().top - 100
+                        }, 500);
+                        
+                        // Focus on table selection dropdown
+                        $('#TableTurnoverId').focus();
+                        
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+
+            // Initialize on page load
             $('#orderType').trigger('change');
         });
     </script>

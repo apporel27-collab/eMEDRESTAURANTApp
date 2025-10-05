@@ -2464,7 +2464,7 @@ namespace RestaurantManagementSystem.Controllers
                 using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
-                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT TOP 1 DefaultGSTPercentage FROM RestaurantSettings ORDER BY Id", connection))
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT TOP 1 DefaultGSTPercentage FROM dbo.RestaurantSettings ORDER BY Id", connection))
                     {
                         var gstObj = cmd.ExecuteScalar();
                         decimal gstPercent = 0m;

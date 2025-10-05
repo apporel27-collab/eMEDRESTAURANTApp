@@ -17,15 +17,15 @@
         <div class="card-body">
             <ol>
                 <li>Make sure you have appropriate database permissions.</li>
-                <li>Run the following SQL script to create the RestaurantSettings table:</li>
+                <li>Run the following SQL script to create the dbo.RestaurantSettings table:</li>
             </ol>
             <div class="bg-light p-3 my-3 border rounded">
                 <pre class="mb-0"><code>
--- SQL Script to create the RestaurantSettings table
+-- SQL Script to create the dbo.RestaurantSettings table
 USE [dev_Restaurant]; -- Database name from connection string
 
--- Check if the RestaurantSettings table already exists
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RestaurantSettings')
+-- Check if the dbo.RestaurantSettings table already exists
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RestaurantSettings' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
     -- Create RestaurantSettings table
     CREATE TABLE [dbo].[RestaurantSettings] (

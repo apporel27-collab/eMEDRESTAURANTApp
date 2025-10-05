@@ -2,9 +2,9 @@
 USE [dev_Restaurant]; -- Database name from connection string
 
 -- Check if the RestaurantSettings table already exists
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RestaurantSettings')
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RestaurantSettings' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
-    -- Create RestaurantSettings table
+    -- Create dbo.RestaurantSettings table
     CREATE TABLE [dbo].[RestaurantSettings] (
         [Id] INT IDENTITY(1,1) PRIMARY KEY,
         [RestaurantName] NVARCHAR(100) NOT NULL,
@@ -54,9 +54,9 @@ BEGIN
         5.00
     );
     
-    PRINT 'RestaurantSettings table created successfully with default settings.';
+    PRINT 'dbo.RestaurantSettings table created successfully with default settings.';
 END
 ELSE
 BEGIN
-    PRINT 'RestaurantSettings table already exists.';
+    PRINT 'dbo.RestaurantSettings table already exists.';
 END

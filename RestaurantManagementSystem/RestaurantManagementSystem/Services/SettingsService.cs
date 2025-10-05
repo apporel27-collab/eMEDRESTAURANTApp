@@ -117,7 +117,7 @@ namespace RestaurantManagementSystem.Services
                 
                 // Check if table exists
                 var checkTableCommand = new SqlCommand(@"
-                    IF EXISTS (SELECT * FROM sys.tables WHERE name = 'RestaurantSettings')
+                    IF EXISTS (SELECT * FROM sys.tables WHERE name = 'RestaurantSettings' AND schema_id = SCHEMA_ID('dbo'))
                     SELECT 1
                     ELSE
                     SELECT 0", connection);
