@@ -1,0 +1,383 @@
+@model RestaurantManagementSystem.Models.SubCategory
+@{
+    ViewData["Title"] = "Edit Sub Category";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-edit text-primary me-2"></i>
+                        Edit Sub Category
+                    </h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                            <li class="breadcrumb-item"><a asp-controller="Category" asp-action="Index">Categories</a></li>
+                            <li class="breadcrumb-item"><a asp-controller="SubCategory" asp-action="Index">Sub Categories</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">Edit</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div>
+                    <a asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Back to List
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Sub Category Information
+                        </h5>
+                        <small class="text-muted">
+                            Created: @Model.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                            @if (Model.UpdatedAt.HasValue)
+                            {
+                                <br />@:Updated: @Model.UpdatedAt.Value.ToString("MMM dd, yyyy HH:mm")
+                            }
+                        </small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Edit" method="post" id="editSubCategoryForm">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                        
+                        <input asp-for="Id" type="hidden" />
+                        <input asp-for="CreatedAt" type="hidden" />
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Name" class="form-label required">Sub Category Name</label>
+                                    <input asp-for="Name" class="form-control" placeholder="Enter sub category name" />
+                                    <span asp-validation-for="Name" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="CategoryId" class="form-label required">Parent Category</label>
+                                    <select asp-for="CategoryId" class="form-select" asp-items="ViewBag.CategoryId">
+                                        <option value="">-- Select Category --</option>
+                                    </select>
+                                    <span asp-validation-for="CategoryId" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="DisplayOrder" class="form-label">Display Order</label>
+                                    <input asp-for="DisplayOrder" class="form-control" type="number" min="1" placeholder="Enter display order" />
+                                    <div class="form-text">Lower numbers appear first in lists</div>
+                                    <span asp-validation-for="DisplayOrder" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch mt-4">
+                                        <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                                        <label asp-for="IsActive" class="form-check-label">
+                                            Active Status
+                                        </label>
+                                        <div class="form-text">Inactive sub categories won't be shown in menus</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="Description" class="form-label">Description</label>
+                            <textarea asp-for="Description" class="form-control" rows="4" 
+                                      placeholder="Enter sub category description (optional)"></textarea>
+                            <span asp-validation-for="Description" class="text-danger"></span>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-muted small">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Fields marked with <span class="text-danger">*</span> are required
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-outline-warning me-2" onclick="resetToOriginal()">
+                                    <i class="fas fa-undo me-1"></i>
+                                    Reset Changes
+                                </button>
+                                <button type="submit" class="btn btn-primary" id="submitBtn">
+                                    <i class="fas fa-save me-1"></i>
+                                    Update Sub Category
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Additional Information Panel -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-info text-white">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Usage Statistics
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <div class="stat-item">
+                                <div class="stat-value text-primary">0</div>
+                                <div class="stat-label">Menu Items</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stat-item">
+                                <div class="stat-value text-success">@(Model.IsActive ? "Active" : "Inactive")</div>
+                                <div class="stat-label">Status</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stat-item">
+                                <div class="stat-value text-info">@Model.DisplayOrder</div>
+                                <div class="stat-label">Display Order</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    @Html.AntiForgeryToken()
+    
+    <script>
+        // Store original values for reset functionality
+        const originalValues = {
+            name: '@Html.Raw(Model.Name)',
+            categoryId: '@Model.CategoryId',
+            displayOrder: '@Model.DisplayOrder',
+            isActive: @(Model.IsActive.ToString().ToLower()),
+            description: '@Html.Raw(Model.Description ?? "")'
+        };
+
+        $(document).ready(function() {
+            // Category change handler
+            $('#CategoryId').change(function() {
+                const originalCategoryId = '@Model.CategoryId';
+                const currentCategoryId = $(this).val();
+                
+                if (currentCategoryId !== originalCategoryId) {
+                    updateDisplayOrder();
+                }
+            });
+
+            // Form validation
+            $('#editSubCategoryForm').on('submit', function(e) {
+                if (!validateForm()) {
+                    e.preventDefault();
+                    return false;
+                }
+                
+                // Disable submit button to prevent double submission
+                $('#submitBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Updating...');
+            });
+
+            // Real-time validation
+            $('#Name').on('blur', function() {
+                checkDuplicateName();
+            });
+
+            // Track form changes
+            trackFormChanges();
+        });
+
+        function updateDisplayOrder() {
+            const categoryId = $('#CategoryId').val();
+            if (categoryId) {
+                $.ajax({
+                    url: '@Url.Action("GetSubCategoriesByCategory", "SubCategory")',
+                    type: 'GET',
+                    data: { categoryId: categoryId },
+                    success: function(response) {
+                        if (response.success && response.data) {
+                            // Don't auto-update if user hasn't changed from original category
+                            const originalCategoryId = '@Model.CategoryId';
+                            if (categoryId !== originalCategoryId) {
+                                const nextOrder = response.data.length + 1;
+                                $('#DisplayOrder').val(nextOrder);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function checkDuplicateName() {
+            const name = $('#Name').val().trim();
+            const categoryId = $('#CategoryId').val();
+            const currentId = '@Model.Id';
+            
+            if (name && categoryId) {
+                $.ajax({
+                    url: '@Url.Action("CheckDuplicateName", "SubCategory")',
+                    type: 'POST',
+                    data: { 
+                        name: name, 
+                        categoryId: categoryId,
+                        id: currentId,
+                        __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function(response) {
+                        const nameField = $('#Name');
+                        const feedbackElement = nameField.next('.validation-feedback');
+                        
+                        if (response.isDuplicate) {
+                            nameField.addClass('is-invalid');
+                            if (feedbackElement.length === 0) {
+                                nameField.after('<div class="invalid-feedback validation-feedback">This sub category name already exists in the selected category.</div>');
+                            }
+                        } else {
+                            nameField.removeClass('is-invalid');
+                            feedbackElement.remove();
+                        }
+                    }
+                });
+            }
+        }
+
+        function validateForm() {
+            let isValid = true;
+            
+            // Check required fields
+            const requiredFields = ['Name', 'CategoryId'];
+            requiredFields.forEach(function(fieldName) {
+                const field = $('#' + fieldName);
+                const value = field.val().trim();
+                
+                if (!value) {
+                    field.addClass('is-invalid');
+                    isValid = false;
+                } else {
+                    field.removeClass('is-invalid');
+                }
+            });
+
+            // Check for duplicate name
+            if ($('#Name').hasClass('is-invalid')) {
+                isValid = false;
+            }
+
+            if (!isValid) {
+                toastr.error('Please fill in all required fields and fix any validation errors.', 'Validation Error');
+            }
+
+            return isValid;
+        }
+
+        function resetToOriginal() {
+            toastr.warning('Are you sure you want to reset all changes? This will restore the original values.<br/><br/>' +
+                '<button type="button" class="btn btn-warning btn-sm me-2" onclick="confirmResetToOriginal()">Yes, Reset Changes</button>' +
+                '<button type="button" class="btn btn-secondary btn-sm" onclick="toastr.clear()">Cancel</button>', 
+                'Confirm Reset Changes', {
+                allowHtml: true,
+                closeButton: false,
+                timeOut: 0,
+                extendedTimeOut: 0,
+                tapToDismiss: false
+            });
+        }
+
+        function confirmResetToOriginal() {
+            toastr.clear();
+            $('#Name').val(originalValues.name);
+            $('#CategoryId').val(originalValues.categoryId).trigger('change');
+            $('#DisplayOrder').val(originalValues.displayOrder);
+            $('#IsActive').prop('checked', originalValues.isActive);
+            $('#Description').val(originalValues.description);
+            
+            // Clear validation errors
+            $('.is-invalid').removeClass('is-invalid');
+            $('.validation-feedback').remove();
+            
+            toastr.success('Form has been reset to original values.', 'Changes Reset');
+        }
+
+        function trackFormChanges() {
+            let formChanged = false;
+            
+            $('#editSubCategoryForm input, #editSubCategoryForm select, #editSubCategoryForm textarea').on('change input', function() {
+                formChanged = true;
+            });
+
+            // Warn user about unsaved changes using toastr
+            $(window).on('beforeunload', function(e) {
+                if (formChanged) {
+                    // For beforeunload, we still need to use the native browser dialog
+                    const message = 'You have unsaved changes. Are you sure you want to leave?';
+                    e.returnValue = message;
+                    return message;
+                }
+            });
+
+            // Remove warning when form is submitted
+            $('#editSubCategoryForm').on('submit', function() {
+                formChanged = false;
+                $(window).off('beforeunload');
+            });
+        }
+
+        // Add CSS for required field indicator
+        $(document).ready(function() {
+            $('label.required').append(' <span class="text-danger">*</span>');
+        });
+    </script>
+
+    <style>
+        .required::after {
+            content: " *";
+            color: #dc3545;
+        }
+        
+        .form-check-input:checked {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        
+        .card {
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+
+        .stat-item {
+            padding: 1rem 0;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+    </style>
+}

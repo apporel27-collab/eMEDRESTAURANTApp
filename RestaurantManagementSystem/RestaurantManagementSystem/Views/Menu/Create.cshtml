@@ -66,10 +66,18 @@
                                         
                                         <div class="form-group mb-2">
                                             <label asp-for="CategoryId" class="form-label small mb-1">Category</label>
-                                            <select asp-for="CategoryId" class="form-select form-select-sm" asp-items="ViewBag.Categories">
+                                            <select asp-for="CategoryId" class="form-select form-select-sm" asp-items="ViewBag.Categories" onchange="loadSubCategories()">
                                                 <option value="">-- Select Category --</option>
                                             </select>
                                             <span asp-validation-for="CategoryId" class="text-danger small"></span>
+                                        </div>
+
+                                        <div class="form-group mb-2">
+                                            <label asp-for="SubCategoryId" class="form-label small mb-1">Sub Category</label>
+                                            <select asp-for="SubCategoryId" class="form-select form-select-sm" asp-items="ViewBag.SubCategories">
+                                                <option value="">-- Select Sub Category --</option>
+                                            </select>
+                                            <span asp-validation-for="SubCategoryId" class="text-danger small"></span>
                                         </div>
 
                                         <div class="form-group mb-2">
@@ -393,5 +401,27 @@
             $('#IsGstApplicableCreate').on('change', toggleGstField);
             toggleGstField();
         });
+
+        // Load subcategories based on selected category
+        function loadSubCategories() {
+            var categoryId = $('#CategoryId').val();
+            var subCategorySelect = $('#SubCategoryId');
+            
+            // Clear existing options
+            subCategorySelect.empty();
+            subCategorySelect.append('<option value="">-- Select Sub Category --</option>');
+            
+            if (categoryId) {
+                $.get('@Url.Action("GetSubCategoriesByCategory", "Menu")', { categoryId: categoryId })
+                    .done(function(data) {
+                        $.each(data, function(index, item) {
+                            subCategorySelect.append('<option value="' + item.value + '">' + item.text + '</option>');
+                        });
+                    })
+                    .fail(function() {
+                        console.log('Error loading subcategories');
+                    });
+            }
+        }
     </script>
 }

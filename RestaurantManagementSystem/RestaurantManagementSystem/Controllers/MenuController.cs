@@ -120,9 +120,109 @@ namespace RestaurantManagementSystem.Controllers
         // GET: Menu
         public IActionResult Index()
         {
-            var menuItems = GetAllMenuItems();
-            return View(menuItems);
+            try
+            {
+                var menuItems = GetAllMenuItems();
+                return View(menuItems);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error loading menu items: " + ex.Message;
+                return View(new List<MenuItem>());
+            }
         }
+        
+        // Diagnostic action to check database status
+        [HttpGet]
+        public IActionResult DbDiagnostic()
+        {
+            var diagnostics = new List<string>();
+            
+            try
+            {
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    diagnostics.Add("✓ Database connection successful");
+                    
+                    // Check if MenuItems table exists
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'MenuItems'", connection))
+                    {
+                        var menuItemsTableExists = (int)cmd.ExecuteScalar() > 0;
+                        diagnostics.Add(menuItemsTableExists ? "✓ MenuItems table exists" : "✗ MenuItems table missing");
+                    }
+                    
+                    // Check if Categories table exists
+                    using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Categories'", connection))
+                    {
+                        var categoriesTableExists = (int)cmd.ExecuteScalar() > 0;
+                        diagnostics.Add(categoriesTableExists ? "✓ Categories table exists" : "✗ Categories table missing");
+                    }
+                    
+                    // Check MenuItems count
+                    try
+                    {
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT COUNT(*) FROM MenuItems", connection))
+                        {
+                            var menuItemCount = (int)cmd.ExecuteScalar();
+                            diagnostics.Add($"📊 MenuItems count: {menuItemCount}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        diagnostics.Add($"✗ Error counting MenuItems: {ex.Message}");
+                    }
+                    
+                    // Check Categories count
+                    try
+                    {
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT COUNT(*) FROM Categories", connection))
+                        {
+                            var categoryCount = (int)cmd.ExecuteScalar();
+                            diagnostics.Add($"📊 Categories count: {categoryCount}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        diagnostics.Add($"✗ Error counting Categories: {ex.Message}");
+                    }
+                    
+                    // Check SubCategories table
+                    try
+                    {
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                            SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'SubCategories'", connection))
+                        {
+                            var subCategoriesTableExists = (int)cmd.ExecuteScalar() > 0;
+                            diagnostics.Add(subCategoriesTableExists ? "✓ SubCategories table exists" : "✗ SubCategories table missing");
+                            
+                            if (subCategoriesTableExists)
+                            {
+                                using (var countCmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT COUNT(*) FROM SubCategories", connection))
+                                {
+                                    var subCategoryCount = (int)countCmd.ExecuteScalar();
+                                    diagnostics.Add($"📊 SubCategories count: {subCategoryCount}");
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        diagnostics.Add($"✗ Error checking SubCategories: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add($"✗ Database connection failed: {ex.Message}");
+            }
+            
+            ViewBag.Diagnostics = diagnostics;
+            return View();
+        }
+
 
         // GET: Menu/Details/5
         public IActionResult Details(int id)
@@ -140,6 +240,7 @@ namespace RestaurantManagementSystem.Controllers
         public IActionResult Create()
         {
             ViewBag.Categories = GetCategorySelectList();
+            ViewBag.SubCategories = GetSubCategorySelectList(); // Empty list initially
             ViewBag.Allergens = GetAllAllergens();
             // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
@@ -216,6 +317,7 @@ namespace RestaurantManagementSystem.Controllers
 
             // If we got this far, something failed, redisplay form
             ViewBag.Categories = GetCategorySelectList();
+            ViewBag.SubCategories = GetSubCategorySelectList(model.CategoryId);
             ViewBag.Allergens = GetAllAllergens();
             // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
@@ -242,6 +344,7 @@ namespace RestaurantManagementSystem.Controllers
                 Description = menuItem.Description,
                 Price = menuItem.Price,
                 CategoryId = menuItem.CategoryId,
+                SubCategoryId = menuItem.SubCategoryId,
                 ImagePath = menuItem.ImagePath,
                 IsAvailable = menuItem.IsAvailable,
                 NotAvailable = menuItem.NotAvailable,
@@ -261,6 +364,7 @@ namespace RestaurantManagementSystem.Controllers
             };
 
             ViewBag.Categories = GetCategorySelectList();
+            ViewBag.SubCategories = GetSubCategorySelectList(viewModel.CategoryId);
             ViewBag.Allergens = GetAllAllergens();
             // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
@@ -351,6 +455,7 @@ namespace RestaurantManagementSystem.Controllers
 
             // If we got this far, something failed, redisplay form
             ViewBag.Categories = GetCategorySelectList();
+            ViewBag.SubCategories = GetSubCategorySelectList(model.CategoryId);
             ViewBag.Allergens = GetAllAllergens();
             // Ingredients tab removed; do not populate ViewBag.Ingredients
             ViewBag.Modifiers = GetAllModifiers();
@@ -528,55 +633,86 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                // Instead of using the stored procedure which may not have all columns,
-                // let's directly query the tables to ensure we get all columns
-                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    -- First, let's check if ItemType column exists
-                    DECLARE @ItemTypeExists INT = 0;
-                    
-                    IF EXISTS (
-                        SELECT 1
-                        FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_NAME = 'MenuItems' 
-                        AND COLUMN_NAME = 'ItemType'
-                    )
-                    BEGIN
-                        SET @ItemTypeExists = 1;
-                    END
-                    
-                    -- Now build the dynamic query
-                    DECLARE @SqlQuery NVARCHAR(MAX);
-                    SET @SqlQuery = 'SELECT 
-                        m.[Id], 
-                        ISNULL(m.[PLUCode], '''') AS PLUCode,
-                        m.[Name], 
-                        m.[Description], 
-                        m.[Price], 
-                        m.[CategoryId], 
-                        c.[Name] AS CategoryName,
-                        m.[ImagePath], 
-                        m.[IsAvailable], 
-                        m.[NotAvailable],
-                        ISNULL(m.[PrepTime], 0) AS PreparationTimeMinutes,
-                        m.[CalorieCount],
-                        ISNULL(m.[IsFeatured], 0) AS IsFeatured,
-                        ISNULL(m.[IsSpecial], 0) AS IsSpecial,
-                        m.[DiscountPercentage],
-                        m.[KitchenStationId],
-                        m.[TargetGP]';
-                        
-                    -- Include ItemType if it exists
-                    IF @ItemTypeExists = 1
-                    BEGIN
-                        SET @SqlQuery = @SqlQuery + ', m.[ItemType]';
-                    END
-                    
-                    SET @SqlQuery = @SqlQuery + '
-                    FROM [dbo].[MenuItems] m
-                    INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
-                    ORDER BY m.[Name]';
-                    
-                    EXEC sp_executesql @SqlQuery;", connection))
+                // Check if SubCategoryId column exists and SubCategories table exists
+                bool hasSubCategoryColumn = false;
+                bool hasSubCategoriesTable = false;
+                
+                using (var checkCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
+                    SELECT 
+                        (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                         WHERE TABLE_NAME = 'MenuItems' AND COLUMN_NAME = 'SubCategoryId') as HasColumn,
+                        (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
+                         WHERE TABLE_NAME = 'SubCategories') as HasTable", connection))
+                {
+                    using (var reader = checkCommand.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            hasSubCategoryColumn = reader.GetInt32("HasColumn") > 0;
+                            hasSubCategoriesTable = reader.GetInt32("HasTable") > 0;
+                        }
+                    }
+                }
+                
+                // Build dynamic query based on available schema
+                string query;
+                if (hasSubCategoryColumn && hasSubCategoriesTable)
+                {
+                    query = @"
+                        SELECT 
+                            m.[Id], 
+                            ISNULL(m.[PLUCode], '') AS PLUCode,
+                            m.[Name], 
+                            m.[Description], 
+                            m.[Price], 
+                            m.[CategoryId], 
+                            c.[Name] AS CategoryName,
+                            m.[SubCategoryId],
+                            sc.[Name] AS SubCategoryName,
+                            m.[ImagePath], 
+                            m.[IsAvailable], 
+                            ISNULL(m.[NotAvailable], 0) AS NotAvailable,
+                            ISNULL(m.[PrepTime], 0) AS PreparationTimeMinutes,
+                            m.[CalorieCount],
+                            ISNULL(m.[IsFeatured], 0) AS IsFeatured,
+                            ISNULL(m.[IsSpecial], 0) AS IsSpecial,
+                            m.[DiscountPercentage],
+                            m.[KitchenStationId],
+                            m.[TargetGP]
+                        FROM [dbo].[MenuItems] m
+                        INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
+                        LEFT JOIN [dbo].[SubCategories] sc ON m.[SubCategoryId] = sc.[Id]
+                        ORDER BY m.[Name]";
+                }
+                else
+                {
+                    query = @"
+                        SELECT 
+                            m.[Id], 
+                            ISNULL(m.[PLUCode], '') AS PLUCode,
+                            m.[Name], 
+                            m.[Description], 
+                            m.[Price], 
+                            m.[CategoryId], 
+                            c.[Name] AS CategoryName,
+                            NULL AS SubCategoryId,
+                            NULL AS SubCategoryName,
+                            m.[ImagePath], 
+                            m.[IsAvailable], 
+                            CAST(0 AS BIT) AS NotAvailable,
+                            ISNULL(m.[PrepTime], 0) AS PreparationTimeMinutes,
+                            m.[CalorieCount],
+                            ISNULL(m.[IsFeatured], 0) AS IsFeatured,
+                            ISNULL(m.[IsSpecial], 0) AS IsSpecial,
+                            m.[DiscountPercentage],
+                            m.[KitchenStationId],
+                            m.[TargetGP]
+                        FROM [dbo].[MenuItems] m
+                        INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
+                        ORDER BY m.[Name]";
+                }
+                
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(query, connection))
                 {
                     try
                     {
@@ -595,6 +731,9 @@ namespace RestaurantManagementSystem.Controllers
                                         Price = SafeGetDecimal(reader, "Price"),
                                         CategoryId = SafeGetInt(reader, "CategoryId"),
                                         Category = new Category { Name = SafeGetString(reader, "CategoryName") ?? "Uncategorized" },
+                                        SubCategoryId = SafeGetNullableInt(reader, "SubCategoryId"),
+                                        SubCategory = SafeGetNullableInt(reader, "SubCategoryId").HasValue ? 
+                                            new SubCategory { Name = SafeGetString(reader, "SubCategoryName") ?? "N/A" } : null,
                                         ImagePath = SafeGetString(reader, "ImagePath"),
                                         IsAvailable = SafeGetBoolean(reader, "IsAvailable"),
                                         NotAvailable = HasColumn(reader, "NotAvailable") ? SafeGetBoolean(reader, "NotAvailable") : false,
@@ -625,8 +764,8 @@ namespace RestaurantManagementSystem.Controllers
                     }
                     catch (Exception ex)
                     {
-                        // Log the error
-                        
+                        // Re-throw the exception so it can be handled by the calling method
+                        throw new Exception("Database query failed: " + ex.Message, ex);
                     }
                 }
             }
@@ -642,29 +781,88 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                // Check if SubCategoryId column exists and SubCategories table exists
+                bool hasSubCategoryColumn = false;
+                bool hasSubCategoriesTable = false;
+                
+                using (var checkCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
                     SELECT 
-                        m.[Id], 
-                        m.[PLUCode], 
-                        m.[Name], 
-                        m.[Description], 
-                        m.[Price], 
-                        m.[CategoryId], 
-                        c.[Name] AS CategoryName,
-                        m.[ImagePath], 
-                        m.[IsAvailable], 
-                        m.[PrepTime] AS PreparationTimeMinutes,
-                        m.[CalorieCount],
-                        m.[IsFeatured],
-                        m.[IsSpecial],
-                        m.[DiscountPercentage],
-                        m.[KitchenStationId],
-                        m.[TargetGP],
-                        m.[GSTPercentage],
-                        m.[IsGstApplicable]
-                    FROM [dbo].[MenuItems] m
-                    INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
-                    WHERE m.[Id] = @Id", connection))
+                        (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                         WHERE TABLE_NAME = 'MenuItems' AND COLUMN_NAME = 'SubCategoryId') as HasColumn,
+                        (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
+                         WHERE TABLE_NAME = 'SubCategories') as HasTable", connection))
+                {
+                    using (var reader = checkCommand.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            hasSubCategoryColumn = reader.GetInt32("HasColumn") > 0;
+                            hasSubCategoriesTable = reader.GetInt32("HasTable") > 0;
+                        }
+                    }
+                }
+                
+                // Build dynamic query based on available schema
+                string query;
+                if (hasSubCategoryColumn && hasSubCategoriesTable)
+                {
+                    query = @"
+                        SELECT 
+                            m.[Id], 
+                            m.[PLUCode], 
+                            m.[Name], 
+                            m.[Description], 
+                            m.[Price], 
+                            m.[CategoryId], 
+                            c.[Name] AS CategoryName,
+                            m.[SubCategoryId],
+                            sc.[Name] AS SubCategoryName,
+                            m.[ImagePath], 
+                            m.[IsAvailable], 
+                            m.[PrepTime] AS PreparationTimeMinutes,
+                            m.[CalorieCount],
+                            m.[IsFeatured],
+                            m.[IsSpecial],
+                            m.[DiscountPercentage],
+                            m.[KitchenStationId],
+                            m.[TargetGP],
+                            m.[GSTPercentage],
+                            m.[IsGstApplicable]
+                        FROM [dbo].[MenuItems] m
+                        INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
+                        LEFT JOIN [dbo].[SubCategories] sc ON m.[SubCategoryId] = sc.[Id]
+                        WHERE m.[Id] = @Id";
+                }
+                else
+                {
+                    query = @"
+                        SELECT 
+                            m.[Id], 
+                            m.[PLUCode], 
+                            m.[Name], 
+                            m.[Description], 
+                            m.[Price], 
+                            m.[CategoryId], 
+                            c.[Name] AS CategoryName,
+                            NULL AS SubCategoryId,
+                            NULL AS SubCategoryName,
+                            m.[ImagePath], 
+                            m.[IsAvailable], 
+                            m.[PrepTime] AS PreparationTimeMinutes,
+                            m.[CalorieCount],
+                            m.[IsFeatured],
+                            m.[IsSpecial],
+                            m.[DiscountPercentage],
+                            m.[KitchenStationId],
+                            m.[TargetGP],
+                            m.[GSTPercentage],
+                            m.[IsGstApplicable]
+                        FROM [dbo].[MenuItems] m
+                        INNER JOIN [dbo].[Categories] c ON m.[CategoryId] = c.[Id]
+                        WHERE m.[Id] = @Id";
+                }
+                
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(query, connection))
                 {
                     command.Parameters.AddWithValue("@Id", id);
                     
@@ -681,6 +879,9 @@ namespace RestaurantManagementSystem.Controllers
                                 Price = SafeGetDecimal(reader, "Price"),
                                 CategoryId = SafeGetInt(reader, "CategoryId"),
                                 Category = new Category { Name = SafeGetString(reader, "CategoryName") ?? "Uncategorized" },
+                                SubCategoryId = SafeGetNullableInt(reader, "SubCategoryId"),
+                                SubCategory = SafeGetNullableInt(reader, "SubCategoryId").HasValue ? 
+                                    new SubCategory { Name = SafeGetString(reader, "SubCategoryName") ?? "N/A" } : null,
                                 ImagePath = SafeGetString(reader, "ImagePath"),
                                 IsAvailable = SafeGetBoolean(reader, "IsAvailable"),
                                 NotAvailable = HasColumn(reader, "NotAvailable") ? SafeGetBoolean(reader, "NotAvailable") : false,
@@ -778,20 +979,56 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-            INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
-                      IsAvailable, PrepTime, CalorieCount, 
-                      IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId, GSTPercentage, IsGstApplicable, NotAvailable)
-                    VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @ImagePath,
-                @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
-                @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId, @GSTPercentage, @IsGstApplicable, @NotAvailable);
-                    SELECT SCOPE_IDENTITY();", connection))
+                // Check if SubCategoryId column exists
+                bool hasSubCategoryColumn = false;
+                using (var checkCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'MenuItems' AND COLUMN_NAME = 'SubCategoryId'", connection))
+                {
+                    hasSubCategoryColumn = (int)checkCommand.ExecuteScalar() > 0;
+                }
+                
+                // Build INSERT query based on available schema
+                string insertQuery;
+                if (hasSubCategoryColumn)
+                {
+                    insertQuery = @"
+                        INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, SubCategoryId, ImagePath,
+                                  IsAvailable, PrepTime, CalorieCount, 
+                                  IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId, GSTPercentage, IsGstApplicable, NotAvailable)
+                        VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @SubCategoryId, @ImagePath,
+                            @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
+                            @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId, @GSTPercentage, @IsGstApplicable, @NotAvailable);
+                        SELECT SCOPE_IDENTITY();";
+                }
+                else
+                {
+                    insertQuery = @"
+                        INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
+                                  IsAvailable, PrepTime, CalorieCount, 
+                                  IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId, GSTPercentage, IsGstApplicable, NotAvailable)
+                        VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @ImagePath,
+                            @IsAvailable, @PreparationTimeMinutes, @CalorieCount, 
+                            @IsFeatured, @IsSpecial, @DiscountPercentage, @KitchenStationId, @GSTPercentage, @IsGstApplicable, @NotAvailable);
+                        SELECT SCOPE_IDENTITY();";
+                }
+                
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(insertQuery, connection))
                 {
                     command.Parameters.AddWithValue("@PLUCode", model.PLUCode);
                     command.Parameters.AddWithValue("@Name", model.Name);
                     command.Parameters.AddWithValue("@Description", model.Description);
                     command.Parameters.AddWithValue("@Price", model.Price);
                     command.Parameters.AddWithValue("@CategoryId", model.CategoryId);
+                    
+                    // Add SubCategoryId parameter only if column exists
+                    if (hasSubCategoryColumn)
+                    {
+                        if (model.SubCategoryId.HasValue)
+                            command.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId);
+                        else
+                            command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                    }
                     
                     if (!string.IsNullOrEmpty(model.ImagePath))
                         command.Parameters.AddWithValue("@ImagePath", model.ImagePath);
@@ -840,25 +1077,64 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
                 
-                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    UPDATE MenuItems
-                    SET Name = @Name,
-                        PLUCode = @PLUCode,
-                        Description = @Description,
-                        Price = @Price,
-                        CategoryId = @CategoryId,
-                        ImagePath = @ImagePath,
-                        IsAvailable = @IsAvailable,
-                        PrepTime = @PreparationTimeMinutes,
-                        CalorieCount = @CalorieCount,
-                        IsFeatured = @IsFeatured,
-                        IsSpecial = @IsSpecial,
-                        DiscountPercentage = @DiscountPercentage,
-                        KitchenStationId = @KitchenStationId,
-                        GSTPercentage = @GSTPercentage,
-                        IsGstApplicable = @IsGstApplicable,
-                        NotAvailable = @NotAvailable
-                    WHERE Id = @Id", connection))
+                // Check if SubCategoryId column exists
+                bool hasSubCategoryColumn = false;
+                using (var checkCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'MenuItems' AND COLUMN_NAME = 'SubCategoryId'", connection))
+                {
+                    hasSubCategoryColumn = (int)checkCommand.ExecuteScalar() > 0;
+                }
+                
+                // Build UPDATE query based on available schema
+                string updateQuery;
+                if (hasSubCategoryColumn)
+                {
+                    updateQuery = @"
+                        UPDATE MenuItems
+                        SET Name = @Name,
+                            PLUCode = @PLUCode,
+                            Description = @Description,
+                            Price = @Price,
+                            CategoryId = @CategoryId,
+                            SubCategoryId = @SubCategoryId,
+                            ImagePath = @ImagePath,
+                            IsAvailable = @IsAvailable,
+                            PrepTime = @PreparationTimeMinutes,
+                            CalorieCount = @CalorieCount,
+                            IsFeatured = @IsFeatured,
+                            IsSpecial = @IsSpecial,
+                            DiscountPercentage = @DiscountPercentage,
+                            KitchenStationId = @KitchenStationId,
+                            GSTPercentage = @GSTPercentage,
+                            IsGstApplicable = @IsGstApplicable,
+                            NotAvailable = @NotAvailable
+                        WHERE Id = @Id";
+                }
+                else
+                {
+                    updateQuery = @"
+                        UPDATE MenuItems
+                        SET Name = @Name,
+                            PLUCode = @PLUCode,
+                            Description = @Description,
+                            Price = @Price,
+                            CategoryId = @CategoryId,
+                            ImagePath = @ImagePath,
+                            IsAvailable = @IsAvailable,
+                            PrepTime = @PreparationTimeMinutes,
+                            CalorieCount = @CalorieCount,
+                            IsFeatured = @IsFeatured,
+                            IsSpecial = @IsSpecial,
+                            DiscountPercentage = @DiscountPercentage,
+                            KitchenStationId = @KitchenStationId,
+                            GSTPercentage = @GSTPercentage,
+                            IsGstApplicable = @IsGstApplicable,
+                            NotAvailable = @NotAvailable
+                        WHERE Id = @Id";
+                }
+                
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(updateQuery, connection))
                 {
                     command.Parameters.AddWithValue("@Id", model.Id);
                     command.Parameters.AddWithValue("@PLUCode", model.PLUCode ?? string.Empty);
@@ -866,6 +1142,15 @@ namespace RestaurantManagementSystem.Controllers
                     command.Parameters.AddWithValue("@Description", model.Description);
                     command.Parameters.AddWithValue("@Price", model.Price);
                     command.Parameters.AddWithValue("@CategoryId", model.CategoryId);
+                    
+                    // Add SubCategoryId parameter only if column exists
+                    if (hasSubCategoryColumn)
+                    {
+                        if (model.SubCategoryId.HasValue)
+                            command.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId);
+                        else
+                            command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                    }
                     
                     if (!string.IsNullOrEmpty(model.ImagePath))
                         command.Parameters.AddWithValue("@ImagePath", model.ImagePath);
@@ -1486,6 +1771,87 @@ namespace RestaurantManagementSystem.Controllers
             }
             
             return categories;
+        }
+
+        private List<SelectListItem> GetSubCategorySelectList(int? categoryId = null)
+        {
+            var subCategories = new List<SelectListItem>();
+            
+            try 
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    // First check if SubCategories table exists
+                    using (Microsoft.Data.SqlClient.SqlCommand checkTableCommand = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        SELECT COUNT(*)
+                        FROM INFORMATION_SCHEMA.TABLES 
+                        WHERE TABLE_NAME = 'SubCategories'", connection))
+                    {
+                        var tableExists = (int)checkTableCommand.ExecuteScalar() > 0;
+                        
+                        if (!tableExists)
+                        {
+                            // Return empty list if table doesn't exist
+                            return subCategories;
+                        }
+                    }
+                    
+                    string query = @"
+                        SELECT Id, Name
+                        FROM SubCategories
+                        WHERE IsActive = 1";
+                    
+                    if (categoryId.HasValue)
+                    {
+                        query += " AND CategoryId = @CategoryId";
+                    }
+                    
+                    query += " ORDER BY DisplayOrder, Name";
+                    
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(query, connection))
+                    {
+                        if (categoryId.HasValue)
+                        {
+                            command.Parameters.AddWithValue("@CategoryId", categoryId.Value);
+                        }
+                        
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                subCategories.Add(new SelectListItem
+                                {
+                                    Value = reader.GetInt32(0).ToString(),
+                                    Text = reader.GetString(1)
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Return empty list if any error occurs
+                return new List<SelectListItem>();
+            }
+            
+            return subCategories;
+        }
+
+        [HttpGet]
+        public JsonResult GetSubCategoriesByCategory(int categoryId)
+        {
+            try
+            {
+                var subCategories = GetSubCategorySelectList(categoryId);
+                return Json(subCategories);
+            }
+            catch (Exception)
+            {
+                return Json(new List<SelectListItem>());
+            }
         }
 
         private List<Allergen> GetAllAllergens()

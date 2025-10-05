@@ -1,0 +1,80 @@
+@{
+    ViewData["Title"] = "Database Diagnostics";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Database Diagnostics</h4>
+                    <div class="float-right">
+                        <a asp-action="Index" class="btn btn-primary">
+                            <i class="fa fa-arrow-left"></i> Back to Menu
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h5>Database Status</h5>
+                    <ul class="list-unstyled">
+                        @if (ViewBag.Diagnostics != null)
+                        {
+                            @foreach (string diagnostic in ViewBag.Diagnostics)
+                            {
+                                <li class="mb-2">
+                                    @if (diagnostic.StartsWith("✓"))
+                                    {
+                                        <span class="text-success">@diagnostic</span>
+                                    }
+                                    else if (diagnostic.StartsWith("✗"))
+                                    {
+                                        <span class="text-danger">@diagnostic</span>
+                                    }
+                                    else if (diagnostic.StartsWith("📊"))
+                                    {
+                                        <span class="text-info">@diagnostic</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@diagnostic</span>
+                                    }
+                                </li>
+                            }
+                        }
+                    </ul>
+                    
+                    <hr />
+                    
+                    <h5>Quick Actions</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6>Missing Tables?</h6>
+                                    <p>If tables are missing, you may need to run database setup scripts:</p>
+                                    <ul>
+                                        <li>Categories table setup</li>
+                                        <li>MenuItems table setup</li>
+                                        <li>SubCategories table setup (optional)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6>Empty Tables?</h6>
+                                    <p>If tables exist but are empty:</p>
+                                    <ul>
+                                        <li><a asp-action="Create" class="btn btn-sm btn-success">Create New Menu Item</a></li>
+                                        <li>Add Categories first if none exist</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

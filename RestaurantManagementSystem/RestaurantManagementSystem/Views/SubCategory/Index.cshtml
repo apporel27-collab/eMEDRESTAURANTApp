@@ -1,0 +1,204 @@
+@model IEnumerable<RestaurantManagementSystem.Models.SubCategory>
+@{
+    ViewData["Title"] = "Sub Categories";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-list-ul text-primary me-2"></i>
+                        Sub Categories Management
+                    </h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                            <li class="breadcrumb-item"><a asp-controller="Category" asp-action="Index">Categories</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">Sub Categories</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div>
+                    <a asp-action="Create" class="btn btn-success">
+                        <i class="fas fa-plus me-1"></i>
+                        Add New Sub Category
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table me-2"></i>
+                            Sub Categories List
+                        </h5>
+                        <div class="text-muted small">
+                            Total: @Model.Count() | Active: @Model.Count(s => s.IsActive)
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="subCategoriesTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Sub Category Name</th>
+                                        <th>Category</th>
+                                        <th>Description</th>
+                                        <th class="text-center">Display Order</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-center">Created Date</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var subCategory in Model)
+                                    {
+                                        <tr class="@(subCategory.IsActive ? "" : "table-secondary")">
+                                            <td>
+                                                <div class="fw-semibold">@subCategory.Name</div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-primary">@subCategory.Category?.Name</span>
+                                            </td>
+                                            <td>
+                                                <div class="text-truncate" style="max-width: 300px;" title="@subCategory.Description">
+                                                    @(string.IsNullOrEmpty(subCategory.Description) ? "-" : subCategory.Description)
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-secondary">@subCategory.DisplayOrder</span>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" 
+                                                        class="btn btn-sm @(subCategory.IsActive ? "btn-success" : "btn-outline-secondary")"
+                                                        onclick="toggleStatus(@subCategory.Id)"
+                                                        title="Click to @(subCategory.IsActive ? "deactivate" : "activate")">
+                                                    <i class="fas @(subCategory.IsActive ? "fa-check" : "fa-times")"></i>
+                                                    @(subCategory.IsActive ? "Active" : "Inactive")
+                                                </button>
+                                            </td>
+                                            <td class="text-center text-muted small">
+                                                @subCategory.CreatedAt.ToString("MMM dd, yyyy")
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group" role="group">
+                                                    <a asp-action="Edit" asp-route-id="@subCategory.Id" 
+                                                       class="btn btn-outline-primary btn-sm" 
+                                                       title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <a asp-action="Delete" asp-route-id="@subCategory.Id" 
+                                                       class="btn btn-outline-danger btn-sm" 
+                                                       title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center p-5">
+                            <div class="mb-3">
+                                <i class="fas fa-list-ul fa-3x text-muted"></i>
+                            </div>
+                            <h5 class="text-muted mb-3">No Sub Categories Found</h5>
+                            <p class="text-muted mb-4">Get started by creating your first sub category.</p>
+                            <a asp-action="Create" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Create Sub Category
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @Html.AntiForgeryToken()
+    <script>
+        $(document).ready(function() {
+            // Initialize DataTable if there are records
+            if ($('#subCategoriesTable tbody tr').length > 0) {
+                $('#subCategoriesTable').DataTable({
+                    responsive: true,
+                    pageLength: 25,
+                    order: [[1, 'asc'], [3, 'asc']], // Sort by Category, then DisplayOrder
+                    columnDefs: [
+                        { orderable: false, targets: [6] } // Disable sorting on Actions column
+                    ],
+                    language: {
+                        search: "Search sub categories:",
+                        lengthMenu: "Show _MENU_ sub categories per page",
+                        info: "Showing _START_ to _END_ of _TOTAL_ sub categories",
+                        infoEmpty: "No sub categories available",
+                        emptyTable: "No sub categories found"
+                    }
+                });
+            }
+        });
+
+        // Toggle sub category status
+        function toggleStatus(subCategoryId) {
+            toastr.info('Are you sure you want to change the status of this sub category?<br/><br/>' +
+                '<button type="button" class="btn btn-success btn-sm me-2" onclick="confirmToggleStatus(' + subCategoryId + ')">Yes, Change Status</button>' +
+                '<button type="button" class="btn btn-secondary btn-sm" onclick="toastr.clear()">Cancel</button>', 
+                'Confirm Status Change', {
+                allowHtml: true,
+                closeButton: false,
+                timeOut: 0,
+                extendedTimeOut: 0,
+                tapToDismiss: false
+            });
+        }
+
+        function confirmToggleStatus(subCategoryId) {
+            toastr.clear();
+            toastr.info('Updating status...', 'Please wait');
+            
+            $.ajax({
+                url: '@Url.Action("ToggleStatus", "SubCategory")',
+                type: 'POST',
+                data: { 
+                    id: subCategoryId,
+                    __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                },
+                success: function(response) {
+                    toastr.clear();
+                    if (response.success) {
+                        toastr.success(response.message, 'Success');
+                        
+                        // Reload the page to reflect changes
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        toastr.error(response.message, 'Error');
+                    }
+                },
+                error: function() {
+                    toastr.clear();
+                    toastr.error('An error occurred while updating the status.', 'Error');
+                }
+            });
+        }
+    </script>
+}

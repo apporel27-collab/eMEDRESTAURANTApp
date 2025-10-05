@@ -32,6 +32,9 @@ namespace RestaurantManagementSystem.ViewModels
         [Display(Name = "Category")]
         public int CategoryId { get; set; }
 
+        [Display(Name = "Sub Category")]
+        public int? SubCategoryId { get; set; }
+
         [Display(Name = "Image")]
         public string ImagePath { get; set; }
 

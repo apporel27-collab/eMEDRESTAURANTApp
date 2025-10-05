@@ -65,10 +65,18 @@
                                         
                                         <div class="form-group">
                                             <label asp-for="CategoryId" class="control-label"></label>
-                                            <select asp-for="CategoryId" class="form-control" asp-items="ViewBag.Categories">
+                                            <select asp-for="CategoryId" class="form-control" asp-items="ViewBag.Categories" onchange="loadSubCategories()">
                                                 <option value="">-- Select Category --</option>
                                             </select>
                                             <span asp-validation-for="CategoryId" class="text-danger"></span>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label asp-for="SubCategoryId" class="control-label"></label>
+                                            <select asp-for="SubCategoryId" class="form-control" asp-items="ViewBag.SubCategories">
+                                                <option value="">-- Select Sub Category --</option>
+                                            </select>
+                                            <span asp-validation-for="SubCategoryId" class="text-danger"></span>
                                         </div>
 
                                         <div class="form-group">
@@ -332,5 +340,37 @@
             }
             $('#IsGstApplicableEdit').on('change', toggleGstField);
             toggleGstField();
+            
+            // Load subcategories on page load if category is selected
+            loadSubCategories();
+        });
+
+        // Load subcategories based on selected category
+        function loadSubCategories() {
+            var categoryId = $('#CategoryId').val();
+            var subCategorySelect = $('#SubCategoryId');
+            var selectedSubCategory = '@Model.SubCategoryId';
+            
+            // Clear existing options except the first one
+            subCategorySelect.find('option:not(:first)').remove();
+            
+            if (categoryId) {
+                $.get('@Url.Action("GetSubCategoriesByCategory", "Menu")', { categoryId: categoryId })
+                    .done(function(data) {
+                        $.each(data, function(index, item) {
+                            var option = '<option value="' + item.value + '">' + item.text + '</option>';
+                            subCategorySelect.append(option);
+                        });
+                        
+                        // Set the selected subcategory if editing
+                        if (selectedSubCategory) {
+                            subCategorySelect.val(selectedSubCategory);
+                        }
+                    })
+                    .fail(function() {
+                        console.log('Error loading subcategories');
+                    });
+            }
+        }
     </script>
 }
