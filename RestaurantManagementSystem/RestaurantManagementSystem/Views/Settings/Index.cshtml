@@ -100,6 +100,35 @@
                     
                     <div class="settings-card mb-3">
                         <div class="card-header">
+                            <i class="fas fa-cogs me-1"></i>
+                            Parameter Setup
+                        </div>
+                        <div class="card-body info-section">
+                            <dl class="row compact-info">
+                                <dt class="col-sm-6">Is Default GST Required</dt>
+                                <dd class="col-sm-6">
+                                    <span class="badge @(Model.IsDefaultGSTRequired ? "bg-success" : "bg-danger")">
+                                        @(Model.IsDefaultGSTRequired ? "Yes" : "No")
+                                    </span>
+                                </dd>
+                                
+                                <dt class="col-sm-6">Is Take Away GST Required</dt>
+                                <dd class="col-sm-6">
+                                    <span class="badge @(Model.IsTakeAwayGSTRequired ? "bg-success" : "bg-danger")">
+                                        @(Model.IsTakeAwayGSTRequired ? "Yes" : "No")
+                                    </span>
+                                </dd>
+                                
+                                <dt class="col-sm-6">Bill Format</dt>
+                                <dd class="col-sm-6">
+                                    <span class="badge bg-primary">@Model.BillFormat</span>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-card mb-3">
+                        <div class="card-header">
                             <i class="fas fa-info-circle me-1"></i>
                             System Information
                         </div>

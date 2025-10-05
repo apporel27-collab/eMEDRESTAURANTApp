@@ -164,6 +164,9 @@ namespace RestaurantManagementSystem.Controllers
                 CurrencySymbol = model.CurrencySymbol,
                 DefaultGSTPercentage = model.DefaultGSTPercentage,
                 TakeAwayGSTPercentage = model.TakeAwayGSTPercentage,
+                IsDefaultGSTRequired = model.IsDefaultGSTRequired,
+                IsTakeAwayGSTRequired = model.IsTakeAwayGSTRequired,
+                BillFormat = model.BillFormat,
                 CreatedAt = model.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
                 UpdatedAt = model.UpdatedAt.ToString("dd MMM yyyy, hh:mm tt")
             };
@@ -188,6 +191,9 @@ namespace RestaurantManagementSystem.Controllers
                 CurrencySymbol = viewModel.CurrencySymbol,
                 DefaultGSTPercentage = viewModel.DefaultGSTPercentage,
                 TakeAwayGSTPercentage = viewModel.TakeAwayGSTPercentage,
+                IsDefaultGSTRequired = viewModel.IsDefaultGSTRequired,
+                IsTakeAwayGSTRequired = viewModel.IsTakeAwayGSTRequired,
+                BillFormat = viewModel.BillFormat,
                 UpdatedAt = DateTime.Now
             };
         }

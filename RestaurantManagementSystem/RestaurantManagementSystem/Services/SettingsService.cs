@@ -43,7 +43,9 @@ namespace RestaurantManagementSystem.Services
                         Website = "https://www.myrestaurant.com",
                         CurrencySymbol = "₹",
                         DefaultGSTPercentage = 5.00m,
-                        TakeAwayGSTPercentage = 5.00m
+                        TakeAwayGSTPercentage = 5.00m,
+                        IsDefaultGSTRequired = true,
+                        BillFormat = "A4"
                     };
                     
                     _dbContext.RestaurantSettings.Add(settings);
@@ -82,6 +84,9 @@ namespace RestaurantManagementSystem.Services
                     currentSettings.CurrencySymbol = settings.CurrencySymbol;
                     currentSettings.DefaultGSTPercentage = settings.DefaultGSTPercentage;
                     currentSettings.TakeAwayGSTPercentage = settings.TakeAwayGSTPercentage;
+                    currentSettings.IsDefaultGSTRequired = settings.IsDefaultGSTRequired;
+                    currentSettings.IsTakeAwayGSTRequired = settings.IsTakeAwayGSTRequired;
+                    currentSettings.BillFormat = settings.BillFormat;
                     currentSettings.UpdatedAt = DateTime.Now;
                     
                     await _dbContext.SaveChangesAsync();
@@ -139,6 +144,9 @@ namespace RestaurantManagementSystem.Services
                         [CurrencySymbol] NVARCHAR(50) NOT NULL DEFAULT N'₹',
                         [DefaultGSTPercentage] DECIMAL(5,2) NOT NULL DEFAULT 5.00,
                         [TakeAwayGSTPercentage] DECIMAL(5,2) NOT NULL DEFAULT 5.00,
+                        [IsDefaultGSTRequired] BIT NOT NULL DEFAULT 1,
+                        [IsTakeAwayGSTRequired] BIT NOT NULL DEFAULT 1,
+                        [BillFormat] NVARCHAR(10) NOT NULL DEFAULT N'A4',
                         [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(),
                         [UpdatedAt] DATETIME NOT NULL DEFAULT GETDATE()
                     );
@@ -157,7 +165,10 @@ namespace RestaurantManagementSystem.Services
                         [Website],
                         [CurrencySymbol],
                         [DefaultGSTPercentage],
-                        [TakeAwayGSTPercentage]
+                        [TakeAwayGSTPercentage],
+                        [IsDefaultGSTRequired],
+                        [IsTakeAwayGSTRequired],
+                        [BillFormat]
                     )
                     VALUES (
                         'My Restaurant',
@@ -172,14 +183,79 @@ namespace RestaurantManagementSystem.Services
                         'https://www.myrestaurant.com',
                         '₹',
                         5.00,
-                        5.00
+                        5.00,
+                        1,
+                        1,
+                        'A4'
                     );", connection);
                     
                     await createTableCommand.ExecuteNonQueryAsync();
                     return true;
                 }
                 
+                // Also ensure new parameter columns exist
+                await EnsureParameterColumnsExistAsync();
+                
                 return false;
+            }
+        }
+        
+        private async Task EnsureParameterColumnsExistAsync()
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+                
+                // Check if IsDefaultGSTRequired column exists
+                var checkColumn1 = new SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'RestaurantSettings' 
+                    AND COLUMN_NAME = 'IsDefaultGSTRequired'
+                    AND TABLE_SCHEMA = 'dbo'", connection);
+                    
+                var column1Exists = (int)await checkColumn1.ExecuteScalarAsync() > 0;
+                
+                if (!column1Exists)
+                {
+                    var addColumn1 = new SqlCommand(@"
+                        ALTER TABLE [dbo].[RestaurantSettings] 
+                        ADD [IsDefaultGSTRequired] BIT NOT NULL DEFAULT 1", connection);
+                    await addColumn1.ExecuteNonQueryAsync();
+                }
+                
+                // Check if IsTakeAwayGSTRequired column exists
+                var checkColumn2 = new SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'RestaurantSettings' 
+                    AND COLUMN_NAME = 'IsTakeAwayGSTRequired'
+                    AND TABLE_SCHEMA = 'dbo'", connection);
+                    
+                var column2Exists = (int)await checkColumn2.ExecuteScalarAsync() > 0;
+                
+                if (!column2Exists)
+                {
+                    var addColumn2 = new SqlCommand(@"
+                        ALTER TABLE [dbo].[RestaurantSettings] 
+                        ADD [IsTakeAwayGSTRequired] BIT NOT NULL DEFAULT 1", connection);
+                    await addColumn2.ExecuteNonQueryAsync();
+                }
+                
+                // Check if BillFormat column exists
+                var checkColumn3 = new SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'RestaurantSettings' 
+                    AND COLUMN_NAME = 'BillFormat'
+                    AND TABLE_SCHEMA = 'dbo'", connection);
+                    
+                var column3Exists = (int)await checkColumn3.ExecuteScalarAsync() > 0;
+                
+                if (!column3Exists)
+                {
+                    var addColumn3 = new SqlCommand(@"
+                        ALTER TABLE [dbo].[RestaurantSettings] 
+                        ADD [BillFormat] NVARCHAR(10) NOT NULL DEFAULT N'A4'", connection);
+                    await addColumn3.ExecuteNonQueryAsync();
+                }
             }
         }
     }

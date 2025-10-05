@@ -79,6 +79,17 @@ namespace RestaurantManagementSystem.ViewModels
     [Display(Name = "Take Away GST Percentage")]
     public decimal TakeAwayGSTPercentage { get; set; } = 5.00m;
 
+        // Parameter Setup Section
+        [Display(Name = "Is Default GST Required")]
+        public bool IsDefaultGSTRequired { get; set; } = true;
+        
+        [Display(Name = "Is Take Away GST Required")]
+        public bool IsTakeAwayGSTRequired { get; set; } = true;
+        
+        [Required(ErrorMessage = "Bill Format is required")]
+        [Display(Name = "Bill Format")]
+        public string BillFormat { get; set; } = "A4";
+
         // Additional display-only information
         [Display(Name = "Created On")]
         public string CreatedAt { get; set; }
