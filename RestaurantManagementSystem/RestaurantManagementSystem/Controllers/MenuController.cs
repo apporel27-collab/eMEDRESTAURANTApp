@@ -1087,12 +1087,12 @@ namespace RestaurantManagementSystem.Controllers
                     hasSubCategoryColumn = (int)checkCommand.ExecuteScalar() > 0;
                 }
                 
-                // Build INSERT query based on available schema
+                // Build INSERT query for dbo schema
                 string insertQuery;
                 if (hasSubCategoryColumn)
                 {
                     insertQuery = @"
-                        INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, SubCategoryId, ImagePath,
+                        INSERT INTO [dbo].[MenuItems] (PLUCode, Name, Description, Price, CategoryId, SubCategoryId, ImagePath,
                                   IsAvailable, PrepTime, CalorieCount, 
                                   IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId, GSTPercentage, IsGstApplicable, NotAvailable)
                         VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @SubCategoryId, @ImagePath,
@@ -1103,7 +1103,7 @@ namespace RestaurantManagementSystem.Controllers
                 else
                 {
                     insertQuery = @"
-                        INSERT INTO MenuItems (PLUCode, Name, Description, Price, CategoryId, ImagePath,
+                        INSERT INTO [dbo].[MenuItems] (PLUCode, Name, Description, Price, CategoryId, ImagePath,
                                   IsAvailable, PrepTime, CalorieCount, 
                                   IsFeatured, IsSpecial, DiscountPercentage, KitchenStationId, GSTPercentage, IsGstApplicable, NotAvailable)
                         VALUES (@PLUCode, @Name, @Description, @Price, @CategoryId, @ImagePath,
@@ -1125,9 +1125,10 @@ namespace RestaurantManagementSystem.Controllers
                     {
                         if (model.SubCategoryId.HasValue)
                         {
-                            // Validate that SubCategoryId exists in SubCategories table
+                            // Validate that SubCategoryId exists in dbo.SubCategories table
+                            string subCategoriesTable = GetSubCategoriesTableReference();
                             using (var validateCommand = new Microsoft.Data.SqlClient.SqlCommand(
-                                "SELECT COUNT(*) FROM SubCategories WHERE Id = @SubCategoryId", connection))
+                                $"SELECT COUNT(*) FROM {subCategoriesTable} WHERE Id = @SubCategoryId AND IsActive = 1", connection))
                             {
                                 validateCommand.Parameters.AddWithValue("@SubCategoryId", model.SubCategoryId.Value);
                                 int count = (int)validateCommand.ExecuteScalar();
@@ -1138,7 +1139,7 @@ namespace RestaurantManagementSystem.Controllers
                                 }
                                 else
                                 {
-                                    // SubCategory doesn't exist, set to NULL
+                                    // SubCategory doesn't exist in dbo schema, set to NULL
                                     command.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
                                 }
                             }
@@ -2251,6 +2252,34 @@ namespace RestaurantManagementSystem.Controllers
                 IsOptional = i.IsOptional,
                 Instructions = i.Instructions
             }).ToList();
+        }
+
+        // API endpoint for Estimation page to get menu items with SubCategory data
+        [HttpGet]
+        public JsonResult GetMenuItemsForEstimation()
+        {
+            try
+            {
+                var menuItems = GetAllMenuItems();
+                var result = menuItems.Select(item => new
+                {
+                    id = item.Id,
+                    plu = item.PLUCode,
+                    name = item.Name,
+                    price = item.Price,
+                    category = item.Category?.Name ?? "Uncategorized",
+                    subCategory = item.SubCategory?.Name ?? "",
+                    categoryId = item.CategoryId,
+                    subCategoryId = item.SubCategoryId,
+                    isAvailable = item.IsAvailable
+                }).ToList();
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { error = ex.Message });
+            }
         }
     }
 }

@@ -30,39 +30,40 @@ $(document).ready(function() {
     function loadMenuData() {
         showLoading();
         
-        // Load menu data from the Menu/Index endpoint with SubCategory support
-        $.get('/Menu/Index')
+        // Load menu data from the dedicated API endpoint with SubCategory support
+        $.get('/Menu/GetMenuItemsForEstimation')
             .done(function(data) {
-                const items = $(data).find('.table tbody tr');
+                if (data.error) {
+                    showError('Failed to load menu items: ' + data.error);
+                    return;
+                }
+                
                 menuData = [];
                 allSubCategories = [];
                 
-                items.each(function() {
-                    const row = $(this);
-                    const cells = row.find('td');
-                    if (cells.length >= 6) {
-                        // Check if this row has SubCategory column (6 columns total)
-                        const hasSubCategory = cells.length >= 6;
-                        
-                        const item = {
-                            plu: cells.eq(0).text().trim(),
-                            name: cells.eq(2).text().trim(),
-                            category: cells.eq(3).text().trim(),
-                            subCategory: hasSubCategory ? cells.eq(4).text().trim() : '',
-                            price: parseFloat(cells.eq(hasSubCategory ? 5 : 4).text().replace(/[^\d.]/g, '')) || 0,
-                            categoryId: null,
-                            subCategoryId: null
-                        };
-                        
-                        menuData.push(item);
+                data.forEach(function(item) {
+                    const menuItem = {
+                        plu: item.plu || '',
+                        name: item.name || '',
+                        category: item.category || 'Uncategorized',
+                        subCategory: item.subCategory || '',
+                        price: parseFloat(item.price) || 0,
+                        categoryId: item.categoryId,
+                        subCategoryId: item.subCategoryId,
+                        isAvailable: item.isAvailable
+                    };
+                    
+                    // Only include available items
+                    if (menuItem.isAvailable) {
+                        menuData.push(menuItem);
                         
                         // Collect unique categories and subcategories
-                        if (item.subCategory && item.subCategory !== '') {
-                            const existing = allSubCategories.find(s => s.name === item.subCategory);
+                        if (menuItem.subCategory && menuItem.subCategory !== '' && menuItem.subCategory !== '-') {
+                            const existing = allSubCategories.find(s => s.name === menuItem.subCategory);
                             if (!existing) {
                                 allSubCategories.push({
-                                    name: item.subCategory,
-                                    category: item.category
+                                    name: menuItem.subCategory,
+                                    category: menuItem.category
                                 });
                             }
                         }
@@ -88,12 +89,16 @@ $(document).ready(function() {
         }
         
         items.forEach(item => {
+            const subCategoryDisplay = (item.subCategory && item.subCategory !== '' && item.subCategory !== '-') 
+                ? item.subCategory 
+                : '-';
+                
             tbody.append(`
                 <tr data-price="${item.price}">
                     <td>${item.name}</td>
                     <td>₹${item.price.toFixed(2)}</td>
                     <td>${item.category}</td>
-                    <td>${item.subCategory || ''}</td>
+                    <td>${subCategoryDisplay}</td>
                     <td>${item.plu}</td>
                     <td><input type="number" class="form-control form-control-sm qty-input" min="0" value="0"></td>
                 </tr>
