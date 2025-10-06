@@ -161,6 +161,134 @@
                         </div>
                     </div>
 
+                    <!-- Pending Payments Section -->
+                    @if (Model.PendingPayments.Any())
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header bg-warning text-dark">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-clock me-2"></i>Pending Payments - Need Approval
+                                    </h5>
+                                    <span class="badge bg-dark">@Model.PendingPayments.Count Pending</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <div>
+                                        The following payments are waiting for approval. Please review and approve or reject them.
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th scope="col">Created</th>
+                                                <th scope="col">Order</th>
+                                                <th scope="col">Table</th>
+                                                <th scope="col">Payment Method</th>
+                                                <th scope="col">Amount</th>
+                                                <th scope="col">Discount</th>
+                                                <th scope="col">Tip</th>
+                                                <th scope="col">Total</th>
+                                                <th scope="col">Details</th>
+                                                <th scope="col" class="text-center">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var pending in Model.PendingPayments)
+                                            {
+                                                <tr class="table-warning">
+                                                    <td>
+                                                        <div class="fw-semibold">@pending.CreatedAt.ToString("MM/dd/yyyy")</div>
+                                                        <div class="small text-muted">@pending.CreatedAt.ToString("HH:mm")</div>
+                                                    </td>
+                                                    <td>
+                                                        <div class="fw-semibold text-primary">@pending.OrderNumber</div>
+                                                        <div class="small text-muted">Order #@pending.OrderId</div>
+                                                    </td>
+                                                    <td>@pending.TableName</td>
+                                                    <td>
+                                                        <div class="fw-semibold">@pending.PaymentMethodDisplay</div>
+                                                        @if (!string.IsNullOrEmpty(pending.LastFourDigits))
+                                                        {
+                                                            <div class="small text-muted">
+                                                                @pending.CardType •••• @pending.LastFourDigits
+                                                            </div>
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(pending.ReferenceNumber))
+                                                        {
+                                                            <div class="small text-muted">Ref: @pending.ReferenceNumber</div>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end">
+                                                        @if (pending.HasDiscount)
+                                                        {
+                                                            <div class="fw-semibold">₹@pending.Amount.ToString("F2")</div>
+                                                            <div class="small text-muted text-decoration-line-through">₹@pending.OriginalAmount.ToString("F2")</div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="fw-semibold">₹@pending.Amount.ToString("F2")</div>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end">
+                                                        @if (pending.HasDiscount)
+                                                        {
+                                                            <span class="badge bg-danger">₹@pending.DiscountAmount.ToString("F2")</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted small">No Discount</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end">₹@pending.TipAmount.ToString("F2")</td>
+                                                    <td class="fw-bold text-end text-primary">₹@((pending.Amount + pending.TipAmount).ToString("F2"))</td>
+                                                    <td>
+                                                        @if (!string.IsNullOrEmpty(pending.ProcessedByName))
+                                                        {
+                                                            <div class="small text-muted">By: @pending.ProcessedByName</div>
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(pending.Notes))
+                                                        {
+                                                            <div class="small text-muted" title="@pending.Notes">
+                                                                <i class="fas fa-sticky-note me-1"></i>Notes available
+                                                            </div>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <!-- CSRF Token for AJAX requests -->
+                                                        @Html.AntiForgeryToken()
+                                                        
+                                                        <div class="btn-group" role="group">
+                                                            <button type="button" class="btn btn-sm btn-success me-1 btn-approve-payment" 
+                                                                    data-payment-id="@pending.PaymentId" 
+                                                                    data-order-number="@pending.OrderNumber"
+                                                                    data-table-number="@pending.TableName"
+                                                                    data-amount="@((pending.Amount + pending.TipAmount).ToString("F2"))"
+                                                                    title="Approve Payment">
+                                                                <i class="fas fa-check me-1"></i> Approve
+                                                            </button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger btn-reject-payment" 
+                                                                    data-payment-id="@pending.PaymentId" 
+                                                                    data-order-number="@pending.OrderNumber"
+                                                                    data-table-number="@pending.TableName"
+                                                                    data-amount="@((pending.Amount + pending.TipAmount).ToString("F2"))"
+                                                                    title="Reject Payment">
+                                                                <i class="fas fa-times me-1"></i> Reject
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
                     <!-- Payment History Table -->
                     <div class="card">
                         <div class="card-header bg-light">
@@ -370,6 +498,300 @@
                     }
                 }
             });
+        });
+    </script>
+    
+    <style>
+        /* Complete modal blinking fix - Disable all Bootstrap animations */
+        .modal, .modal * {
+            -webkit-transition: none !important;
+            -moz-transition: none !important;
+            -o-transition: none !important;
+            transition: none !important;
+            -webkit-animation: none !important;
+            -moz-animation: none !important;
+            -o-animation: none !important;
+            animation: none !important;
+        }
+        
+        /* Remove fade class effects */
+        .modal.fade .modal-dialog {
+            -webkit-transform: none !important;
+            -ms-transform: none !important;
+            -o-transform: none !important;
+            transform: none !important;
+        }
+        
+        .modal-backdrop.fade {
+            opacity: 0.5 !important;
+        }
+        
+        .modal-backdrop {
+            -webkit-transition: none !important;
+            -moz-transition: none !important;
+            -o-transition: none !important;
+            transition: none !important;
+        }
+        
+        /* Ensure instant display */
+        .modal.show {
+            display: block !important;
+            opacity: 1 !important;
+        }
+        
+        /* Professional styling without animations */
+        .modal-content {
+            border: none !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+            border-radius: 8px !important;
+        }
+        
+        .modal-header.bg-success {
+            border-top-left-radius: 8px !important;
+            border-top-right-radius: 8px !important;
+        }
+    </style>
+    
+    <script>
+        $(document).ready(function() {
+            // Set up AJAX antiforgery token
+            $.ajaxSetup({
+                headers: {
+                    'RequestVerificationToken': $('input:hidden[name="__RequestVerificationToken"]').val()
+                }
+            });
+            
+            // Handle approval
+            $(document).on('click', '.btn-approve-payment', function(e) {
+                e.preventDefault();
+                const paymentId = $(this).data('payment-id');
+                const orderNumber = $(this).data('order-number');
+                const tableNumber = $(this).data('table-number');
+                const amount = $(this).data('amount');
+                
+                // Show confirmation using toastr with custom options
+                toastr.options = {
+                    closeButton: true,
+                    timeOut: 0,
+                    extendedTimeOut: 0,
+                    positionClass: "toast-top-center",
+                    preventDuplicates: false,
+                    onclick: null,
+                    showDuration: "300",
+                    hideDuration: "1000",
+                    showMethod: "fadeIn",
+                    hideMethod: "fadeOut",
+                    tapToDismiss: false
+                };
+                
+                // Custom HTML for the toastr notification with approval buttons
+                const toastHtml = `
+                    <div>
+                        <h6><strong>Confirm Payment Approval</strong></h6>
+                        <div style="margin-bottom: 10px;">
+                            <strong>Order:</strong> ${orderNumber}<br>
+                            <strong>Table:</strong> ${tableNumber}<br>
+                            <strong>Amount:</strong> ₹${amount}
+                        </div>
+                        <div style="text-align: center; margin-top: 15px;">
+                            <button class="btn btn-sm btn-light mr-2 cancel-toast" style="margin-right: 10px;">Cancel</button>
+                            <button class="btn btn-sm btn-success confirm-approve" data-payment-id="${paymentId}">
+                                <i class="fas fa-check me-1"></i> Approve
+                            </button>
+                        </div>
+                    </div>`;
+                
+                // Display confirmation toast
+                const $toast = toastr.info(toastHtml);
+                
+                // Handle cancel button
+                $toast.find('.cancel-toast').on('click', function() {
+                    toastr.clear($toast);
+                    resetToastrDefaults();
+                });
+                
+                // Handle confirm button
+                $toast.find('.confirm-approve').on('click', function() {
+                    const paymentId = $(this).data('payment-id');
+                    toastr.clear($toast);
+                    approvePayment(paymentId);
+                });
+            });
+            
+            // Handle rejection
+            $(document).on('click', '.btn-reject-payment', function(e) {
+                e.preventDefault();
+                const paymentId = $(this).data('payment-id');
+                const orderNumber = $(this).data('order-number');
+                const tableNumber = $(this).data('table-number');
+                const amount = $(this).data('amount');
+                
+                // Show confirmation using toastr with custom options
+                toastr.options = {
+                    closeButton: true,
+                    timeOut: 0,
+                    extendedTimeOut: 0,
+                    positionClass: "toast-top-center",
+                    preventDuplicates: false,
+                    onclick: null,
+                    showDuration: "300",
+                    hideDuration: "1000",
+                    showMethod: "fadeIn",
+                    hideMethod: "fadeOut",
+                    tapToDismiss: false
+                };
+                
+                // Custom HTML for the toastr notification with rejection form
+                const toastHtml = `
+                    <div>
+                        <h6><strong>Confirm Payment Rejection</strong></h6>
+                        <div style="margin-bottom: 10px;">
+                            <strong>Order:</strong> ${orderNumber}<br>
+                            <strong>Table:</strong> ${tableNumber}<br>
+                            <strong>Amount:</strong> ₹${amount}
+                        </div>
+                        <div style="margin-top: 10px; margin-bottom: 10px;">
+                            <label for="reject-reason" class="form-label">Reason (optional):</label>
+                            <textarea id="reject-reason" class="form-control form-control-sm" rows="2"></textarea>
+                        </div>
+                        <div style="text-align: center; margin-top: 15px;">
+                            <button class="btn btn-sm btn-light mr-2 cancel-toast" style="margin-right: 10px;">Cancel</button>
+                            <button class="btn btn-sm btn-danger confirm-reject" data-payment-id="${paymentId}">
+                                <i class="fas fa-times me-1"></i> Reject
+                            </button>
+                        </div>
+                    </div>`;
+                
+                // Display confirmation toast
+                const $toast = toastr.warning(toastHtml);
+                
+                // Handle cancel button
+                $toast.find('.cancel-toast').on('click', function() {
+                    toastr.clear($toast);
+                    resetToastrDefaults();
+                });
+                
+                // Handle confirm button
+                $toast.find('.confirm-reject').on('click', function() {
+                    const paymentId = $(this).data('payment-id');
+                    const reason = $toast.find('#reject-reason').val();
+                    toastr.clear($toast);
+                    rejectPayment(paymentId, reason);
+                });
+            });
+            
+            // Function to approve payment via AJAX
+            function approvePayment(paymentId) {
+                $.ajax({
+                    url: '@Url.Action("ApprovePaymentAjax")',
+                    type: 'POST',
+                    data: { id: paymentId },
+                    success: function(response) {
+                        resetToastrDefaults();
+                        
+                        if (response.success) {
+                            toastr.success(response.message);
+                            // Reload the page after a short delay to refresh the data
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            toastr.error(response.message);
+                        }
+                    },
+                    error: function() {
+                        resetToastrDefaults();
+                        toastr.error('An error occurred while processing your request.');
+                    }
+                });
+            }
+            
+            // Function to reject payment via AJAX
+            function rejectPayment(paymentId, reason) {
+                $.ajax({
+                    url: '@Url.Action("RejectPaymentAjax")',
+                    type: 'POST',
+                    data: { 
+                        id: paymentId,
+                        reason: reason
+                    },
+                    success: function(response) {
+                        resetToastrDefaults();
+                        
+                        if (response.success) {
+                            toastr.success(response.message);
+                            // Reload the page after a short delay to refresh the data
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            toastr.error(response.message);
+                        }
+                    },
+                    error: function() {
+                        resetToastrDefaults();
+                        toastr.error('An error occurred while processing your request.');
+                    }
+                });
+            }
+            
+            // Reset toastr default options
+            function resetToastrDefaults() {
+                toastr.options = {
+                    closeButton: true,
+                    progressBar: true,
+                    positionClass: "toast-top-right",
+                    timeOut: 5000,
+                    extendedTimeOut: 2000,
+                    showMethod: "fadeIn",
+                    hideMethod: "fadeOut"
+                };
+            }
+            
+            // Initialize DataTables for both tables - Check if already initialized first
+            if ($.fn.DataTable) {
+                try {
+                    // Handle pending payments table
+                    if ($('#pendingPaymentsTable').length > 0) {
+                        // Destroy existing instance if it exists
+                        if ($.fn.dataTable.isDataTable('#pendingPaymentsTable')) {
+                            $('#pendingPaymentsTable').DataTable().destroy();
+                        }
+                        
+                        // Initialize table
+                        $('#pendingPaymentsTable').DataTable({
+                            order: [[0, 'desc']],
+                            language: {
+                                search: '<i class="fas fa-search"></i> _INPUT_',
+                                searchPlaceholder: 'Search payments...',
+                            },
+                            dom: '<"top"lf>rt<"bottom"ip><"clear">',
+                            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]]
+                        });
+                    }
+                    
+                    // Handle payment history table
+                    if ($('#paymentHistoryTable').length > 0) {
+                        // Destroy existing instance if it exists
+                        if ($.fn.dataTable.isDataTable('#paymentHistoryTable')) {
+                            $('#paymentHistoryTable').DataTable().destroy();
+                        }
+                        
+                        // Initialize table
+                        $('#paymentHistoryTable').DataTable({
+                            order: [[6, 'desc']],
+                            language: {
+                                search: '<i class="fas fa-search"></i> _INPUT_',
+                                searchPlaceholder: 'Search history...',
+                            },
+                            dom: '<"top"lf>rt<"bottom"ip><"clear">',
+                            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]]
+                        });
+                    }
+                } catch (err) {
+                    console.error("DataTables initialization error:", err);
+                }
+            }
         });
     </script>
 }

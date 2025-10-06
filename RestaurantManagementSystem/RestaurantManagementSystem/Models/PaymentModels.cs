@@ -47,6 +47,31 @@ namespace RestaurantManagementSystem.Models
         [Range(0, 10000)]
         public decimal TipAmount { get; set; }
         
+        // GST-related columns for storing calculated GST information
+        [Range(0, 10000)]
+        public decimal? GSTAmount { get; set; }
+        
+        [Range(0, 10000)]
+        public decimal? CGSTAmount { get; set; }
+        
+        [Range(0, 10000)]
+        public decimal? SGSTAmount { get; set; }
+        
+        [Range(0, 10000)]
+        public decimal? DiscAmount { get; set; }
+        
+        [Range(0, 100)]
+        public decimal? GST_Perc { get; set; }
+        
+        [Range(0, 100)]
+        public decimal? CGST_Perc { get; set; }
+        
+        [Range(0, 100)]
+        public decimal? SGST_Perc { get; set; }
+        
+        [Range(0, 10000)]
+        public decimal? Amount_ExclGST { get; set; }
+        
         public int Status { get; set; } // 0=Pending, 1=Approved, 2=Rejected, 3=Voided
         
         public string StatusDisplay

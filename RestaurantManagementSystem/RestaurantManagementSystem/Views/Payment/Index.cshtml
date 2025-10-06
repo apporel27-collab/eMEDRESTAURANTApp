@@ -212,12 +212,69 @@
                                             </td>
                                             <td>@payment.ProcessedByName</td>
                                             <td class="text-end pe-4">
-                                                @if (payment.Status == 1) @* Approved *@
-                                                {
-                                                    <a asp-action="VoidPayment" asp-route-id="@payment.Id" class="btn btn-sm btn-outline-danger rounded-pill px-3">
-                                                        <i class="fas fa-ban me-1"></i> Void
-                                                    </a>
-                                                }
+                                                @if (payment.Status == 0) @* Pending - Needs Approval *@
+                                {
+                                    <div class="btn-group" role="group">
+                                        <form asp-action="ApprovePayment" asp-route-id="@payment.Id" method="post" style="display:inline;">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-success rounded-pill px-3 me-1" 
+                                                    onclick="return confirm('Are you sure you want to approve this payment?')">
+                                                <i class="fas fa-check me-1"></i> Approve
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" 
+                                                data-bs-toggle="modal" data-bs-target="#rejectModal-@payment.Id">
+                                            <i class="fas fa-times me-1"></i> Reject
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Reject Modal -->
+                                    <div class="modal fade" id="rejectModal-@payment.Id" tabindex="-1" aria-labelledby="rejectModalLabel-@payment.Id" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="rejectModalLabel-@payment.Id">Reject Payment</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <form asp-action="RejectPayment" asp-route-id="@payment.Id" method="post">
+                                                    @Html.AntiForgeryToken()
+                                                    <div class="modal-body">
+                                                        <p>Are you sure you want to reject this payment of <strong>₹@payment.Amount.ToString("F2")</strong>?</p>
+                                                        <div class="mb-3">
+                                                            <label for="reason-@payment.Id" class="form-label">Reason for Rejection (Optional):</label>
+                                                            <textarea class="form-control" id="reason-@payment.Id" name="reason" rows="3" 
+                                                                      placeholder="Enter reason for rejecting this payment..."></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-danger">
+                                                            <i class="fas fa-times me-1"></i> Reject Payment
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                else if (payment.Status == 1) @* Approved *@
+                                {
+                                    <a asp-action="VoidPayment" asp-route-id="@payment.Id" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                        <i class="fas fa-ban me-1"></i> Void
+                                    </a>
+                                }
+                                else if (payment.Status == 2) @* Rejected *@
+                                {
+                                    <span class="text-muted">
+                                        <i class="fas fa-times-circle me-1"></i> Rejected
+                                    </span>
+                                }
+                                else if (payment.Status == 3) @* Voided *@
+                                {
+                                    <span class="text-muted">
+                                        <i class="fas fa-ban me-1"></i> Voided
+                                    </span>
+                                }
                                             </td>
                                         </tr>
                                     }

@@ -173,6 +173,9 @@ namespace RestaurantManagementSystem.Models
         
         // Payment History
         public List<PaymentHistoryItem> PaymentHistory { get; set; } = new List<PaymentHistoryItem>();
+        
+        // Pending Payments for Approval
+        public List<PendingPaymentItem> PendingPayments { get; set; } = new List<PendingPaymentItem>();
     }
 
     public class PaymentHistoryItem
@@ -195,5 +198,30 @@ namespace RestaurantManagementSystem.Models
         public string PaymentMethodDisplayName { get; set; }
         public decimal TotalAmount { get; set; }
         public int TransactionCount { get; set; }
+    }
+    
+    public class PendingPaymentItem
+    {
+        public int PaymentId { get; set; }
+        public int OrderId { get; set; }
+        public string OrderNumber { get; set; }
+        public string TableName { get; set; }
+        public string PaymentMethodName { get; set; }
+        public string PaymentMethodDisplay { get; set; }
+        public decimal Amount { get; set; }
+        public decimal TipAmount { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string ProcessedByName { get; set; }
+        public string ReferenceNumber { get; set; }
+        public string LastFourDigits { get; set; }
+        public string CardType { get; set; }
+        public string Notes { get; set; }
+        
+        // Enhanced discount information display
+        public decimal DiscountAmount { get; set; }
+        public decimal OriginalAmount { get; set; } // Amount before discount (Amount + DiscountAmount)
+        public bool HasDiscount => DiscountAmount > 0;
+        public string DiscountDisplay => HasDiscount ? $"₹{DiscountAmount:F2}" : "No Discount";
+        public string OriginalAmountDisplay => HasDiscount ? $"₹{OriginalAmount:F2}" : "-";
     }
 }

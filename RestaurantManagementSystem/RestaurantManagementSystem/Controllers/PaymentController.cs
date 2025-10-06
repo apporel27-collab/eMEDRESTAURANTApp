@@ -260,17 +260,101 @@ END", connection))
                         }
                     }
                     
+                    // Calculate GST information before processing payment
+                    decimal gstPercentage = 5.0m; // Default
+                    decimal subtotal = 0m;
+                    decimal gstAmount = 0m;
+                    decimal cgstAmount = 0m;
+                    decimal sgstAmount = 0m;
+                    decimal amountExclGST = 0m;
+                    
+                    // Get GST percentage and order subtotal
+                    using (Microsoft.Data.SqlClient.SqlConnection gstConnection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                    {
+                        gstConnection.Open();
+                        
+                        // Get GST percentage from settings
+                        using (Microsoft.Data.SqlClient.SqlCommand gstCmd = new Microsoft.Data.SqlClient.SqlCommand(
+                            "SELECT DefaultGSTPercentage FROM dbo.RestaurantSettings", gstConnection))
+                        {
+                            var result = gstCmd.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                gstPercentage = Convert.ToDecimal(result);
+                            }
+                        }
+                        
+                        // Get order subtotal for GST calculation
+                        using (Microsoft.Data.SqlClient.SqlCommand subtotalCmd = new Microsoft.Data.SqlClient.SqlCommand(
+                            "SELECT Subtotal FROM Orders WHERE Id = @OrderId", gstConnection))
+                        {
+                            subtotalCmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                            var subtotalResult = subtotalCmd.ExecuteScalar();
+                            if (subtotalResult != null && subtotalResult != DBNull.Value)
+                            {
+                                subtotal = Convert.ToDecimal(subtotalResult);
+                            }
+                        }
+                    }
+                    
+                    // Get GST percentage and order details
+                    decimal paymentGstPercentage = 5.0m; // Default fallback
+                    decimal orderSubtotal = 0m;
+                    using (var gstConnection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                    {
+                        gstConnection.Open();
+                        
+                        // Get GST percentage from settings
+                        using (var gstCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT DefaultGSTPercentage FROM dbo.RestaurantSettings", gstConnection))
+                        {
+                            var result = gstCmd.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                paymentGstPercentage = Convert.ToDecimal(result);
+                            }
+                        }
+                        
+                        // Get order subtotal (amount before GST)
+                        using (var subtotalCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT Subtotal FROM Orders WHERE Id = @OrderId", gstConnection))
+                        {
+                            subtotalCmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                            var subtotalResult = subtotalCmd.ExecuteScalar();
+                            if (subtotalResult != null && subtotalResult != DBNull.Value)
+                            {
+                                orderSubtotal = Convert.ToDecimal(subtotalResult);
+                            }
+                        }
+                    }
+                    
+                    // NEW CORRECT PROCESS: Apply discount on subtotal, then recalculate GST
+                    // Step 1: Apply discount on original subtotal (excludes GST)
+                    decimal discountAmount = model.DiscountAmount;
+                    decimal discountedSubtotal = orderSubtotal - discountAmount;
+                    
+                    // Step 2: Calculate GST on the discounted subtotal
+                    decimal paymentGstAmount = Math.Round(discountedSubtotal * paymentGstPercentage / 100m, 2, MidpointRounding.AwayFromZero);
+                    
+                    // Step 3: Calculate final amounts
+                    decimal paymentAmountExclGST = discountedSubtotal; // This is the subtotal after discount
+                    decimal totalPaymentAmountWithGST = discountedSubtotal + paymentGstAmount; // Final amount customer pays
+                    
+                    // Step 4: Split GST into CGST and SGST (equal split)
+                    decimal paymentCgstPercentage = paymentGstPercentage / 2m;
+                    decimal paymentSgstPercentage = paymentGstPercentage / 2m;
+                    decimal paymentCgstAmount = Math.Round(paymentGstAmount / 2m, 2, MidpointRounding.AwayFromZero);
+                    decimal paymentSgstAmount = paymentGstAmount - paymentCgstAmount; // Ensures total adds up exactly
+                    
                     using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
                         
-                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("usp_ProcessPayment", connection))
+                        using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand("[dbo].[usp_ProcessPayment]", connection))
                         {
                             command.CommandType = CommandType.StoredProcedure;
                             
                             command.Parameters.AddWithValue("@OrderId", model.OrderId);
                             command.Parameters.AddWithValue("@PaymentMethodId", model.PaymentMethodId);
-                            command.Parameters.AddWithValue("@Amount", model.Amount);
+                            command.Parameters.AddWithValue("@Amount", totalPaymentAmountWithGST); // Store exact payment amount (discounted subtotal + GST)
                             command.Parameters.AddWithValue("@TipAmount", model.TipAmount);
                             command.Parameters.AddWithValue("@ReferenceNumber", string.IsNullOrEmpty(model.ReferenceNumber) ? (object)DBNull.Value : model.ReferenceNumber);
                             command.Parameters.AddWithValue("@LastFourDigits", string.IsNullOrEmpty(model.LastFourDigits) ? (object)DBNull.Value : model.LastFourDigits);
@@ -279,6 +363,19 @@ END", connection))
                             command.Parameters.AddWithValue("@Notes", string.IsNullOrEmpty(model.Notes) ? (object)DBNull.Value : model.Notes);
                             command.Parameters.AddWithValue("@ProcessedBy", GetCurrentUserId());
                             command.Parameters.AddWithValue("@ProcessedByName", GetCurrentUserName());
+                            
+                            // Add GST-related parameters
+                            command.Parameters.AddWithValue("@GSTAmount", paymentGstAmount);
+                            command.Parameters.AddWithValue("@CGSTAmount", paymentCgstAmount);
+                            command.Parameters.AddWithValue("@SGSTAmount", paymentSgstAmount);
+                            command.Parameters.AddWithValue("@DiscAmount", model.DiscountAmount);
+                            command.Parameters.AddWithValue("@GST_Perc", paymentGstPercentage);
+                            command.Parameters.AddWithValue("@CGST_Perc", paymentCgstPercentage);
+                            command.Parameters.AddWithValue("@SGST_Perc", paymentSgstPercentage);
+                            command.Parameters.AddWithValue("@Amount_ExclGST", paymentAmountExclGST); // Amount excluding GST
+                            
+                            // Note: ForceApproval will be handled after payment creation if discount is applied
+                            
                             // If UPI selected store reference in ReferenceNumber if not provided separately
                             if (paymentMethodName.Equals("UPI", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(model.UPIReference))
                             {
@@ -296,23 +393,76 @@ END", connection))
                                     
                                     if (paymentId > 0)
                                     {
+                                        // DISCOUNT APPROVAL WORKFLOW: Force pending status if discount is applied
+                                        if (model.DiscountAmount > 0 && paymentStatus == 1)
+                                        {
+                                            reader.Close();
+                                            // Force payment to pending status for approval when discount is given
+                                            using (var forceApprovalCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                                UPDATE Payments 
+                                                SET Status = 0, 
+                                                    UpdatedAt = GETDATE(),
+                                                    Notes = CASE 
+                                                        WHEN Notes IS NULL OR Notes = '' THEN 'Discount applied - requires approval'
+                                                        ELSE Notes + ' | Discount applied - requires approval'
+                                                    END
+                                                WHERE Id = @PaymentId", connection))
+                                            {
+                                                forceApprovalCmd.Parameters.AddWithValue("@PaymentId", paymentId);
+                                                forceApprovalCmd.ExecuteNonQuery();
+                                            }
+                                            paymentStatus = 0; // Update local variable to reflect pending status
+                                        }
+                                        
                                         if (paymentStatus == 1) // Approved
                                         {
                                             TempData["SuccessMessage"] = "Payment processed successfully.";
                                         }
                                         else // Pending
                                         {
-                                            TempData["InfoMessage"] = "Payment requires approval. It has been saved as pending.";
+                                            if (model.DiscountAmount > 0)
+                                            {
+                                                TempData["InfoMessage"] = $"Payment with discount of ₹{model.DiscountAmount:F2} requires approval. It has been saved as pending.";
+                                            }
+                                            else
+                                            {
+                                                TempData["InfoMessage"] = "Payment requires approval. It has been saved as pending.";
+                                            }
                                         }
 
-                                        // If discount provided update order
+                                        // If discount provided update order with proper GST recalculation
                                         if (model.DiscountAmount > 0)
                                         {
-                                            reader.Close();
-                                            using (var discountCmd = new Microsoft.Data.SqlClient.SqlCommand(@"UPDATE Orders SET DiscountAmount = DiscountAmount + @Disc, UpdatedAt = GETDATE(), TotalAmount = Subtotal + TaxAmount + TipAmount - (DiscountAmount + @Disc) WHERE Id = @OrderId", connection))
+                                            if (!reader.IsClosed) reader.Close();
+                                            using (var discountCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                                -- Get current order values
+                                                DECLARE @CurrentDiscount DECIMAL(18,2);
+                                                DECLARE @CurrentSubtotal DECIMAL(18,2);
+                                                DECLARE @CurrentTipAmount DECIMAL(18,2);
+                                                
+                                                SELECT @CurrentDiscount = ISNULL(DiscountAmount, 0),
+                                                       @CurrentSubtotal = Subtotal,
+                                                       @CurrentTipAmount = ISNULL(TipAmount, 0)
+                                                FROM Orders 
+                                                WHERE Id = @OrderId;
+                                                
+                                                -- Calculate new values based on discount applied to subtotal
+                                                DECLARE @NewDiscountAmount DECIMAL(18,2) = @CurrentDiscount + @Disc;
+                                                DECLARE @NetSubtotal DECIMAL(18,2) = @CurrentSubtotal - @NewDiscountAmount;
+                                                DECLARE @NewGSTAmount DECIMAL(18,2) = ROUND(@NetSubtotal * @GSTPerc / 100, 2);
+                                                DECLARE @NewTotalAmount DECIMAL(18,2) = @NetSubtotal + @NewGSTAmount + @CurrentTipAmount;
+                                                
+                                                -- Update order with recalculated amounts
+                                                UPDATE Orders 
+                                                SET DiscountAmount = @NewDiscountAmount, 
+                                                    UpdatedAt = GETDATE(),
+                                                    TaxAmount = @NewGSTAmount,
+                                                    TotalAmount = @NewTotalAmount
+                                                WHERE Id = @OrderId", connection))
                                             {
                                                 discountCmd.Parameters.AddWithValue("@Disc", model.DiscountAmount);
                                                 discountCmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                                discountCmd.Parameters.AddWithValue("@GSTPerc", paymentGstPercentage);
                                                 discountCmd.ExecuteNonQuery();
                                             }
                                         }
@@ -505,6 +655,286 @@ END", connection))
             }
             
             return View(model);
+        }
+        
+        // Approve Payment
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ApprovePayment(int id)
+        {
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Payments 
+                        SET Status = 1, 
+                            UpdatedAt = GETDATE(),
+                            ProcessedBy = @ProcessedBy,
+                            ProcessedByName = @ProcessedByName
+                        WHERE Id = @PaymentId AND Status = 0;
+                        
+                        SELECT @@ROWCOUNT AS RowsAffected, OrderId FROM Payments WHERE Id = @PaymentId;", connection))
+                    {
+                        command.Parameters.AddWithValue("@PaymentId", id);
+                        command.Parameters.AddWithValue("@ProcessedBy", GetCurrentUserId());
+                        command.Parameters.AddWithValue("@ProcessedByName", GetCurrentUserName());
+                        
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                int rowsAffected = reader.GetInt32("RowsAffected");
+                                int orderId = reader.GetInt32("OrderId");
+                                
+                                if (rowsAffected > 0)
+                                {
+                                    TempData["SuccessMessage"] = "Payment approved successfully.";
+                                    
+                                    // Check if this was from dashboard
+                                    string returnUrl = Request.Headers["Referer"].ToString();
+                                    if (returnUrl.Contains("/Payment/Dashboard"))
+                                    {
+                                        return RedirectToAction("Dashboard");
+                                    }
+                                    return RedirectToAction("Index", new { id = orderId });
+                                }
+                                else
+                                {
+                                    TempData["ErrorMessage"] = "Payment not found or already processed.";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error approving payment {PaymentId}", id);
+                TempData["ErrorMessage"] = "An error occurred while approving the payment.";
+            }
+            
+            return RedirectToAction("Dashboard");
+        }
+        
+        // Reject Payment
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult RejectPayment(int id, string reason = null)
+        {
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Payments 
+                        SET Status = 2, 
+                            UpdatedAt = GETDATE(),
+                            ProcessedBy = @ProcessedBy,
+                            ProcessedByName = @ProcessedByName,
+                            Notes = CASE WHEN @Reason IS NOT NULL THEN 
+                                CASE WHEN Notes IS NOT NULL THEN Notes + ' | Rejected: ' + @Reason 
+                                ELSE 'Rejected: ' + @Reason END 
+                                ELSE Notes END
+                        WHERE Id = @PaymentId AND Status = 0;
+                        
+                        SELECT @@ROWCOUNT AS RowsAffected, OrderId FROM Payments WHERE Id = @PaymentId;", connection))
+                    {
+                        command.Parameters.AddWithValue("@PaymentId", id);
+                        command.Parameters.AddWithValue("@ProcessedBy", GetCurrentUserId());
+                        command.Parameters.AddWithValue("@ProcessedByName", GetCurrentUserName());
+                        command.Parameters.AddWithValue("@Reason", string.IsNullOrEmpty(reason) ? (object)DBNull.Value : reason);
+                        
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                int rowsAffected = reader.GetInt32("RowsAffected");
+                                int orderId = reader.GetInt32("OrderId");
+                                
+                                if (rowsAffected > 0)
+                                {
+                                    TempData["SuccessMessage"] = "Payment rejected successfully.";
+                                    
+                                    // Check if this was from dashboard
+                                    string returnUrl = Request.Headers["Referer"].ToString();
+                                    if (returnUrl.Contains("/Payment/Dashboard"))
+                                    {
+                                        return RedirectToAction("Dashboard");
+                                    }
+                                    return RedirectToAction("Index", new { id = orderId });
+                                }
+                                else
+                                {
+                                    TempData["ErrorMessage"] = "Payment not found or already processed.";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error rejecting payment {PaymentId}", id);
+                TempData["ErrorMessage"] = "An error occurred while rejecting the payment.";
+            }
+            
+            return RedirectToAction("Dashboard");
+        }
+        
+        // Approve Payment AJAX
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ApprovePaymentAjax(int id)
+        {
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Payments 
+                        SET Status = 1, 
+                            UpdatedAt = GETDATE(),
+                            ProcessedBy = @ProcessedBy,
+                            ProcessedByName = @ProcessedByName
+                        WHERE Id = @PaymentId AND Status = 0;
+                        
+                        SELECT @@ROWCOUNT AS RowsAffected, OrderId, 
+                               (SELECT OrderNumber FROM Orders WHERE Id = OrderId) AS OrderNumber
+                        FROM Payments WHERE Id = @PaymentId;", connection))
+                    {
+                        command.Parameters.AddWithValue("@PaymentId", id);
+                        command.Parameters.AddWithValue("@ProcessedBy", GetCurrentUserId());
+                        command.Parameters.AddWithValue("@ProcessedByName", GetCurrentUserName());
+                        
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                int rowsAffected = reader.GetInt32("RowsAffected");
+                                int orderId = reader.GetInt32("OrderId");
+                                string orderNumber = reader["OrderNumber"].ToString();
+                                
+                                if (rowsAffected > 0)
+                                {
+                                    return Json(new { 
+                                        success = true, 
+                                        message = $"Payment for order #{orderNumber} approved successfully.",
+                                        orderId = orderId,
+                                        orderNumber = orderNumber
+                                    });
+                                }
+                                else
+                                {
+                                    return Json(new { 
+                                        success = false, 
+                                        message = "Payment not found or already processed." 
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                return Json(new { 
+                                    success = false, 
+                                    message = "Payment not found." 
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error approving payment {PaymentId}", id);
+                return Json(new { 
+                    success = false, 
+                    message = "An error occurred while approving the payment." 
+                });
+            }
+        }
+        
+        // Reject Payment AJAX
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult RejectPaymentAjax(int id, string reason = null)
+        {
+            try
+            {
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                        UPDATE Payments 
+                        SET Status = 2, 
+                            UpdatedAt = GETDATE(),
+                            ProcessedBy = @ProcessedBy,
+                            ProcessedByName = @ProcessedByName,
+                            Notes = CASE WHEN @Reason IS NOT NULL THEN 
+                                CASE WHEN Notes IS NOT NULL THEN Notes + ' | Rejected: ' + @Reason 
+                                ELSE 'Rejected: ' + @Reason END 
+                                ELSE Notes END
+                        WHERE Id = @PaymentId AND Status = 0;
+                        
+                        SELECT @@ROWCOUNT AS RowsAffected, OrderId, 
+                               (SELECT OrderNumber FROM Orders WHERE Id = OrderId) AS OrderNumber
+                        FROM Payments WHERE Id = @PaymentId;", connection))
+                    {
+                        command.Parameters.AddWithValue("@PaymentId", id);
+                        command.Parameters.AddWithValue("@ProcessedBy", GetCurrentUserId());
+                        command.Parameters.AddWithValue("@ProcessedByName", GetCurrentUserName());
+                        command.Parameters.AddWithValue("@Reason", string.IsNullOrEmpty(reason) ? (object)DBNull.Value : reason);
+                        
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                int rowsAffected = reader.GetInt32("RowsAffected");
+                                int orderId = reader.GetInt32("OrderId");
+                                string orderNumber = reader["OrderNumber"].ToString();
+                                
+                                if (rowsAffected > 0)
+                                {
+                                    return Json(new { 
+                                        success = true, 
+                                        message = $"Payment for order #{orderNumber} rejected successfully.",
+                                        orderId = orderId,
+                                        orderNumber = orderNumber
+                                    });
+                                }
+                                else
+                                {
+                                    return Json(new { 
+                                        success = false, 
+                                        message = "Payment not found or already processed." 
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                return Json(new { 
+                                    success = false, 
+                                    message = "Payment not found." 
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error rejecting payment {PaymentId}", id);
+                return Json(new { 
+                    success = false, 
+                    message = "An error occurred while rejecting the payment." 
+                });
+            }
         }
         
         // Split Bill
@@ -933,6 +1363,60 @@ END", connection))
                         }
                     }
                 }
+
+                // Get pending payments that need approval
+                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                    SELECT 
+                        p.Id AS PaymentId,
+                        p.OrderId,
+                        o.OrderNumber,
+                        ISNULL(t.TableName, 'Takeout/Delivery') AS TableName,
+                        pm.Name AS PaymentMethodName,
+                        pm.DisplayName AS PaymentMethodDisplay,
+                        p.Amount,
+                        p.TipAmount,
+                        p.CreatedAt,
+                        p.ProcessedByName,
+                        p.ReferenceNumber,
+                        p.LastFourDigits,
+                        p.CardType,
+                        p.Notes,
+                        ISNULL(p.DiscAmount, 0) AS DiscountAmount,
+                        (p.Amount + ISNULL(p.DiscAmount, 0)) AS OriginalAmount
+                    FROM Payments p
+                    INNER JOIN Orders o ON p.OrderId = o.Id
+                    INNER JOIN PaymentMethods pm ON p.PaymentMethodId = pm.Id
+                    LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
+                    LEFT JOIN Tables t ON tt.TableId = t.Id
+                    WHERE p.Status = 0 -- Pending approval
+                    ORDER BY p.CreatedAt ASC", connection))
+                {
+                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            model.PendingPayments.Add(new PendingPaymentItem
+                            {
+                                PaymentId = reader.GetInt32("PaymentId"),
+                                OrderId = reader.GetInt32("OrderId"),
+                                OrderNumber = reader.GetString("OrderNumber"),
+                                TableName = GetMergedTableDisplayName((int)reader["OrderId"], reader.GetString("TableName")),
+                                PaymentMethodName = reader.GetString("PaymentMethodName"),
+                                PaymentMethodDisplay = reader.GetString("PaymentMethodDisplay"),
+                                Amount = reader.GetDecimal("Amount"),
+                                TipAmount = reader.GetDecimal("TipAmount"),
+                                CreatedAt = reader.GetDateTime("CreatedAt"),
+                                ProcessedByName = reader.IsDBNull("ProcessedByName") ? "" : reader.GetString("ProcessedByName"),
+                                ReferenceNumber = reader.IsDBNull("ReferenceNumber") ? "" : reader.GetString("ReferenceNumber"),
+                                LastFourDigits = reader.IsDBNull("LastFourDigits") ? "" : reader.GetString("LastFourDigits"),
+                                CardType = reader.IsDBNull("CardType") ? "" : reader.GetString("CardType"),
+                                Notes = reader.IsDBNull("Notes") ? "" : reader.GetString("Notes"),
+                                DiscountAmount = reader.GetDecimal("DiscountAmount"),
+                                OriginalAmount = reader.GetDecimal("OriginalAmount")
+                            });
+                        }
+                    }
+                }
             }
 
             return View(model);
@@ -1006,9 +1490,15 @@ END", connection))
                         // Move to next result set: Payments
                         reader.NextResult();
                         
+                        // Variables to store GST information from the most recent payment
+                        decimal totalGSTFromPayments = 0m;
+                        decimal totalCGSTFromPayments = 0m;
+                        decimal totalSGSTFromPayments = 0m;
+                        decimal gstPercentageFromPayments = 5.0m; // Default fallback
+                        
                         while (reader.Read())
                         {
-                            model.Payments.Add(new Payment
+                            var payment = new Payment
                             {
                                 Id = reader.GetInt32(0),
                                 PaymentMethodId = reader.GetInt32(1),
@@ -1023,8 +1513,48 @@ END", connection))
                                 AuthorizationCode = reader.IsDBNull(10) ? null : reader.GetString(10),
                                 Notes = reader.IsDBNull(11) ? null : reader.GetString(11),
                                 ProcessedByName = reader.IsDBNull(12) ? null : reader.GetString(12),
-                                CreatedAt = reader.GetDateTime(13)
-                            });
+                                CreatedAt = reader.GetDateTime(13),
+                                // Read GST information from database
+                                GSTAmount = reader.IsDBNull(14) ? null : reader.GetDecimal(14),
+                                CGSTAmount = reader.IsDBNull(15) ? null : reader.GetDecimal(15),
+                                SGSTAmount = reader.IsDBNull(16) ? null : reader.GetDecimal(16),
+                                DiscAmount = reader.IsDBNull(17) ? null : reader.GetDecimal(17),
+                                GST_Perc = reader.IsDBNull(18) ? null : reader.GetDecimal(18),
+                                CGST_Perc = reader.IsDBNull(19) ? null : reader.GetDecimal(19),
+                                SGST_Perc = reader.IsDBNull(20) ? null : reader.GetDecimal(20),
+                                Amount_ExclGST = reader.IsDBNull(21) ? null : reader.GetDecimal(21)
+                            };
+                            
+                            model.Payments.Add(payment);
+                            
+                            // If this is an approved payment with GST data, accumulate GST information
+                            if (payment.Status == 1 && payment.GSTAmount.HasValue)
+                            {
+                                totalGSTFromPayments += payment.GSTAmount.Value;
+                                totalCGSTFromPayments += payment.CGSTAmount ?? 0m;
+                                totalSGSTFromPayments += payment.SGSTAmount ?? 0m;
+                                if (payment.GST_Perc.HasValue)
+                                {
+                                    gstPercentageFromPayments = payment.GST_Perc.Value;
+                                }
+                            }
+                        }
+                        
+                        // Set GST information from payments data if available, otherwise calculate
+                        if (totalGSTFromPayments > 0)
+                        {
+                            model.GSTPercentage = gstPercentageFromPayments;
+                            model.CGSTAmount = totalCGSTFromPayments;
+                            model.SGSTAmount = totalSGSTFromPayments;
+                            
+                            // Update TaxAmount to match total GST from payments
+                            if (model.TaxAmount == 0)
+                            {
+                                model.TaxAmount = totalGSTFromPayments;
+                                // Recalculate total amount to include GST
+                                model.TotalAmount = model.Subtotal + model.TaxAmount - model.DiscountAmount + model.TipAmount;
+                                model.RemainingAmount = model.TotalAmount - model.PaidAmount;
+                            }
                         }
                         
                         // Move to next result set: Available payment methods
@@ -1042,6 +1572,62 @@ END", connection))
                                 RequiresApproval = reader.GetBoolean(5)
                             });
                         }
+                    }
+                }
+                
+                // Fallback GST calculation if no payment GST data available
+                if (model.GSTPercentage == 0 || (model.CGSTAmount == 0 && model.SGSTAmount == 0))
+                {
+                    try
+                    {
+                        using (Microsoft.Data.SqlClient.SqlCommand gstCmd = new Microsoft.Data.SqlClient.SqlCommand(
+                            "SELECT DefaultGSTPercentage FROM dbo.RestaurantSettings", connection))
+                        {
+                            var result = gstCmd.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                model.GSTPercentage = Convert.ToDecimal(result);
+                            }
+                            else
+                            {
+                                model.GSTPercentage = 5.0m;
+                            }
+                        }
+                        
+                        decimal gstAmount = model.TaxAmount > 0 ? model.TaxAmount : 
+                            Math.Round(model.Subtotal * model.GSTPercentage / 100m, 2, MidpointRounding.AwayFromZero);
+                        
+                        // Update TaxAmount if it was 0 (calculated GST)
+                        if (model.TaxAmount == 0 && gstAmount > 0)
+                        {
+                            model.TaxAmount = gstAmount;
+                        }
+                        
+                        model.CGSTAmount = Math.Round(gstAmount / 2m, 2, MidpointRounding.AwayFromZero);
+                        model.SGSTAmount = gstAmount - model.CGSTAmount;
+                        
+                        // Recalculate total amount to include GST
+                        model.TotalAmount = model.Subtotal + model.TaxAmount - model.DiscountAmount + model.TipAmount;
+                        model.RemainingAmount = model.TotalAmount - model.PaidAmount;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Error calculating fallback GST for order {OrderId}", model.OrderId);
+                        model.GSTPercentage = 5.0m;
+                        decimal fallbackGst = Math.Round(model.Subtotal * 0.05m, 2, MidpointRounding.AwayFromZero);
+                        
+                        // Update TaxAmount with calculated GST
+                        if (model.TaxAmount == 0)
+                        {
+                            model.TaxAmount = fallbackGst;
+                        }
+                        
+                        model.CGSTAmount = Math.Round(fallbackGst / 2m, 2, MidpointRounding.AwayFromZero);
+                        model.SGSTAmount = fallbackGst - model.CGSTAmount;
+                        
+                        // Recalculate total amount to include GST
+                        model.TotalAmount = model.Subtotal + model.TaxAmount - model.DiscountAmount + model.TipAmount;
+                        model.RemainingAmount = model.TotalAmount - model.PaidAmount;
                     }
                 }
                 
@@ -1078,55 +1664,6 @@ END", connection))
                             });
                         }
                     }
-                }
-                
-                // Calculate GST breakdown
-                try
-                {
-                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(
-                        "SELECT DefaultGSTPercentage FROM dbo.RestaurantSettings", connection))
-                    {
-                        var result = command.ExecuteScalar();
-                        if (result != null && result != DBNull.Value)
-                        {
-                            model.GSTPercentage = Convert.ToDecimal(result);
-                        }
-                        else
-                        {
-                            model.GSTPercentage = 5.0m; // Default fallback to 5%
-                        }
-                    }
-                    
-                    // Calculate GST amount based on current TaxAmount from stored procedure
-                    decimal gstAmount = model.TaxAmount;
-                    
-                    // If TaxAmount is 0 but we have a subtotal, calculate GST
-                    if (gstAmount == 0 && model.Subtotal > 0)
-                    {
-                        gstAmount = Math.Round(model.Subtotal * model.GSTPercentage / 100m, 2, MidpointRounding.AwayFromZero);
-                        model.TaxAmount = gstAmount; // Update the TaxAmount
-                    }
-                    
-                    // Split GST into CGST and SGST (equal split)
-                    model.CGSTAmount = Math.Round(gstAmount / 2m, 2, MidpointRounding.AwayFromZero);
-                    model.SGSTAmount = gstAmount - model.CGSTAmount; // Ensures total adds up exactly
-                    
-                    // Recalculate Total = Subtotal + GST - Discount + Tip
-                    model.TotalAmount = model.Subtotal + gstAmount - model.DiscountAmount + model.TipAmount;
-                    model.RemainingAmount = model.TotalAmount - model.PaidAmount;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Error calculating GST for order {OrderId}", model.OrderId);
-                    // Fallback values
-                    model.GSTPercentage = 5.0m;
-                    decimal fallbackGst = Math.Round(model.Subtotal * 0.05m, 2, MidpointRounding.AwayFromZero);
-                    model.TaxAmount = fallbackGst;
-                    model.CGSTAmount = Math.Round(fallbackGst / 2m, 2, MidpointRounding.AwayFromZero);
-                    model.SGSTAmount = fallbackGst - model.CGSTAmount;
-                    // Recalculate Total with fallback GST
-                    model.TotalAmount = model.Subtotal + fallbackGst - model.DiscountAmount + model.TipAmount;
-                    model.RemainingAmount = model.TotalAmount - model.PaidAmount;
                 }
             }
             
