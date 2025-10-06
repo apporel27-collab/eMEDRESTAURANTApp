@@ -48,6 +48,9 @@ namespace RestaurantManagementSystem.Models
         public string? MergedTableNames { get; set; }
         public bool IsPartOfMergedOrder { get; set; } = false;
 
+    // Populated at controller level for UI: list of other tables in the merged set (excludes self)
+    public string? DisplayMergedWith { get; set; }
+
         // Calculated property to check if the table is suitable for a given party size
         public bool IsSuitableFor(int partySize)
         {

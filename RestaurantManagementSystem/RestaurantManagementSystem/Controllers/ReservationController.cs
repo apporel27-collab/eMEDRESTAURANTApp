@@ -511,33 +511,64 @@ namespace RestaurantManagementSystem.Controllers
             {
                 var tables = GetAllTables();
 
-                // Ensure secondary merged tables also show as occupied/merged if they appear inside another table's merged list
+                // Rebuild merged table relationships directly from active orders to ensure symmetry (each table lists others in its merge group)
                 try
                 {
-                    var mergedSets = tables
-                        .Where(t => t.IsPartOfMergedOrder && !string.IsNullOrEmpty(t.MergedTableNames))
-                        .Select(t => new { Host = t, Names = t.MergedTableNames!.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) })
-                        .ToList();
+                    var tableLookup = tables.ToDictionary(t => t.TableNumber, t => t, StringComparer.OrdinalIgnoreCase);
 
-                    // Flatten unique table numbers that participate in any merged order
-                    var mergedNumbers = new HashSet<string>(mergedSets.SelectMany(s => s.Names));
-
-                    foreach (var tbl in tables)
+                    // Query active order -> table memberships (only orders with >1 table are merges)
+                    using (var con = new Microsoft.Data.SqlClient.SqlConnection(_config.GetConnectionString("DefaultConnection")))
                     {
-                        if (!tbl.IsPartOfMergedOrder && mergedNumbers.Contains(tbl.TableNumber))
+                        con.Open();
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT o.Id AS OrderId, t.TableNumber
+                                FROM Orders o
+                                INNER JOIN OrderTables ot ON o.Id = ot.OrderId
+                                INNER JOIN Tables t ON ot.TableId = t.Id
+                                WHERE o.Status IN (0,1,2)
+                                ORDER BY o.Id", con))
                         {
-                            tbl.IsPartOfMergedOrder = true;
-                            // Only override status if currently Available to reflect occupied via merge
-                            if (tbl.Status == TableStatus.Available)
+                            var orderTables = new Dictionary<int, List<string>>();
+                            using (var reader = cmd.ExecuteReader())
                             {
-                                tbl.Status = TableStatus.Occupied;
+                                while (reader.Read())
+                                {
+                                    var orderId = reader.GetInt32(0);
+                                    var tblNum = reader.IsDBNull(1) ? null : reader.GetString(1);
+                                    if (string.IsNullOrEmpty(tblNum)) continue;
+                                    if (!orderTables.TryGetValue(orderId, out var list))
+                                    {
+                                        list = new List<string>();
+                                        orderTables[orderId] = list;
+                                    }
+                                    if (!list.Contains(tblNum, StringComparer.OrdinalIgnoreCase))
+                                        list.Add(tblNum);
+                                }
+                            }
+
+                            foreach (var kvp in orderTables)
+                            {
+                                if (kvp.Value.Count <= 1) continue; // not a merge
+                                var group = kvp.Value;
+                                foreach (var tblNum in group)
+                                {
+                                    if (tableLookup.TryGetValue(tblNum, out var tbl))
+                                    {
+                                        tbl.IsPartOfMergedOrder = true;
+                                        if (tbl.Status == TableStatus.Available)
+                                            tbl.Status = TableStatus.Occupied; // show occupied when merged into active order
+
+                                        var others = group.Where(n => !string.Equals(n, tbl.TableNumber, StringComparison.OrdinalIgnoreCase));
+                                        var display = string.Join(" + ", others);
+                                        tbl.DisplayMergedWith = string.IsNullOrWhiteSpace(display) ? null : display;
+                                    }
+                                }
                             }
                         }
                     }
                 }
                 catch (Exception mergeEx)
                 {
-                    Console.WriteLine($"Merged table post-processing failed: {mergeEx.Message}");
+                    Console.WriteLine($"Merged table relationship build failed: {mergeEx.Message}");
                 }
 
                 return View(tables.OrderBy(t => t.TableNumber));

@@ -69,9 +69,24 @@
                                     }
                                 </td>
                                 <td>
-                                    @if (!string.IsNullOrEmpty(table.MergedTableNames))
+                                    @if (!string.IsNullOrEmpty(table.DisplayMergedWith))
                                     {
-                                        <span class="text-primary">@table.MergedTableNames</span>
+                                        <span class="text-primary">@table.DisplayMergedWith</span>
+                                    }
+                                    else if (!string.IsNullOrEmpty(table.MergedTableNames))
+                                    {
+                                        // Fallback (legacy) - remove self name if present
+                                        var parts = table.MergedTableNames.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                                        var filtered = parts.Where(p => !string.Equals(p, table.TableNumber, StringComparison.OrdinalIgnoreCase));
+                                        var show = string.Join(" + ", filtered);
+                                        if (string.IsNullOrEmpty(show))
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-primary">@show</span>
+                                        }
                                     }
                                     else
                                     {
