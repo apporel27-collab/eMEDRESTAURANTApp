@@ -510,7 +510,37 @@ namespace RestaurantManagementSystem.Controllers
             try
             {
                 var tables = GetAllTables();
-                return View(tables);
+
+                // Ensure secondary merged tables also show as occupied/merged if they appear inside another table's merged list
+                try
+                {
+                    var mergedSets = tables
+                        .Where(t => t.IsPartOfMergedOrder && !string.IsNullOrEmpty(t.MergedTableNames))
+                        .Select(t => new { Host = t, Names = t.MergedTableNames!.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) })
+                        .ToList();
+
+                    // Flatten unique table numbers that participate in any merged order
+                    var mergedNumbers = new HashSet<string>(mergedSets.SelectMany(s => s.Names));
+
+                    foreach (var tbl in tables)
+                    {
+                        if (!tbl.IsPartOfMergedOrder && mergedNumbers.Contains(tbl.TableNumber))
+                        {
+                            tbl.IsPartOfMergedOrder = true;
+                            // Only override status if currently Available to reflect occupied via merge
+                            if (tbl.Status == TableStatus.Available)
+                            {
+                                tbl.Status = TableStatus.Occupied;
+                            }
+                        }
+                    }
+                }
+                catch (Exception mergeEx)
+                {
+                    Console.WriteLine($"Merged table post-processing failed: {mergeEx.Message}");
+                }
+
+                return View(tables.OrderBy(t => t.TableNumber));
             }
             catch (Exception ex)
             {
