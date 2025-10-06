@@ -491,5 +491,72 @@ namespace RestaurantManagementSystem.Controllers
                 Console.WriteLine($"Error loading discount report: {ex.Message}");
             }
         }
+
+        public async Task<IActionResult> GSTBreakup()
+        {
+            ViewData["Title"] = "GST Breakup Report";
+            var model = new GSTBreakupReportViewModel();
+            await LoadGSTBreakupReportAsync(model);
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GSTBreakup(GSTBreakupReportFilter filter)
+        {
+            ViewData["Title"] = "GST Breakup Report";
+            var model = new GSTBreakupReportViewModel { Filter = filter };
+            await LoadGSTBreakupReportAsync(model);
+            return View(model);
+        }
+
+        private async Task LoadGSTBreakupReportAsync(GSTBreakupReportViewModel model)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+                using var command = new SqlCommand("usp_GetGSTBreakupReport", connection)
+                { CommandType = CommandType.StoredProcedure };
+                command.Parameters.AddWithValue("@StartDate", (object?)model.Filter.StartDate?.Date ?? DBNull.Value);
+                command.Parameters.AddWithValue("@EndDate", (object?)model.Filter.EndDate?.Date ?? DBNull.Value);
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    model.Summary = new GSTBreakupReportSummary
+                    {
+                        InvoiceCount = reader.IsDBNull(reader.GetOrdinal("InvoiceCount")) ? 0 : reader.GetInt32(reader.GetOrdinal("InvoiceCount")),
+                        TotalTaxableValue = reader.IsDBNull(reader.GetOrdinal("TotalTaxableValue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("TotalTaxableValue")),
+                        TotalDiscount = reader.IsDBNull(reader.GetOrdinal("TotalDiscount")) ? 0 : reader.GetDecimal(reader.GetOrdinal("TotalDiscount")),
+                        TotalCGST = reader.IsDBNull(reader.GetOrdinal("TotalCGST")) ? 0 : reader.GetDecimal(reader.GetOrdinal("TotalCGST")),
+                        TotalSGST = reader.IsDBNull(reader.GetOrdinal("TotalSGST")) ? 0 : reader.GetDecimal(reader.GetOrdinal("TotalSGST")),
+                        NetAmount = reader.IsDBNull(reader.GetOrdinal("NetAmount")) ? 0 : reader.GetDecimal(reader.GetOrdinal("NetAmount")),
+                        AverageTaxablePerInvoice = reader.IsDBNull(reader.GetOrdinal("AverageTaxablePerInvoice")) ? 0 : reader.GetDecimal(reader.GetOrdinal("AverageTaxablePerInvoice")),
+                        AverageGSTPerInvoice = reader.IsDBNull(reader.GetOrdinal("AverageGSTPerInvoice")) ? 0 : reader.GetDecimal(reader.GetOrdinal("AverageGSTPerInvoice"))
+                    };
+                }
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        model.Rows.Add(new GSTBreakupReportRow
+                        {
+                            PaymentDate = reader.IsDBNull(reader.GetOrdinal("PaymentDate")) ? DateTime.MinValue : reader.GetDateTime(reader.GetOrdinal("PaymentDate")),
+                            OrderNumber = reader.IsDBNull(reader.GetOrdinal("OrderNumber")) ? string.Empty : reader.GetString(reader.GetOrdinal("OrderNumber")),
+                            TaxableValue = reader.IsDBNull(reader.GetOrdinal("TaxableValue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("TaxableValue")),
+                            DiscountAmount = reader.IsDBNull(reader.GetOrdinal("DiscountAmount")) ? 0 : reader.GetDecimal(reader.GetOrdinal("DiscountAmount")),
+                            CGSTPercentage = reader.IsDBNull(reader.GetOrdinal("CGSTPercentage")) ? 0 : reader.GetDecimal(reader.GetOrdinal("CGSTPercentage")),
+                            CGSTAmount = reader.IsDBNull(reader.GetOrdinal("CGSTAmount")) ? 0 : reader.GetDecimal(reader.GetOrdinal("CGSTAmount")),
+                            SGSTPercentage = reader.IsDBNull(reader.GetOrdinal("SGSTPercentage")) ? 0 : reader.GetDecimal(reader.GetOrdinal("SGSTPercentage")),
+                            SGSTAmount = reader.IsDBNull(reader.GetOrdinal("SGSTAmount")) ? 0 : reader.GetDecimal(reader.GetOrdinal("SGSTAmount")),
+                            InvoiceTotal = reader.IsDBNull(reader.GetOrdinal("InvoiceTotal")) ? 0 : reader.GetDecimal(reader.GetOrdinal("InvoiceTotal"))
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading GST Breakup report: {ex.Message}");
+            }
+        }
     }
 }
