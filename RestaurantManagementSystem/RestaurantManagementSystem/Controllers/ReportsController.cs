@@ -166,6 +166,13 @@ namespace RestaurantManagementSystem.Controllers
                     Value = viewModel.Filter.UserId.HasValue ? viewModel.Filter.UserId.Value : DBNull.Value 
                 });
                 
+                // Clear existing collections to avoid accumulation when posting back
+                viewModel.DailySales.Clear();
+                viewModel.TopMenuItems.Clear();
+                viewModel.ServerPerformance.Clear();
+                viewModel.OrderStatusData.Clear();
+                viewModel.HourlySalesPattern.Clear();
+
                 using var reader = await command.ExecuteReaderAsync();
                 
                 // Read Summary Statistics (First Result Set)
@@ -205,15 +212,23 @@ namespace RestaurantManagementSystem.Controllers
                 {
                     while (await reader.ReadAsync())
                     {
-                        viewModel.TopMenuItems.Add(new TopMenuItem
+                        try
                         {
-                            ItemName = reader.GetString("ItemName"),
-                            MenuItemId = reader.GetInt32("MenuItemId"),
-                            TotalQuantitySold = reader.GetInt32("TotalQuantitySold"),
-                            TotalRevenue = reader.GetDecimal("TotalRevenue"),
-                            AveragePrice = reader.GetDecimal("AveragePrice"),
-                            OrderCount = reader.GetInt32("OrderCount")
-                        });
+                            // Defensive: ensure no null related exceptions break entire report
+                            viewModel.TopMenuItems.Add(new TopMenuItem
+                            {
+                                ItemName = reader.IsDBNull(reader.GetOrdinal("ItemName")) ? "" : reader.GetString(reader.GetOrdinal("ItemName")),
+                                MenuItemId = reader.IsDBNull(reader.GetOrdinal("MenuItemId")) ? 0 : reader.GetInt32(reader.GetOrdinal("MenuItemId")),
+                                TotalQuantitySold = reader.IsDBNull(reader.GetOrdinal("TotalQuantitySold")) ? 0 : reader.GetInt32(reader.GetOrdinal("TotalQuantitySold")),
+                                TotalRevenue = reader.IsDBNull(reader.GetOrdinal("TotalRevenue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("TotalRevenue")),
+                                AveragePrice = reader.IsDBNull(reader.GetOrdinal("AveragePrice")) ? 0 : reader.GetDecimal(reader.GetOrdinal("AveragePrice")),
+                                OrderCount = reader.IsDBNull(reader.GetOrdinal("OrderCount")) ? 0 : reader.GetInt32(reader.GetOrdinal("OrderCount"))
+                            });
+                        }
+                        catch (Exception exItem)
+                        {
+                            Console.WriteLine($"TopMenuItems row skipped: {exItem.Message}");
+                        }
                     }
                 }
                 
