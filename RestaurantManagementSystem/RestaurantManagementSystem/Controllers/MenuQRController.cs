@@ -48,11 +48,14 @@ namespace RestaurantManagementSystem.Controllers
                     m.ImagePath,
                     m.IsAvailable,
                     m.CategoryId,
-                    c.Name as CategoryName
+                    c.Name as CategoryName,
+                    m.SubCategoryId,
+                    sc.Name as SubCategoryName
                 FROM MenuItems m
                 INNER JOIN Categories c ON m.CategoryId = c.Id
+                LEFT JOIN SubCategories sc ON m.SubCategoryId = sc.Id
                 WHERE m.IsAvailable = 1
-                ORDER BY c.Name, m.Name
+                ORDER BY c.Name, sc.Name, m.Name
             ").ToListAsync();
 
             var categories = menuItemsRaw
@@ -62,18 +65,25 @@ namespace RestaurantManagementSystem.Controllers
                     CategoryId = g.Key.CategoryId,
                     CategoryName = g.Key.CategoryName,
                     CategoryDescription = "",
-                    MenuItems = g.Select(m => new PublicMenuItem
-                    {
-                        MenuItemId = m.Id,
-                        Name = m.Name,
-                        Description = m.Description ?? "",
-                        Price = m.Price,
-                        ImageUrl = m.ImagePath,
-                        IsAvailable = m.IsAvailable,
-                        IsVegetarian = false, // Default value - can be enhanced later
-                        IsSpicy = false, // Default value - can be enhanced later
-                        CategoryName = m.CategoryName
-                    }).ToList()
+                    SubCategories = g.GroupBy(m => new { m.SubCategoryId, m.SubCategoryName })
+                        .Select(subg => new SubCategoryMenuItems
+                        {
+                            SubCategoryId = subg.Key.SubCategoryId,
+                            SubCategoryName = subg.Key.SubCategoryName,
+                            MenuItems = subg.Select(m => new PublicMenuItem
+                            {
+                                MenuItemId = m.Id,
+                                Name = m.Name,
+                                Description = m.Description ?? "",
+                                Price = m.Price,
+                                ImageUrl = m.ImagePath,
+                                IsAvailable = m.IsAvailable,
+                                IsVegetarian = false,
+                                IsSpicy = false,
+                                CategoryName = m.CategoryName,
+                                SubCategoryName = m.SubCategoryName
+                            }).ToList()
+                        }).ToList()
                 })
                 .ToList();
 

@@ -33,11 +33,12 @@
         }
         
         .restaurant-logo {
-            width: 60px;
-            height: 60px;
-            border-radius: 12px;
+            width: 100px;
+            height: 100px;
+            border-radius: 18px;
             border: 2px solid rgba(255,255,255,0.2);
             object-fit: cover;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
         }
         
         .restaurant-info h1 {
@@ -349,7 +350,7 @@
     <div class="container">
         @if (Model.MenuCategories.Any())
         {
-            @foreach (var category in Model.MenuCategories)
+            foreach (var category in Model.MenuCategories)
             {
                 <div class="menu-category">
                     <div class="category-header">
@@ -359,45 +360,59 @@
                             <div class="category-description">@category.CategoryDescription</div>
                         }
                     </div>
-                    
-                    <div class="menu-items">
-                        @if (category.MenuItems.Any())
+                    @if (category.SubCategories != null && category.SubCategories.Any())
+                    {
+                        foreach (var subcat in category.SubCategories)
                         {
-                            @foreach (var item in category.MenuItems)
-                            {
-                                <div class="menu-item">
-                                    <div class="menu-item-info">
-                                        <div class="menu-item-name">
-                                            @item.Name
-                                            <div class="menu-item-badges">
-                                                @if (item.IsVegetarian)
+                            <div class="ps-3 pb-2 pt-2">
+                                <h5 class="fw-bold mb-2" style="color:#2980b9">@subcat.SubCategoryName</h5>
+                                <div class="menu-items">
+                                    @if (subcat.MenuItems.Any())
+                                    {
+                                        foreach (var item in subcat.MenuItems)
+                                        {
+                                            <div class="menu-item">
+                                                <div class="menu-item-info">
+                                                    <div class="menu-item-name">
+                                                        @item.Name
+                                                        <div class="menu-item-badges">
+                                                            @if (item.IsVegetarian)
+                                                            {
+                                                                <span class="badge-veg"><i class="fas fa-leaf"></i> VEG</span>
+                                                            }
+                                                            @if (item.IsSpicy)
+                                                            {
+                                                                <span class="badge-spicy"><i class="fas fa-fire"></i> SPICY</span>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                    @if (!string.IsNullOrEmpty(item.Description))
+                                                    {
+                                                        <div class="menu-item-description">@item.Description</div>
+                                                    }
+                                                </div>
+                                                <div class="menu-item-price">₹@item.Price.ToString("0.00")</div>
+                                                @if (!string.IsNullOrEmpty(item.ImageUrl))
                                                 {
-                                                    <span class="badge-veg"><i class="fas fa-leaf"></i> VEG</span>
-                                                }
-                                                @if (item.IsSpicy)
-                                                {
-                                                    <span class="badge-spicy"><i class="fas fa-fire"></i> SPICY</span>
+                                                    <img src="@item.ImageUrl" alt="@item.Name" class="menu-item-image" />
                                                 }
                                             </div>
-                                        </div>
-                                        @if (!string.IsNullOrEmpty(item.Description))
-                                        {
-                                            <div class="menu-item-description">@item.Description</div>
                                         }
-                                    </div>
-                                    <div class="menu-item-price">₹@item.Price.ToString("0.00")</div>
-                                    @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                    }
+                                    else
                                     {
-                                        <img src="@item.ImageUrl" alt="@item.Name" class="menu-item-image" />
+                                        <div class="no-items">No items available in this subcategory.</div>
                                     }
                                 </div>
-                            }
+                            </div>
                         }
-                        else
-                        {
-                            <div class="no-items">No items available in this category.</div>
-                        }
-                    </div>
+                    }
+                    else
+                    {
+                        <div class="menu-items">
+                            <div class="no-items">No subcategories available in this category.</div>
+                        </div>
+                    }
                 </div>
             }
         }
