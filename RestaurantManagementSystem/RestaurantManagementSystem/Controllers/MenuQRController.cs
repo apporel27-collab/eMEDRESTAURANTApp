@@ -41,6 +41,7 @@ namespace RestaurantManagementSystem.Controllers
             viewModel.RestaurantInfo = GetRestaurantInfo();
 
             // Use raw SQL to get menu items to avoid EF column issues
+            // Show all menu items (both available and unavailable) for public menu
             var menuItemsRaw = await _context.Database.SqlQueryRaw<MenuItemDto>(@"
                 SELECT 
                     m.Id,
@@ -56,15 +57,18 @@ namespace RestaurantManagementSystem.Controllers
                 FROM MenuItems m
                 INNER JOIN Categories c ON m.CategoryId = c.Id
                 LEFT JOIN dbo.SubCategories sc ON m.SubCategoryId = sc.Id
-                WHERE m.IsAvailable = 1
                 ORDER BY c.Name, sc.Name, m.Name
             ").ToListAsync();
 
             var categories = menuItemsRaw
                 .GroupBy(m => new { m.CategoryId, m.CategoryName })
                 .Select(g => {
-                    var subcategoriesWithItems = g.GroupBy(m => new { m.SubCategoryId, m.SubCategoryName })
-                        .Where(subg => subg.Key.SubCategoryId.HasValue) // Only items with actual subcategories
+                    // Group items by subcategory (including null subcategory)
+                    var allGroupedItems = g.GroupBy(m => new { m.SubCategoryId, m.SubCategoryName });
+                    
+                    // Items WITH subcategories
+                    var subcategoriesWithItems = allGroupedItems
+                        .Where(subg => subg.Key.SubCategoryId.HasValue)
                         .Select(subg => new SubCategoryMenuItems
                         {
                             SubCategoryId = subg.Key.SubCategoryId,
@@ -84,13 +88,10 @@ namespace RestaurantManagementSystem.Controllers
                             }).ToList()
                         }).ToList();
 
-                    return new CategoryMenuItems
-                    {
-                        CategoryId = g.Key.CategoryId,
-                        CategoryName = g.Key.CategoryName,
-                        CategoryDescription = "",
-                        // Only populate direct MenuItems if there are no subcategories
-                        MenuItems = !subcategoriesWithItems.Any() ? g.Select(m => new PublicMenuItem
+                    // Items WITHOUT subcategories (show directly under category)
+                    var directCategoryItems = allGroupedItems
+                        .Where(subg => !subg.Key.SubCategoryId.HasValue)
+                        .SelectMany(subg => subg.Select(m => new PublicMenuItem
                         {
                             MenuItemId = m.Id,
                             Name = m.Name,
@@ -102,7 +103,15 @@ namespace RestaurantManagementSystem.Controllers
                             IsSpicy = false,
                             CategoryName = m.CategoryName,
                             SubCategoryName = m.SubCategoryName
-                        }).ToList() : new List<PublicMenuItem>(),
+                        })).ToList();
+
+                    return new CategoryMenuItems
+                    {
+                        CategoryId = g.Key.CategoryId,
+                        CategoryName = g.Key.CategoryName,
+                        CategoryDescription = "",
+                        // Always show direct category items (items without subcategories)
+                        MenuItems = directCategoryItems,
                         SubCategories = subcategoriesWithItems
                     };
                 })

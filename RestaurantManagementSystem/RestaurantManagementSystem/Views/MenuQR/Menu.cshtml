@@ -195,6 +195,32 @@
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
         }
         
+        .menu-item.unavailable {
+            opacity: 0.6;
+            background-color: #f8f9fa !important;
+        }
+        
+        .menu-item.unavailable .menu-item-name {
+            color: #6c757d;
+            text-decoration: line-through;
+        }
+        
+        .menu-item.unavailable .menu-item-price {
+            background: #f1f3f4;
+            color: #6c757d;
+            border-color: #dee2e6;
+        }
+        
+        .unavailable-badge {
+            background: #6c757d;
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.15rem 0.35rem;
+            border-radius: 8px;
+            margin-left: 0.25rem;
+            font-weight: 600;
+        }
+        
         .no-items {
             text-align: center;
             color: #6c757d;
@@ -379,11 +405,15 @@
                                     {
                                         foreach (var item in subcat.MenuItems)
                                         {
-                                            <div class="menu-item">
+                                            <div class="menu-item @(item.IsAvailable ? "" : "unavailable")">
                                                 <div class="menu-item-info">
                                                     <div class="menu-item-name">
                                                         @item.Name
                                                         <div class="menu-item-badges">
+                                                            @if (!item.IsAvailable)
+                                                            {
+                                                                <span class="unavailable-badge">UNAVAILABLE</span>
+                                                            }
                                                             @if (item.IsVegetarian)
                                                             {
                                                                 <span class="badge-veg"><i class="fas fa-leaf"></i> VEG</span>
@@ -418,11 +448,15 @@
                         <div class="menu-items">
                             @foreach (var item in category.MenuItems)
                             {
-                                <div class="menu-item">
+                                <div class="menu-item @(item.IsAvailable ? "" : "unavailable")">
                                     <div class="menu-item-info">
                                         <div class="menu-item-name">
                                             @item.Name
                                             <div class="menu-item-badges">
+                                                @if (!item.IsAvailable)
+                                                {
+                                                    <span class="unavailable-badge">UNAVAILABLE</span>
+                                                }
                                                 @if (item.IsVegetarian)
                                                 {
                                                     <span class="badge-veg"><i class="fas fa-leaf"></i> VEG</span>
