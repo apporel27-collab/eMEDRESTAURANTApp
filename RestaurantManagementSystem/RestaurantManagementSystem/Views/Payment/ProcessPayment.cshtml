@@ -283,6 +283,26 @@
                 } else {
                     $('.payment-icon').removeClass('text-primary');
                 }
+                
+                // Handle Complementary payment method (automatic 100% discount)
+                if (text.includes('complementary')) {
+                    // Select percent mode and set to 100%
+                    $('#discountModePercent').prop('checked', true);
+                    $('#discountPrefix').text('%');
+                    $('#discountEntry').val('100');
+                    
+                    // Force recalculation of discount and amount
+                    recalcDiscountAndAmount();
+                    
+                    // Hide card fields
+                    $('#cardPaymentFields').hide();
+                    $('#upiReferenceWrapper').hide();
+                    $('#UPIReference').val('');
+                    
+                    return; // Skip the AJAX call
+                }
+                
+                // Handle UPI reference field
                 if (text.includes('upi')) {
                     $('#upiReferenceWrapper').slideDown(200);
                 } else {
@@ -290,33 +310,45 @@
                     $('#UPIReference').val('');
                 }
                 
-                // We'll use AJAX to get payment method details or store this in data attributes
-                $.ajax({
-                    url: '/Payment/GetPaymentMethodDetails',
-                    type: 'GET',
-                    data: { id: $(this).val() },
-                    success: function(data) {
-                        if (data && data.requiresCardInfo) {
-                            $('#cardPaymentFields').slideDown(300);
-                            
+                // Immediately show card fields for card payments without waiting for AJAX
+                var paymentMethodText = selectedOption.text().toLowerCase();
+                if (paymentMethodText.includes('card') || paymentMethodText.includes('credit') || paymentMethodText.includes('debit')) {
+                    $('#cardPaymentFields').show(); // Show immediately
+                    
+                    // Still make the AJAX call to get additional details, but don't wait for it to show the fields
+                    $.ajax({
+                        url: '/Payment/GetPaymentMethodDetails',
+                        type: 'GET',
+                        data: { id: $(this).val() },
+                        success: function(data) {
                             // Update card icons based on card type if available
-                            if (data.cardTypes) {
+                            if (data && data.cardTypes) {
                                 highlightCardIcons(data.cardTypes);
                             }
-                        } else {
-                            $('#cardPaymentFields').slideUp(300);
                         }
-                    },
-                    error: function() {
-                        // Fallback: simple check if payment method contains "card"
-                        var paymentMethodText = selectedOption.text().toLowerCase();
-                        if (paymentMethodText.includes('card') || paymentMethodText.includes('credit') || paymentMethodText.includes('debit')) {
-                            $('#cardPaymentFields').slideDown(300);
-                        } else {
-                            $('#cardPaymentFields').slideUp(300);
+                    });
+                } else {
+                    // For non-card methods, hide card fields
+                    $('#cardPaymentFields').hide();
+                    
+                    // Only make AJAX call if not a card and not complementary
+                    $.ajax({
+                        url: '/Payment/GetPaymentMethodDetails',
+                        type: 'GET',
+                        data: { id: $(this).val() },
+                        success: function(data) {
+                            // In case the API indicates it requires card info
+                            if (data && data.requiresCardInfo) {
+                                $('#cardPaymentFields').show();
+                                
+                                // Update card icons based on card type if available
+                                if (data.cardTypes) {
+                                    highlightCardIcons(data.cardTypes);
+                                }
+                            }
                         }
-                    }
-                });
+                    });
+                }
             });
             
             // Quick amount buttons

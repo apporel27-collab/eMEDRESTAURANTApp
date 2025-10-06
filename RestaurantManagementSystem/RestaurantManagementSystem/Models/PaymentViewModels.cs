@@ -186,6 +186,7 @@ namespace RestaurantManagementSystem.Models
         public decimal TotalPayable { get; set; } // Total amount including GST
         public decimal TotalPaid { get; set; }
         public decimal DueAmount { get; set; }
+        public decimal GSTAmount { get; set; } // GST amount for the payment
         public DateTime PaymentDate { get; set; }
         public int OrderStatus { get; set; }
         public string OrderStatusDisplay { get; set; }

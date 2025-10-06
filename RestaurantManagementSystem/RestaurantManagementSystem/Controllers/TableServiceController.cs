@@ -167,8 +167,7 @@ namespace RestaurantManagementSystem.Controllers
                     using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         UPDATE TableTurnovers 
                         SET Status = 5, -- Departed
-                            DepartedAt = GETDATE(),
-                            UpdatedAt = GETDATE()
+                            DepartedAt = GETDATE()
                         WHERE Status < 5 -- Not already departed
                         AND DATEDIFF(MINUTE, SeatedAt, GETDATE()) > 480 -- More than 8 hours old
                         AND NOT EXISTS (
@@ -223,8 +222,7 @@ namespace RestaurantManagementSystem.Controllers
                     using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         UPDATE TableTurnovers 
                         SET Status = 5, -- Departed
-                            DepartedAt = GETDATE(),
-                            UpdatedAt = GETDATE()
+                            DepartedAt = GETDATE()
                         WHERE Status < 5", connection))
                     {
                         departedTurnovers = command.ExecuteNonQuery();
@@ -245,7 +243,7 @@ namespace RestaurantManagementSystem.Controllers
                     using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
                         UPDATE ServerAssignments 
                         SET IsActive = 0,
-                            UpdatedAt = GETDATE()
+                            LastModifiedAt = GETDATE()
                         WHERE IsActive = 1", connection))
                     {
                         command.ExecuteNonQuery();

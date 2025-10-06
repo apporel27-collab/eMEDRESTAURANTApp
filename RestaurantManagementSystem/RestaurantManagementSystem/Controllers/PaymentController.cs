@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace RestaurantManagementSystem.Controllers
 {
-    public class PaymentController : Controller
+    public partial class PaymentController : Controller
     {
         private readonly IConfiguration _configuration;
         private readonly string _connectionString;
@@ -175,11 +175,20 @@ namespace RestaurantManagementSystem.Controllers
             {
                 connection.Open();
 
-                // Ensure UPI method exists
-                using (var ensureCmd = new Microsoft.Data.SqlClient.SqlCommand(@"IF NOT EXISTS (SELECT 1 FROM PaymentMethods WHERE Name='UPI')
+                // Ensure UPI and Complementary methods exist
+                using (var ensureCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+-- Ensure UPI method exists
+IF NOT EXISTS (SELECT 1 FROM PaymentMethods WHERE Name='UPI')
 BEGIN
     INSERT INTO PaymentMethods (Name, DisplayName, IsActive, RequiresCardInfo, RequiresCardPresent, RequiresApproval)
     VALUES ('UPI','UPI',1,0,0,0);
+END
+
+-- Ensure Complementary method exists
+IF NOT EXISTS (SELECT 1 FROM PaymentMethods WHERE Name='Complementary')
+BEGIN
+    INSERT INTO PaymentMethods (Name, DisplayName, IsActive, RequiresCardInfo, RequiresCardPresent, RequiresApproval)
+    VALUES ('Complementary','Complementary (100% Discount)',1,0,0,1);
 END", connection))
                 {
                     ensureCmd.ExecuteNonQuery();
@@ -337,6 +346,20 @@ END", connection))
                     // Step 3: Calculate final amounts
                     decimal paymentAmountExclGST = discountedSubtotal; // This is the subtotal after discount
                     decimal totalPaymentAmountWithGST = discountedSubtotal + paymentGstAmount; // Final amount customer pays
+                    
+                    // Check for Complementary payment method - ensure discount is properly set
+                    if (paymentMethodName.Equals("Complementary", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // For Complementary, ensure 100% discount is applied
+                        discountAmount = orderSubtotal; // Full subtotal amount as discount
+                        discountedSubtotal = 0; // After 100% discount, subtotal is 0
+                        paymentGstAmount = 0; // No GST on a zero subtotal
+                        paymentAmountExclGST = 0; // Zero subtotal after discount
+                        totalPaymentAmountWithGST = 0; // Zero total to pay
+                        
+                        // If the model didn't already have the discount set to full amount
+                        model.DiscountAmount = discountAmount;
+                    }
                     
                     // Step 4: Split GST into CGST and SGST (equal split)
                     decimal paymentCgstPercentage = paymentGstPercentage / 2m;
@@ -1323,6 +1346,8 @@ END", connection))
                         ISNULL(SUM(p.Amount), 0) AS TotalPaid,
                         -- Due amount is 0 since we're only showing orders with payments
                         0 AS DueAmount,
+                        -- Sum of GST amounts from all approved payments
+                        ISNULL(SUM(p.GSTAmount), 0) AS GSTAmount,
                         MAX(p.CreatedAt) AS PaymentDate,
                         o.Status AS OrderStatus,
                         CASE o.Status 
@@ -1356,6 +1381,7 @@ END", connection))
                                 TotalPayable = Convert.ToDecimal(reader["TotalPayable"]),
                                 TotalPaid = Convert.ToDecimal(reader["TotalPaid"]),
                                 DueAmount = Convert.ToDecimal(reader["DueAmount"]),
+                                GSTAmount = Convert.ToDecimal(reader["GSTAmount"]),
                                 PaymentDate = reader.GetDateTime("PaymentDate"),
                                 OrderStatus = reader.GetInt32("OrderStatus"),
                                 OrderStatusDisplay = reader.GetString("OrderStatusDisplay")

@@ -150,98 +150,72 @@
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     <script>
-        $(document).ready(function () {
-            // Order type change handler
-            $('#orderType').change(function () {
-                var orderType = $(this).val();
+        $(function () {
+            function toggleTableSection() {
+                var orderType = $('#orderType').val();
                 if (orderType === '0') {
                     $('#tableSection').removeClass('d-none');
-                    $('#customerSection').addClass('d-none');
-                    $('#phoneSection').addClass('d-none');
+                    $('#customerSection, #phoneSection').addClass('d-none');
                     $('#mergeTablesWrapper').removeClass('d-none');
                 } else {
                     $('#tableSection').addClass('d-none');
-                    $('#customerSection').removeClass('d-none');
-                    $('#phoneSection').removeClass('d-none');
+                    $('#customerSection, #phoneSection').removeClass('d-none');
                     $('#mergeTablesWrapper').addClass('d-none');
                 }
-                updateMergeTableOptions();
-            });
+            }
 
-            // Primary table selection change handler
-            $('#TableTurnoverId').change(function () {
-                updateMergeTableOptions();
-            });
+            function resolvePrimaryTableId() {
+                // Priority: hidden SelectedTableId (coming from dashboard) else dropdown value
+                var hidden = $('input[name="SelectedTableId"]').val();
+                if (hidden) return hidden; // Already actual TableId
+                var dropdownVal = $('#TableTurnoverId').val();
+                if (!dropdownVal) return null;
+                // Available tables prefixed with '-' so strip it
+                if (dropdownVal.startsWith('-')) return dropdownVal.substring(1);
+                // For occupied seated tables, the value is turnover id; we have checkboxes with actual tableId values.
+                // We attempt to find a checkbox whose id ends with that turnover id pattern if mapping exists; fallback using same value.
+                return dropdownVal; 
+            }
 
-            // Function to disable selected primary table in merge section
             function updateMergeTableOptions() {
-                var orderType = $('#orderType').val();
-                var selectedTableId = $('#TableTurnoverId').val();
-                
-                if (orderType === '0') { // Dine-In only
-                    // Reset all merge checkboxes to enabled
-                    $('input[name="SelectedTableIds"]').prop('disabled', false);
-                    $('input[name="SelectedTableIds"]').closest('.form-check').removeClass('text-muted');
-                    
-                    if (selectedTableId && selectedTableId !== '') {
-                        var tableId;
-                        // Handle negative values for available tables
-                        if (selectedTableId.startsWith('-')) {
-                            tableId = selectedTableId.substring(1);
-                        } else {
-                            // For occupied tables, we need to find the corresponding table ID
-                            // This is a simplification - you might need to adjust based on your data structure
-                            tableId = selectedTableId;
-                        }
-                        
-                        // Disable the corresponding checkbox in merge section
-                        $('input[name="SelectedTableIds"][value="' + tableId + '"]').prop('disabled', true);
-                        $('input[name="SelectedTableIds"][value="' + tableId + '"]').prop('checked', false);
-                        $('input[name="SelectedTableIds"][value="' + tableId + '"]').closest('.form-check').addClass('text-muted');
+                // Enable all first
+                var $all = $('input[name="SelectedTableIds"]').prop('disabled', false).closest('.form-check').removeClass('text-muted');
+                var primaryId = resolvePrimaryTableId();
+                if (primaryId) {
+                    var $cb = $('input[name="SelectedTableIds"][value="' + primaryId + '"]');
+                    if ($cb.length) {
+                        $cb.prop('disabled', true).prop('checked', false).closest('.form-check').addClass('text-muted');
                     }
                 }
             }
 
-            // Form validation before submission
-            $('form').on('submit', function (e) {
-                var orderType = $('#orderType').val();
-                var selectedTableId = $('#TableTurnoverId').val();
-                
-                // Validation for Dine-In orders
-                if (orderType === '0') { // Dine-In
-                    if (!selectedTableId || selectedTableId === '') {
+            // Handlers
+            $('#orderType').on('change', function(){ toggleTableSection(); updateMergeTableOptions(); });
+            $('#TableTurnoverId').on('change', updateMergeTableOptions);
+
+            // Form submit validation
+            $('form').on('submit', function(e){
+                if ($('#orderType').val() === '0') { // dine-in
+                    var hasHidden = $('input[name="SelectedTableId"]').val();
+                    var dropdownVal = $('#TableTurnoverId').val();
+                    if (!hasHidden && (!dropdownVal || dropdownVal === '')) {
                         e.preventDefault();
-                        
-                        // Remove existing alerts
                         $('.alert-danger.table-validation').remove();
-                        
-                        // Show validation alert
                         var alertHtml = '<div class="alert alert-danger alert-dismissible fade show table-validation" role="alert">' +
-                            '<i class="fas fa-exclamation-triangle me-2"></i>' +
-                            '<strong>Primary Table Required!</strong> Please select a primary table for Dine-In orders.' +
-                            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
-                            '</div>';
-                        
-                        // Insert alert at the top of the form
+                            '<i class="fas fa-exclamation-triangle me-2"></i><strong>Primary Table Required!</strong> Please select a primary table for Dine-In orders.' +
+                            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
                         $('form .row').first().before(alertHtml);
-                        
-                        // Scroll to top to show the alert
-                        $('html, body').animate({
-                            scrollTop: $('.alert-danger.table-validation').offset().top - 100
-                        }, 500);
-                        
-                        // Focus on table selection dropdown
+                        $('html, body').animate({ scrollTop: $(document).find('.alert-danger.table-validation').offset().top - 100 }, 400);
                         $('#TableTurnoverId').focus();
-                        
                         return false;
                     }
                 }
-                
                 return true;
             });
 
-            // Initialize on page load
-            $('#orderType').trigger('change');
+            // Initial load
+            toggleTableSection();
+            updateMergeTableOptions();
         });
     </script>
 }

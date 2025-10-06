@@ -309,6 +309,7 @@
                                                 <th scope="col">Order No</th>
                                                 <th scope="col">Table No</th>
                                                 <th scope="col">Total Payable</th>
+                                                <th scope="col">GST Amount</th>
                                                 <th scope="col">Total Paid</th>
                                                 <th scope="col">Due Amount</th>
                                                 <th scope="col">Status</th>
@@ -323,6 +324,7 @@
                                                     <td class="fw-bold">@payment.OrderNumber</td>
                                                     <td>@payment.TableName</td>
                                                     <td class="text-end fw-bold text-primary">₹@payment.TotalPayable.ToString("N2")</td>
+                                                    <td class="text-end fw-bold text-info">₹@payment.GSTAmount.ToString("N2")</td>
                                                     <td class="text-end fw-bold text-success">₹@payment.TotalPaid.ToString("N2")</td>
                                                     <td class="text-end fw-bold @(payment.DueAmount > 0 ? "text-danger" : "text-success")">
                                                         ₹@payment.DueAmount.ToString("N2")
@@ -467,7 +469,7 @@
             if ($.fn.DataTable) {
                 $('#paymentHistoryTable').DataTable({
                     "pageLength": 25,
-                    "order": [[ 6, "desc" ]], // Sort by payment date descending
+                    "order": [[ 7, "desc" ]], // Sort by payment date descending (updated index)
                     "responsive": true,
                     "language": {
                         "search": "Search payments:",
@@ -779,7 +781,7 @@
                         
                         // Initialize table
                         $('#paymentHistoryTable').DataTable({
-                            order: [[6, 'desc']],
+                            order: [[7, 'desc']], // Updated to match Payment Date column index
                             language: {
                                 search: '<i class="fas fa-search"></i> _INPUT_',
                                 searchPlaceholder: 'Search history...',
