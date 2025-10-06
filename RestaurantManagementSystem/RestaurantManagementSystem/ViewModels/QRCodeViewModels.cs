@@ -29,6 +29,14 @@ namespace RestaurantManagementSystem.ViewModels
         public string CategoryName { get; set; } = string.Empty;
         public string CategoryDescription { get; set; } = string.Empty;
         public List<PublicMenuItem> MenuItems { get; set; } = new();
+        public List<SubCategoryMenuItems> SubCategories { get; set; } = new();
+    }
+
+    public class SubCategoryMenuItems
+    {
+        public int? SubCategoryId { get; set; }
+        public string SubCategoryName { get; set; } = string.Empty;
+        public List<PublicMenuItem> MenuItems { get; set; } = new();
     }
 
     public class PublicMenuItem
@@ -42,6 +50,7 @@ namespace RestaurantManagementSystem.ViewModels
         public bool IsVegetarian { get; set; }
         public bool IsSpicy { get; set; }
         public string CategoryName { get; set; } = string.Empty;
+        public string? SubCategoryName { get; set; } = string.Empty;
     }
 
     public class RestaurantInfo

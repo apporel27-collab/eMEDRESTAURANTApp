@@ -18,6 +18,8 @@ namespace RestaurantManagementSystem.Controllers
         public bool IsAvailable { get; set; }
         public int CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
+        public int? SubCategoryId { get; set; }
+        public string? SubCategoryName { get; set; }
     }
 
     public class MenuQRController : Controller
