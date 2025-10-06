@@ -29,6 +29,8 @@
                         <input type="hidden" asp-for="OrderNumber" />
                         <input type="hidden" asp-for="TotalAmount" />
                         <input type="hidden" asp-for="RemainingAmount" />
+                        <input type="hidden" asp-for="Subtotal" />
+                        <input type="hidden" asp-for="GSTPercentage" />
                         
                         <!-- Payment Summary Card -->
                         <div class="card mb-4 bg-light rounded-3">
@@ -435,23 +437,30 @@
             }
 
             function recalcDiscountAndAmount(){
+                var baseSubtotal = parseFloat($('#Subtotal').val()) || 0; // pre-GST base
+                var gstPerc = parseFloat($('#GSTPercentage').val()) || 0;
                 var mode = $('input[name=discountMode]:checked').val();
                 var entry = parseFloat($('#discountEntry').val());
                 if (isNaN(entry) || entry < 0) entry = 0;
                 var discountAmt = 0;
-                if (mode === 'percent'){
+                if (mode === 'percent') {
                     if (entry > 100) entry = 100;
-                    discountAmt = originalRemaining * (entry / 100.0);
+                    discountAmt = baseSubtotal * (entry / 100.0);
                 } else {
                     discountAmt = entry;
                 }
-                if (discountAmt > originalRemaining) discountAmt = originalRemaining;
+                if (discountAmt > baseSubtotal) discountAmt = baseSubtotal;
                 $('#DiscountAmount').val(discountAmt.toFixed(2));
+                var discountedSubtotal = baseSubtotal - discountAmt;
+                if (discountedSubtotal < 0) discountedSubtotal = 0;
+                var gstAmount = discountedSubtotal * (gstPerc / 100.0);
+                // Simulate MidpointRounding.AwayFromZero
+                gstAmount = parseFloat((Math.round(gstAmount * 100 + (gstAmount >= 0 ? 0.0000001 : -0.0000001)) / 100).toFixed(2));
+                var totalWithGst = discountedSubtotal + gstAmount;
                 if (!manualAmountOverride){
-                    var newAmount = originalRemaining - discountAmt;
-                    if (newAmount < 0) newAmount = 0;
-                    $('#Amount').val(newAmount.toFixed(2));
+                    $('#Amount').val(totalWithGst.toFixed(2));
                 }
+                originalRemaining = totalWithGst;
                 updatePaymentSummary();
                 calculateTipPreviews();
             }

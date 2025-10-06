@@ -49,6 +49,10 @@ namespace RestaurantManagementSystem.Models
         public string OrderNumber { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal RemainingAmount { get; set; }
+        // New: underlying order subtotal (before GST) so discount percent is correctly applied
+        public decimal Subtotal { get; set; }
+        // New: GST percentage (e.g. 5.00) to recompute GST after discount
+        public decimal GSTPercentage { get; set; }
         
         [Required]
         [Display(Name = "Payment Method")]

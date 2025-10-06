@@ -168,7 +168,9 @@ namespace RestaurantManagementSystem.Controllers
                 OrderNumber = paymentViewModel.OrderNumber,
                 TotalAmount = paymentViewModel.TotalAmount, // This now includes GST
                 RemainingAmount = paymentViewModel.RemainingAmount, // This is Total - Paid (including GST)
-                Amount = paymentViewModel.RemainingAmount // Default to remaining amount
+                Amount = paymentViewModel.RemainingAmount, // Default to remaining amount
+                Subtotal = paymentViewModel.Subtotal, // base amount before GST
+                GSTPercentage = paymentViewModel.GSTPercentage // dynamic GST %
             };
             
             using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
