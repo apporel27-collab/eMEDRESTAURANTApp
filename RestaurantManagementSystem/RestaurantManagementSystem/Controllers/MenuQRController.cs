@@ -55,19 +55,16 @@ namespace RestaurantManagementSystem.Controllers
                     sc.Name as SubCategoryName
                 FROM MenuItems m
                 INNER JOIN Categories c ON m.CategoryId = c.Id
-                LEFT JOIN SubCategories sc ON m.SubCategoryId = sc.Id
+                LEFT JOIN dbo.SubCategories sc ON m.SubCategoryId = sc.Id
                 WHERE m.IsAvailable = 1
                 ORDER BY c.Name, sc.Name, m.Name
             ").ToListAsync();
 
             var categories = menuItemsRaw
                 .GroupBy(m => new { m.CategoryId, m.CategoryName })
-                .Select(g => new CategoryMenuItems
-                {
-                    CategoryId = g.Key.CategoryId,
-                    CategoryName = g.Key.CategoryName,
-                    CategoryDescription = "",
-                    SubCategories = g.GroupBy(m => new { m.SubCategoryId, m.SubCategoryName })
+                .Select(g => {
+                    var subcategoriesWithItems = g.GroupBy(m => new { m.SubCategoryId, m.SubCategoryName })
+                        .Where(subg => subg.Key.SubCategoryId.HasValue) // Only items with actual subcategories
                         .Select(subg => new SubCategoryMenuItems
                         {
                             SubCategoryId = subg.Key.SubCategoryId,
@@ -85,7 +82,29 @@ namespace RestaurantManagementSystem.Controllers
                                 CategoryName = m.CategoryName,
                                 SubCategoryName = m.SubCategoryName
                             }).ToList()
-                        }).ToList()
+                        }).ToList();
+
+                    return new CategoryMenuItems
+                    {
+                        CategoryId = g.Key.CategoryId,
+                        CategoryName = g.Key.CategoryName,
+                        CategoryDescription = "",
+                        // Only populate direct MenuItems if there are no subcategories
+                        MenuItems = !subcategoriesWithItems.Any() ? g.Select(m => new PublicMenuItem
+                        {
+                            MenuItemId = m.Id,
+                            Name = m.Name,
+                            Description = m.Description ?? "",
+                            Price = m.Price,
+                            ImageUrl = m.ImagePath,
+                            IsAvailable = m.IsAvailable,
+                            IsVegetarian = false,
+                            IsSpicy = false,
+                            CategoryName = m.CategoryName,
+                            SubCategoryName = m.SubCategoryName
+                        }).ToList() : new List<PublicMenuItem>(),
+                        SubCategories = subcategoriesWithItems
+                    };
                 })
                 .ToList();
 

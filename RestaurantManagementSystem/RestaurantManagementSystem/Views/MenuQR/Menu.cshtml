@@ -33,12 +33,17 @@
         }
         
         .restaurant-logo {
-            width: 100px;
-            height: 100px;
-            border-radius: 18px;
-            border: 2px solid rgba(255,255,255,0.2);
+            width: 150px;
+            height: 150px;
+            border-radius: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
             object-fit: cover;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .restaurant-logo:hover {
+            transform: scale(1.05);
         }
         
         .restaurant-info h1 {
@@ -365,7 +370,10 @@
                         foreach (var subcat in category.SubCategories)
                         {
                             <div class="ps-3 pb-2 pt-2">
-                                <h5 class="fw-bold mb-2" style="color:#2980b9">@subcat.SubCategoryName</h5>
+                                @if (!string.IsNullOrEmpty(subcat.SubCategoryName))
+                                {
+                                    <h5 class="fw-bold mb-2" style="color:#2980b9">@subcat.SubCategoryName</h5>
+                                }
                                 <div class="menu-items">
                                     @if (subcat.MenuItems.Any())
                                     {
@@ -399,18 +407,44 @@
                                             </div>
                                         }
                                     }
-                                    else
-                                    {
-                                        <div class="no-items">No items available in this subcategory.</div>
-                                    }
                                 </div>
                             </div>
                         }
                     }
-                    else
+                    
+                    @* Fallback: Show category items directly ONLY if no subcategories exist *@
+                    @if ((category.SubCategories == null || !category.SubCategories.Any()) && category.MenuItems != null && category.MenuItems.Any())
                     {
                         <div class="menu-items">
-                            <div class="no-items">No subcategories available in this category.</div>
+                            @foreach (var item in category.MenuItems)
+                            {
+                                <div class="menu-item">
+                                    <div class="menu-item-info">
+                                        <div class="menu-item-name">
+                                            @item.Name
+                                            <div class="menu-item-badges">
+                                                @if (item.IsVegetarian)
+                                                {
+                                                    <span class="badge-veg"><i class="fas fa-leaf"></i> VEG</span>
+                                                }
+                                                @if (item.IsSpicy)
+                                                {
+                                                    <span class="badge-spicy"><i class="fas fa-fire"></i> SPICY</span>
+                                                }
+                                            </div>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(item.Description))
+                                        {
+                                            <div class="menu-item-description">@item.Description</div>
+                                        }
+                                    </div>
+                                    <div class="menu-item-price">₹@item.Price.ToString("0.00")</div>
+                                    @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                    {
+                                        <img src="@item.ImageUrl" alt="@item.Name" class="menu-item-image" />
+                                    }
+                                </div>
+                            }
                         </div>
                     }
                 </div>
