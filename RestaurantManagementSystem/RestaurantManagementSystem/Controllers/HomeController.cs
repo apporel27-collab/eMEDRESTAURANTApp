@@ -45,6 +45,45 @@ namespace RestaurantManagementSystem.Controllers
             // Get live dashboard data from database
             var dashboardStats = await GetDashboardStatsAsync();
             var recentOrders = await GetRecentOrdersAsync();
+
+            // Load restaurant logo path (fall back to default if not set)
+            string? logoPath = null;
+            string? restaurantName = null;
+            try
+            {
+                using var logoCon = new SqlConnection(_connectionString);
+                await logoCon.OpenAsync();
+                using var logoCmd = new SqlCommand("SELECT TOP 1 LogoPath, RestaurantName FROM RestaurantSettings ORDER BY Id DESC", logoCon);
+                using (var reader = await logoCmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        if (!reader.IsDBNull(reader.GetOrdinal("LogoPath")))
+                        {
+                            var raw = reader.GetString(reader.GetOrdinal("LogoPath"));
+                            if (!string.IsNullOrWhiteSpace(raw)) logoPath = raw;
+                        }
+                        if (!reader.IsDBNull(reader.GetOrdinal("RestaurantName")))
+                        {
+                            var rawName = reader.GetString(reader.GetOrdinal("RestaurantName"));
+                            if (!string.IsNullOrWhiteSpace(rawName)) restaurantName = rawName;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Unable to load restaurant logo path");
+            }
+            if (string.IsNullOrWhiteSpace(logoPath))
+            {
+                // Provide a default placeholder (ensure file exists or use a generic path)
+                logoPath = "/images/logo.png"; // fallback
+            }
+            if (string.IsNullOrWhiteSpace(restaurantName))
+            {
+                restaurantName = "Restaurant"; // fallback label
+            }
             
             // Create a dashboard view model with live data
             var model = new DashboardViewModel
@@ -91,7 +130,9 @@ namespace RestaurantManagementSystem.Controllers
                     new CustomersByTimeViewModel { Hour = 18, CustomerCount = 35 },
                     new CustomersByTimeViewModel { Hour = 19, CustomerCount = 40 },
                     new CustomersByTimeViewModel { Hour = 20, CustomerCount = 30 }
-                }
+                },
+                LogoPath = logoPath,
+                RestaurantName = restaurantName
             };
             
             return View(model);

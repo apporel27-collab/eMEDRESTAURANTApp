@@ -23,6 +23,10 @@ namespace RestaurantManagementSystem.Models
         public List<MenuItemPopularityViewModel> PopularMenuItems { get; set; } = new List<MenuItemPopularityViewModel>();
         public List<SalesDataViewModel> SalesData { get; set; } = new List<SalesDataViewModel>();
         public List<CustomersByTimeViewModel> CustomersByTime { get; set; } = new List<CustomersByTimeViewModel>();
+
+        // Branding
+        public string? LogoPath { get; set; }
+    public string? RestaurantName { get; set; }
     }
 
     public class DashboardOrderViewModel

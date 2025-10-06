@@ -43,6 +43,42 @@
         position: relative;
         overflow: hidden;
     }
+    .dashboard-header .brand-logo-wrapper {
+        position: absolute;
+        top: 12px;
+        right: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255,255,255,0.15);
+        padding: 6px 14px 6px 10px;
+        border-radius: 40px;
+        backdrop-filter: blur(4px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+        max-width: 260px;
+    }
+    .dashboard-header .brand-logo-wrapper img.brand-logo {
+        height: 48px;
+        width: auto;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+        transition: transform .25s ease;
+    }
+    .dashboard-header .brand-logo-wrapper img.brand-logo:hover {
+        transform: scale(1.04);
+    }
+    .dashboard-header .brand-logo-wrapper .brand-name {
+        font-size: 0.95rem;
+        font-weight: 600;
+        line-height: 1.1;
+        letter-spacing: .5px;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        max-width: 170px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
     
     .dashboard-header h1 {
         margin: 0;
@@ -255,7 +291,18 @@
 <div class="container-fluid p-0">
     <div class="dashboard-container">
         <div class="dashboard-header">
-            <h1><i class="fas fa-utensils me-2"></i>Restaurant Dashboard</h1>
+            <div class="brand-logo-wrapper" title="@Model.RestaurantName">
+                @if (!string.IsNullOrEmpty(Model.LogoPath))
+                {
+                    <img src="@Model.LogoPath" alt="@Model.RestaurantName Logo" class="brand-logo" />
+                }
+                else
+                {
+                    <i class="fas fa-store fa-2x text-white" aria-hidden="true"></i>
+                }
+                <span class="brand-name">@Model.RestaurantName</span>
+            </div>
+            <h1><i class="fas fa-utensils me-2" aria-hidden="true"></i>@Model.RestaurantName Dashboard</h1>
             <p>Welcome back, <strong>@Model.UserFullName</strong>!</p>
             
             <div class="user-info">
