@@ -146,6 +146,9 @@
                                                     <a asp-action="Details" asp-route-id="@order.Id" class="btn btn-sm btn-outline-primary" title="View Order">
                                                         <i class="fas fa-eye"></i>
                                                     </a>
+                                                    <a href="/Payment/Index/@order.Id" class="btn btn-sm btn-outline-success" title="Process Payment">
+                                                        <i class="fas fa-credit-card"></i>
+                                                    </a>
                                                     <button type="button" class="btn btn-sm btn-outline-danger cancel-order-trigger" 
                                                             data-order-id="@order.Id" data-order-number="@order.OrderNumber" title="Cancel Order">
                                                         <i class="fas fa-times-circle"></i>
