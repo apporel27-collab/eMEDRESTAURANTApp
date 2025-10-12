@@ -9,6 +9,8 @@
     #orderDetailsApp .sticky-top { z-index: 100; }
     /* Defensive: allow dropdown menus to overflow visible area */
     .navbar .dropdown-menu { position: absolute; }
+    /* Disabled anchor-style buttons (payment link) */
+    .btn-disabled { pointer-events: none; opacity: 0.65; cursor: default !important; }
   </style>
 }
 <div class="container-fluid py-3" id="orderDetailsApp" data-order-id="@Model.Id">
@@ -195,4 +197,117 @@
 
 @section Scripts {
   <script src="~/js/order-modern.js"></script>
+  <script>
+    (function() {
+      // Manage Save and Payment button states smoothly on the Order Details page
+      function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+      function $all(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
+
+      const saveBtn = document.getElementById('saveOrderBtn');
+      const itemsBody = document.getElementById('orderItemsBody');
+      const paymentBtn = document.querySelector('a[href*="/Payment/Index/"]');
+
+      function setSaveEnabled(enabled) {
+        if (!saveBtn) return;
+        saveBtn.disabled = !enabled;
+      }
+
+      function setPaymentEnabled(enabled) {
+        if (!paymentBtn) return;
+        if (enabled) {
+          paymentBtn.classList.remove('btn-disabled');
+          paymentBtn.removeAttribute('aria-disabled');
+          paymentBtn.style.pointerEvents = '';
+        } else {
+          paymentBtn.classList.add('btn-disabled');
+          paymentBtn.setAttribute('aria-disabled', 'true');
+          paymentBtn.style.pointerEvents = 'none';
+        }
+      }
+
+      function hasSavedItems() {
+        // saved items are rendered as rows with class 'existing-item-row'
+        const saved = $all('#orderItemsBody tr.existing-item-row');
+        return saved.length > 0;
+      }
+
+      function initState() {
+        // Default: Save disabled until a change is made
+        setSaveEnabled(false);
+        // Payment enabled only when there are saved items
+        setPaymentEnabled(hasSavedItems());
+      }
+
+      // When new rows are added or removed, enable Save (new items) or update Payment state
+      if (itemsBody) {
+        const mo = new MutationObserver(mutations => {
+          for (const m of mutations) {
+            if (m.addedNodes && m.addedNodes.length) {
+              // new item(s) added -> enable Save
+              setSaveEnabled(true);
+            }
+            if (m.removedNodes && m.removedNodes.length) {
+              // an item removed -> consider enabling Save
+              setSaveEnabled(true);
+            }
+          }
+        });
+        mo.observe(itemsBody, { childList: true });
+      }
+
+      // Listen for user interactions that modify rows: edits, quantity/note changes, remove
+      document.addEventListener('input', function(e) {
+        if (e.target && e.target.closest('#orderItemsTable')) {
+          setSaveEnabled(true);
+        }
+      }, { passive: true });
+
+      document.addEventListener('click', function(e) {
+        if (e.target.closest && e.target.closest('#orderItemAddForm')) {
+          // adding via form will be handled by mutation observer after row insertion
+          return;
+        }
+        if (e.target.closest && e.target.closest('.edit-row')) {
+          // entering edit mode -> enable Save
+          setSaveEnabled(true);
+        }
+        if (e.target.closest && e.target.closest('.remove-existing')) {
+          setSaveEnabled(true);
+        }
+        if (e.target && e.target.id === 'saveOrderBtn') {
+          // optimistic: disable Save while saving; actual outcome will be handled by fetch proxy below
+          setSaveEnabled(false);
+        }
+      }, true);
+
+      // Intercept fetch so we can enable Payment when the order items save endpoint succeeds
+      (function() {
+        if (!window.fetch) return;
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = async function(input, init) {
+          try {
+            const url = (typeof input === 'string') ? input : (input && input.url) ? input.url : '';
+            const response = await originalFetch(input, init);
+            // If this was the order items save endpoint and succeeded, enable Payment
+            if (typeof url === 'string' && url.indexOf('/Order/UpdateMultipleOrderItems') !== -1) {
+              if (response && response.ok) {
+                // Saved to DB -> payment now allowed
+                setPaymentEnabled(true);
+              } else {
+                // error -> re-enable Save so user can retry
+                setSaveEnabled(true);
+              }
+            }
+            return response;
+          } catch (err) {
+            console.error('Fetch proxy error', err);
+            throw err;
+          }
+        };
+      })();
+
+      // Initialize
+      try { initState(); } catch (e) { console.error(e); }
+    })();
+  </script>
 }
