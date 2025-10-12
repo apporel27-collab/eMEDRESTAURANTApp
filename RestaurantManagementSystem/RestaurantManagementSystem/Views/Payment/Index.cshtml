@@ -139,7 +139,7 @@
                                 </a>
                                 
                                 <a asp-action="PrintBill" asp-route-orderId="@Model.OrderId" class="btn btn-outline-success btn-lg" target="_blank">
-                                    <i class="fas fa-print me-1"></i> Final Bill
+                                    <i class="fas fa-print me-1"></i> Print Bill(A4)
                                 </a>
                                 
                                 @if (Model.RemainingAmount == 0 && Model.OrderStatus < 3)
@@ -379,7 +379,7 @@
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Final Bill - Order #@Model.OrderNumber</title>
+                    <title>Print Bill(A4) - Order #@Model.OrderNumber</title>
                     <style>
                         body {
                             font-family: Arial, sans-serif;
@@ -434,7 +434,7 @@
                 <body>
                     <div class="header">
                         <h2>Restaurant Management System</h2>
-                        <h3>Final Bill</h3>
+                        <h3>Print Bill(A4)</h3>
                     </div>
                     
                     <div class="info">
