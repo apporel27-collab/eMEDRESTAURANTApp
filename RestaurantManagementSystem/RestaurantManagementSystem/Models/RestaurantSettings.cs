@@ -78,6 +78,12 @@ namespace RestaurantManagementSystem.Models
         
         [Display(Name = "Is Take Away GST Required")]
         public bool IsTakeAwayGSTRequired { get; set; } = true;
+
+    [Display(Name = "Is Discount Approval Required")]
+    public bool IsDiscountApprovalRequired { get; set; } = false;
+
+    [Display(Name = "Card Payment Approval Required")]
+    public bool IsCardPaymentApprovalRequired { get; set; } = false;
         
         [Required(ErrorMessage = "Bill Format is required")]
         [Display(Name = "Bill Format")]

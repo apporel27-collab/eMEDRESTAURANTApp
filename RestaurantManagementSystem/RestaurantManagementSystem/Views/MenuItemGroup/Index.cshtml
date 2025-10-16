@@ -1,0 +1,141 @@
+@model IEnumerable<RestaurantManagementSystem.Models.MenuItemGroup>
+@{
+    ViewData["Title"] = "Menu Item Groups";
+}
+<div class="container py-3">
+    <h2 class="mb-3">Menu Item Groups</h2>
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">@TempData["SuccessMessage"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">@TempData["ErrorMessage"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    }
+    <div class="row g-3">
+        <div class="col-md-5">
+            <div class="card shadow-sm">
+                <div class="card-header"><strong id="formModeLabel">Create Menu Item Group</strong></div>
+                <div class="card-body">
+                    <form id="groupForm" method="post" asp-action="Save" novalidate>
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="ID" id="groupId" value="0" />
+                        <div class="text-danger small mb-2" id="clientValidation"></div>
+                        <div class="mb-3">
+                            <label for="groupName" class="form-label">Group Name</label>
+                            <input type="text" class="form-control" id="groupName" name="ItemGroup" required maxlength="80" />
+                        </div>
+                        <div class="mb-3">
+                            <label for="gstPerc" class="form-label">GST %</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="gstPerc" name="GST_Perc" />
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="hidden" name="IsActive" value="false" />
+                            <input class="form-check-input" type="checkbox" id="groupActive" name="IsActive" value="true" checked />
+                            <label for="groupActive" class="form-check-label">Active</label>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" id="saveBtn"><i class="fas fa-save me-1"></i><span id="saveBtnText">Create</span></button>
+                            <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Existing Groups</strong>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height:55vh;">
+                        <table class="table table-sm table-hover mb-0 align-middle" id="groupsTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Group</th>
+                                    <th style="width:90px" class="text-center">Active</th>
+                                    <th style="width:140px">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var g in Model)
+                                {
+                                    <tr data-id="@g.ID" data-name="@g.ItemGroup" data-active="@g.IsActive.ToString().ToLower()" data-gst="@(g.GST_Perc.HasValue ? g.GST_Perc.Value.ToString() : String.Empty)">
+                                        <td>@g.ItemGroup</td>
+                                        <td class="text-center">
+                                            <span class="badge @(g.IsActive ? "bg-success" : "bg-secondary")">@(g.IsActive ? "Yes" : "No")</span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <button type="button" class="btn btn-outline-primary editGroupBtn" title="Edit"><i class="fas fa-edit"></i></button>
+                                                <form method="post" asp-action="ToggleActive" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@g.ID" />
+                                                    <button type="submit" class="btn btn-outline-warning" title="Toggle Active"><i class="fas fa-sync"></i></button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function(){
+            const form = document.getElementById('groupForm');
+            const idInput = document.getElementById('groupId');
+            const nameInput = document.getElementById('groupName');
+            const gstInput = document.getElementById('gstPerc');
+            const activeInput = document.getElementById('groupActive');
+            const formModeLabel = document.getElementById('formModeLabel');
+            const saveBtnText = document.getElementById('saveBtnText');
+            const resetBtn = document.getElementById('resetBtn');
+            const clientValidation = document.getElementById('clientValidation');
+
+            function setCreateMode(){
+                idInput.value = '0';
+                nameInput.value = '';
+                gstInput.value = '';
+                activeInput.checked = true;
+                formModeLabel.textContent = 'Create Menu Item Group';
+                saveBtnText.textContent = 'Create';
+            }
+
+            function setEditMode(id, name, isActive, gst){
+                idInput.value = id;
+                nameInput.value = name;
+                gstInput.value = gst || '';
+                const a = (typeof isActive === 'string') ? isActive.toLowerCase() : isActive;
+                activeInput.checked = (a === 'true' || a === true || a === '1' || a === 'on');
+                formModeLabel.textContent = 'Edit Menu Item Group';
+                saveBtnText.textContent = 'Update';
+            }
+
+            document.querySelectorAll('.editGroupBtn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const row = btn.closest('tr');
+                    setEditMode(row.dataset.id, row.dataset.name, row.dataset.active, row.dataset.gst);
+                    nameInput.focus();
+                });
+            });
+            resetBtn.addEventListener('click', setCreateMode);
+            setCreateMode();
+
+            form.addEventListener('submit', (e) => {
+                clientValidation.textContent = '';
+                if (!nameInput.value.trim()) {
+                    e.preventDefault();
+                    clientValidation.textContent = 'Group name is required.';
+                    nameInput.focus();
+                }
+            });
+        })();
+    </script>
+}

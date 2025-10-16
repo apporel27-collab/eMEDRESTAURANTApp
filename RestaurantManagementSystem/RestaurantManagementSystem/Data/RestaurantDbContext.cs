@@ -24,6 +24,7 @@ namespace RestaurantManagementSystem.Data
         
         // Menu and Recipe Management
         public DbSet<MenuItem> MenuItems { get; set; } = null!;
+    public DbSet<MenuItemGroup> MenuItemGroups { get; set; } = null!;
         public DbSet<Allergen> Allergens { get; set; } = null!;
         public DbSet<MenuItemAllergen> MenuItemAllergens { get; set; } = null!;
         public DbSet<Modifier> Modifiers { get; set; } = null!;
@@ -92,6 +93,28 @@ namespace RestaurantManagementSystem.Data
                       .HasForeignKey(m => m.SubCategoryId)
                       .OnDelete(DeleteBehavior.SetNull)
                       .IsRequired(false);
+            });
+
+            // Configure MenuItemGroup entity to match existing dbo.menuitemgroup table
+            modelBuilder.Entity<RestaurantManagementSystem.Models.MenuItemGroup>(entity =>
+            {
+                entity.ToTable("menuitemgroup", "dbo");
+                entity.HasKey(e => e.ID);
+                entity.Property(e => e.ID).HasColumnName("ID");
+                entity.Property(e => e.ItemGroup).HasColumnName("itemgroup").HasMaxLength(20);
+                entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.GST_Perc).HasColumnName("GST_Perc").HasColumnType("numeric(12,2)");
+            });
+
+            // Configure MenuItemGroup entity to match existing table
+            modelBuilder.Entity<MenuItemGroup>(entity =>
+            {
+                entity.ToTable("menuitemgroup", "dbo");
+                entity.HasKey(e => e.ID);
+                entity.Property(e => e.ID).HasColumnName("ID").IsRequired();
+                entity.Property(e => e.ItemGroup).HasColumnName("itemgroup").HasMaxLength(20);
+                entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.GST_Perc).HasColumnName("GST_Perc").HasColumnType("numeric(12,2)");
             });
             
             // Seed data for Categories

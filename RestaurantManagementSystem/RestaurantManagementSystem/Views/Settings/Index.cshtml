@@ -123,6 +123,20 @@
                                 <dd class="col-sm-6">
                                     <span class="badge bg-primary">@Model.BillFormat</span>
                                 </dd>
+                                
+                                <dt class="col-sm-6">Is Discount Approval Required</dt>
+                                <dd class="col-sm-6">
+                                    <span class="badge @(Model.IsDiscountApprovalRequired ? "bg-success" : "bg-danger")">
+                                        @(Model.IsDiscountApprovalRequired ? "Yes" : "No")
+                                    </span>
+                                </dd>
+
+                                <dt class="col-sm-6">Card Payment Approval Required</dt>
+                                <dd class="col-sm-6">
+                                    <span class="badge @(Model.IsCardPaymentApprovalRequired ? "bg-success" : "bg-danger")">
+                                        @(Model.IsCardPaymentApprovalRequired ? "Yes" : "No")
+                                    </span>
+                                </dd>
                             </dl>
                         </div>
                     </div>

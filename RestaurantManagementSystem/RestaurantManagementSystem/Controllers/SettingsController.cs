@@ -166,6 +166,8 @@ namespace RestaurantManagementSystem.Controllers
                 TakeAwayGSTPercentage = model.TakeAwayGSTPercentage,
                 IsDefaultGSTRequired = model.IsDefaultGSTRequired,
                 IsTakeAwayGSTRequired = model.IsTakeAwayGSTRequired,
+                IsDiscountApprovalRequired = model.IsDiscountApprovalRequired,
+                IsCardPaymentApprovalRequired = model.IsCardPaymentApprovalRequired,
                 BillFormat = model.BillFormat,
                 CreatedAt = model.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
                 UpdatedAt = model.UpdatedAt.ToString("dd MMM yyyy, hh:mm tt")
@@ -193,6 +195,8 @@ namespace RestaurantManagementSystem.Controllers
                 TakeAwayGSTPercentage = viewModel.TakeAwayGSTPercentage,
                 IsDefaultGSTRequired = viewModel.IsDefaultGSTRequired,
                 IsTakeAwayGSTRequired = viewModel.IsTakeAwayGSTRequired,
+                IsDiscountApprovalRequired = viewModel.IsDiscountApprovalRequired,
+                IsCardPaymentApprovalRequired = viewModel.IsCardPaymentApprovalRequired,
                 BillFormat = viewModel.BillFormat,
                 UpdatedAt = DateTime.Now
             };

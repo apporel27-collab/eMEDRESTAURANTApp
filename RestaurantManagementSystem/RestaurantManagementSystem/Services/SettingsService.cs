@@ -86,6 +86,8 @@ namespace RestaurantManagementSystem.Services
                     currentSettings.TakeAwayGSTPercentage = settings.TakeAwayGSTPercentage;
                     currentSettings.IsDefaultGSTRequired = settings.IsDefaultGSTRequired;
                     currentSettings.IsTakeAwayGSTRequired = settings.IsTakeAwayGSTRequired;
+                    currentSettings.IsDiscountApprovalRequired = settings.IsDiscountApprovalRequired;
+                    currentSettings.IsCardPaymentApprovalRequired = settings.IsCardPaymentApprovalRequired;
                     currentSettings.BillFormat = settings.BillFormat;
                     currentSettings.UpdatedAt = DateTime.Now;
                     
@@ -145,7 +147,9 @@ namespace RestaurantManagementSystem.Services
                         [DefaultGSTPercentage] DECIMAL(5,2) NOT NULL DEFAULT 5.00,
                         [TakeAwayGSTPercentage] DECIMAL(5,2) NOT NULL DEFAULT 5.00,
                         [IsDefaultGSTRequired] BIT NOT NULL DEFAULT 1,
-                        [IsTakeAwayGSTRequired] BIT NOT NULL DEFAULT 1,
+                            [IsTakeAwayGSTRequired] BIT NOT NULL DEFAULT 1,
+                            [IsDiscountApprovalRequired] BIT NOT NULL DEFAULT 0,
+                            [IsCardPaymentApprovalRequired] BIT NOT NULL DEFAULT 0,
                         [BillFormat] NVARCHAR(10) NOT NULL DEFAULT N'A4',
                         [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(),
                         [UpdatedAt] DATETIME NOT NULL DEFAULT GETDATE()
@@ -168,6 +172,8 @@ namespace RestaurantManagementSystem.Services
                         [TakeAwayGSTPercentage],
                         [IsDefaultGSTRequired],
                         [IsTakeAwayGSTRequired],
+                        [IsDiscountApprovalRequired],
+                        [IsCardPaymentApprovalRequired],
                         [BillFormat]
                     )
                     VALUES (
@@ -186,6 +192,8 @@ namespace RestaurantManagementSystem.Services
                         5.00,
                         1,
                         1,
+                        0,
+                        0,
                         'A4'
                     );", connection);
                     
@@ -255,6 +263,36 @@ namespace RestaurantManagementSystem.Services
                         ALTER TABLE [dbo].[RestaurantSettings] 
                         ADD [BillFormat] NVARCHAR(10) NOT NULL DEFAULT N'A4'", connection);
                     await addColumn3.ExecuteNonQueryAsync();
+                }
+
+                // Ensure IsDiscountApprovalRequired column exists
+                var checkColumn4 = new SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'RestaurantSettings' 
+                    AND COLUMN_NAME = 'IsDiscountApprovalRequired'
+                    AND TABLE_SCHEMA = 'dbo'", connection);
+                var column4Exists = (int)await checkColumn4.ExecuteScalarAsync() > 0;
+                if (!column4Exists)
+                {
+                    var addColumn4 = new SqlCommand(@"
+                        ALTER TABLE [dbo].[RestaurantSettings] 
+                        ADD [IsDiscountApprovalRequired] BIT NOT NULL DEFAULT 0", connection);
+                    await addColumn4.ExecuteNonQueryAsync();
+                }
+
+                // Ensure IsCardPaymentApprovalRequired column exists
+                var checkColumn5 = new SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'RestaurantSettings' 
+                    AND COLUMN_NAME = 'IsCardPaymentApprovalRequired'
+                    AND TABLE_SCHEMA = 'dbo'", connection);
+                var column5Exists = (int)await checkColumn5.ExecuteScalarAsync() > 0;
+                if (!column5Exists)
+                {
+                    var addColumn5 = new SqlCommand(@"
+                        ALTER TABLE [dbo].[RestaurantSettings] 
+                        ADD [IsCardPaymentApprovalRequired] BIT NOT NULL DEFAULT 0", connection);
+                    await addColumn5.ExecuteNonQueryAsync();
                 }
             }
         }

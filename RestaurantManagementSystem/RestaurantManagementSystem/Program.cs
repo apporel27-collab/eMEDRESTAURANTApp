@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using RestaurantManagementSystem.Utilities;
+using Microsoft.Data.SqlClient;
 
 namespace RestaurantManagementSystem
 {
@@ -78,6 +79,40 @@ namespace RestaurantManagementSystem
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
+
+            // Ensure compatibility view exists so code that expects dbo.MenuItemGroups works
+            try
+            {
+                using (var scope = app.Services.CreateScope())
+                {
+                    var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+                    var connStr = configuration.GetConnectionString("DefaultConnection");
+                    if (!string.IsNullOrWhiteSpace(connStr))
+                    {
+                        using var conn = new SqlConnection(connStr);
+                        conn.Open();
+                        var checkViewSql = @"SELECT COUNT(*) FROM sys.views WHERE object_id = OBJECT_ID(N'dbo.MenuItemGroups')";
+                        using var checkCmd = new SqlCommand(checkViewSql, conn);
+                        var exists = (int)checkCmd.ExecuteScalar() > 0;
+                        if (!exists)
+                        {
+                            var createViewSql = @"
+IF OBJECT_ID('dbo.MenuItemGroups', 'V') IS NULL
+BEGIN
+    CREATE VIEW dbo.MenuItemGroups AS
+    SELECT ID, itemgroup AS ItemGroup, is_active AS IsActive, GST_Perc
+    FROM dbo.menuitemgroup;
+END";
+                            using var createCmd = new SqlCommand(createViewSql, conn);
+                            createCmd.ExecuteNonQuery();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Non-fatal; if DB access isn't available at startup, the controller will attempt to create the table.
+            }
 
             // Removed blocking admin initialization; now handled by AdminInitializationHostedService
 

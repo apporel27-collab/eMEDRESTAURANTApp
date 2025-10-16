@@ -254,6 +254,32 @@
                                             <div class="help-text">Choose the format for printing bills and receipts</div>
                                         </div>
                                     </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-3">
+                                            <label asp-for="IsDiscountApprovalRequired" class="control-label"></label>
+                                            <div class="form-check form-switch">
+                                                <input asp-for="IsDiscountApprovalRequired" class="form-check-input" type="checkbox" id="isDiscountApprovalRequired">
+                                                <label class="form-check-label" for="isDiscountApprovalRequired">
+                                                    Require approval for discounts
+                                                </label>
+                                            </div>
+                                            <span asp-validation-for="IsDiscountApprovalRequired" class="field-validation-error"></span>
+                                            <div class="help-text">When enabled, discounts require manager approval</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-3">
+                                            <label asp-for="IsCardPaymentApprovalRequired" class="control-label"></label>
+                                            <div class="form-check form-switch">
+                                                <input asp-for="IsCardPaymentApprovalRequired" class="form-check-input" type="checkbox" id="isCardPaymentApprovalRequired">
+                                                <label class="form-check-label" for="isCardPaymentApprovalRequired">
+                                                    Require approval for card payments
+                                                </label>
+                                            </div>
+                                            <span asp-validation-for="IsCardPaymentApprovalRequired" class="field-validation-error"></span>
+                                            <div class="help-text">When enabled, card payments over configured limits require approval</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
