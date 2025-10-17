@@ -1,3 +1,5 @@
+@model RestaurantManagementSystem.Models.CustomerReportViewModel
+
 @{
     ViewData["Title"] = "Customer Reports";
 }
@@ -18,30 +20,125 @@
         </div>
     </div>
 
+    <form method="post" asp-action="Customers" class="row g-3 align-items-end mb-4">
+        <div class="col-auto">
+            <label asp-for="Filter.From" class="form-label">From</label>
+            <input asp-for="Filter.From" class="form-control" />
+        </div>
+        <div class="col-auto">
+            <label asp-for="Filter.To" class="form-label">To</label>
+            <input asp-for="Filter.To" class="form-control" />
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Run Report</button>
+        </div>
+    </form>
+
     <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-user-chart me-2"></i>Customer Analytics</h5>
-                </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
                 <div class="card-body">
-                    <div class="text-center py-5">
-                        <i class="fas fa-users fa-4x text-muted mb-3"></i>
-                        <h4>Customer Reports Coming Soon</h4>
-                        <p class="text-muted">Customer behavior and analytics will be available here.</p>
-                        <div class="mt-4">
-                            <h6>Planned Features:</h6>
-                            <ul class="list-unstyled mt-3">
-                                <li><i class="fas fa-check text-success me-2"></i>Customer Visit Frequency</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Customer Lifetime Value</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Loyalty Program Analytics</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Customer Preferences</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Demographic Analysis</li>
-                            </ul>
-                        </div>
-                    </div>
+                    <h5 class="card-title">Total Customers</h5>
+                    <p class="display-6">@Model.Summary.TotalCustomers</p>
+                    <small class="text-muted">New: @Model.Summary.NewCustomers | Returning: @Model.Summary.ReturningCustomers</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Avg Visits</h5>
+                    <p class="display-6">@Model.Summary.AverageVisitsPerCustomer</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Revenue</h5>
+                    <p class="display-6">@Model.Summary.TotalRevenue.ToString("C")</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-lg-6">
+            <div class="card mb-3">
+                <div class="card-header">Top Customers</div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr><th>Name</th><th>Phone</th><th>Visits</th><th>Revenue</th><th>LTV</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in Model.TopCustomers)
+                            {
+                                <tr>
+                                    <td>@c.Name</td>
+                                    <td>@c.Phone</td>
+                                    <td>@c.Visits</td>
+                                    <td>@c.Revenue.ToString("C")</td>
+                                    <td>@c.LTV.ToString("C")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card mb-3">
+                <div class="card-header">Visit Frequency</div>
+                <div class="card-body">
+                    <canvas id="visitFrequencyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-lg-6">
+            <div class="card mb-3">
+                <div class="card-header">Loyalty Buckets</div>
+                <div class="card-body">
+                    <ul>
+                        @foreach (var b in Model.LoyaltyStats)
+                        {
+                            <li>@b.Bucket: @b.CustomerCount</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card mb-3">
+                <div class="card-header">Demographics</div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead><tr><th>Category</th><th>Count</th></tr></thead>
+                        <tbody>
+                            @foreach (var d in Model.Demographics)
+                            {
+                                <tr><td>@d.Category</td><td>@d.Count</td></tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        (function(){
+            var visits = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.VisitFrequencies.Select(x=> new { x.Period, x.Visits, x.Revenue })));
+            var ctx = document.getElementById('visitFrequencyChart').getContext('2d');
+            var labels = visits.map(v=>v.Period);
+            var data = visits.map(v=>v.Visits);
+            new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: 'Visits', data: data, borderColor: '#007bff', fill:false }] }, options: { responsive:true } });
+        })();
+    </script>
+}

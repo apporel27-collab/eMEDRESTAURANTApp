@@ -89,16 +89,45 @@ namespace RestaurantManagementSystem.Controllers
             return View(viewModel);
         }
 
-        public IActionResult Menu()
+        [HttpGet]
+        public async Task<IActionResult> Menu()
         {
             ViewData["Title"] = "Menu Analysis";
-            return View();
+            var viewModel = new MenuReportViewModel();
+            // Load default report (last 30 days)
+            await LoadMenuReportDataAsync(viewModel);
+            return View(viewModel);
         }
 
-        public IActionResult Customers()
+        [HttpPost]
+        public async Task<IActionResult> Menu(MenuReportFilter filter)
+        {
+            ViewData["Title"] = "Menu Analysis";
+            var viewModel = new MenuReportViewModel
+            {
+                Filter = filter
+            };
+
+            await LoadMenuReportDataAsync(viewModel);
+            return View(viewModel);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Customers()
         {
             ViewData["Title"] = "Customer Reports";
-            return View();
+            var model = new CustomerReportViewModel();
+            await LoadCustomerReportDataAsync(model);
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Customers(CustomerReportFilter filter)
+        {
+            ViewData["Title"] = "Customer Reports";
+            var model = new CustomerReportViewModel { Filter = filter };
+            await LoadCustomerReportDataAsync(model);
+            return View(model);
         }
 
         public IActionResult Financial()
@@ -571,6 +600,207 @@ namespace RestaurantManagementSystem.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error loading GST Breakup report: {ex.Message}");
+            }
+        }
+
+        private async Task LoadCustomerReportDataAsync(CustomerReportViewModel model)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+                using var command = new SqlCommand("usp_GetCustomerAnalysis", connection) { CommandType = CommandType.StoredProcedure };
+                command.Parameters.AddWithValue("@FromDate", (object?)model.Filter.From?.Date ?? DBNull.Value);
+                command.Parameters.AddWithValue("@ToDate", (object?)model.Filter.To?.Date ?? DBNull.Value);
+
+                // Clear existing
+                model.TopCustomers.Clear();
+                model.VisitFrequencies.Clear();
+                model.LoyaltyStats.Clear();
+                model.Demographics.Clear();
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                // Summary
+                if (await reader.ReadAsync())
+                {
+                    model.Summary = new CustomerSummary
+                    {
+                        TotalCustomers = reader.IsDBNull(reader.GetOrdinal("TotalCustomers")) ? 0 : reader.GetInt32(reader.GetOrdinal("TotalCustomers")),
+                        NewCustomers = reader.IsDBNull(reader.GetOrdinal("NewCustomers")) ? 0 : reader.GetInt32(reader.GetOrdinal("NewCustomers")),
+                        ReturningCustomers = reader.IsDBNull(reader.GetOrdinal("ReturningCustomers")) ? 0 : reader.GetInt32(reader.GetOrdinal("ReturningCustomers")),
+                        AverageVisitsPerCustomer = reader.IsDBNull(reader.GetOrdinal("AverageVisitsPerCustomer")) ? 0 : reader.GetDecimal(reader.GetOrdinal("AverageVisitsPerCustomer")),
+                        TotalRevenue = reader.IsDBNull(reader.GetOrdinal("TotalRevenue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("TotalRevenue"))
+                    };
+                }
+
+                // Top Customers
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        model.TopCustomers.Add(new TopCustomer
+                        {
+                            CustomerId = reader.IsDBNull(reader.GetOrdinal("CustomerId")) ? null : (int?)reader.GetInt32(reader.GetOrdinal("CustomerId")),
+                            Name = reader.IsDBNull(reader.GetOrdinal("Name")) ? string.Empty : reader.GetString(reader.GetOrdinal("Name")),
+                            Phone = reader.IsDBNull(reader.GetOrdinal("Phone")) ? string.Empty : reader.GetString(reader.GetOrdinal("Phone")),
+                            Visits = reader.IsDBNull(reader.GetOrdinal("Visits")) ? 0 : reader.GetInt32(reader.GetOrdinal("Visits")),
+                            Revenue = reader.IsDBNull(reader.GetOrdinal("Revenue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("Revenue")),
+                            LTV = reader.IsDBNull(reader.GetOrdinal("LTV")) ? 0 : reader.GetDecimal(reader.GetOrdinal("LTV"))
+                        });
+                    }
+                }
+
+                // Visit Frequency
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        model.VisitFrequencies.Add(new VisitFrequency
+                        {
+                            Period = reader.IsDBNull(reader.GetOrdinal("PeriodLabel")) ? string.Empty : reader.GetString(reader.GetOrdinal("PeriodLabel")),
+                            Visits = reader.IsDBNull(reader.GetOrdinal("Visits")) ? 0 : reader.GetInt32(reader.GetOrdinal("Visits")),
+                            Revenue = reader.IsDBNull(reader.GetOrdinal("Revenue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("Revenue"))
+                        });
+                    }
+                }
+
+                // Loyalty buckets
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        model.LoyaltyStats.Add(new LoyaltyBucket
+                        {
+                            Bucket = reader.IsDBNull(reader.GetOrdinal("Bucket")) ? string.Empty : reader.GetString(reader.GetOrdinal("Bucket")),
+                            CustomerCount = reader.IsDBNull(reader.GetOrdinal("CustomerCount")) ? 0 : reader.GetInt32(reader.GetOrdinal("CustomerCount"))
+                        });
+                    }
+                }
+
+                // Demographics
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        model.Demographics.Add(new DemographicRow
+                        {
+                            Category = reader.IsDBNull(reader.GetOrdinal("Category")) ? string.Empty : reader.GetString(reader.GetOrdinal("Category")),
+                            Count = reader.IsDBNull(reader.GetOrdinal("Count")) ? 0 : reader.GetInt32(reader.GetOrdinal("Count"))
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading customer report: {ex.Message}");
+            }
+        }
+
+        private async Task LoadMenuReportDataAsync(MenuReportViewModel viewModel)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand("usp_GetMenuAnalysis", connection)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
+
+                command.Parameters.Add(new SqlParameter("@FromDate", SqlDbType.Date) { Value = (object?)viewModel.Filter.From?.Date ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@ToDate", SqlDbType.Date) { Value = (object?)viewModel.Filter.To?.Date ?? DBNull.Value });
+
+                // Clear existing collections
+                viewModel.TopItems.Clear();
+                viewModel.CategoryPerformance.Clear();
+                viewModel.SeasonalTrends.Clear();
+                viewModel.Recommendations.Clear();
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                // Summary (first result set)
+                if (await reader.ReadAsync())
+                {
+                    viewModel.Summary = new MenuSummary
+                    {
+                        TotalItemsSold = reader.IsDBNull(reader.GetOrdinal("TotalItemsSold")) ? 0 : reader.GetInt32(reader.GetOrdinal("TotalItemsSold")),
+                        TotalRevenue = reader.IsDBNull(reader.GetOrdinal("TotalRevenue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("TotalRevenue")),
+                        AveragePrice = reader.IsDBNull(reader.GetOrdinal("AveragePrice")) ? 0 : reader.GetDecimal(reader.GetOrdinal("AveragePrice")),
+                        OverallGP = reader.IsDBNull(reader.GetOrdinal("OverallGP")) ? 0 : reader.GetDecimal(reader.GetOrdinal("OverallGP"))
+                    };
+                }
+
+                // Top Items (second result set)
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        try
+                        {
+                            viewModel.TopItems.Add(new MenuTopItem
+                            {
+                                MenuItemId = reader.IsDBNull(reader.GetOrdinal("MenuItemId")) ? 0 : reader.GetInt32(reader.GetOrdinal("MenuItemId")),
+                                Name = reader.IsDBNull(reader.GetOrdinal("ItemName")) ? string.Empty : reader.GetString(reader.GetOrdinal("ItemName")),
+                                Quantity = reader.IsDBNull(reader.GetOrdinal("QuantitySold")) ? 0 : reader.GetInt32(reader.GetOrdinal("QuantitySold")),
+                                Revenue = reader.IsDBNull(reader.GetOrdinal("Revenue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("Revenue")),
+                                Profit = reader.IsDBNull(reader.GetOrdinal("Profit")) ? 0 : reader.GetDecimal(reader.GetOrdinal("Profit"))
+                            });
+                        }
+                        catch (Exception exItem)
+                        {
+                            Console.WriteLine($"TopItems row skipped: {exItem.Message}");
+                        }
+                    }
+                }
+
+                // Category Performance (third result set)
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        viewModel.CategoryPerformance.Add(new CategoryPerformance
+                        {
+                            Category = reader.IsDBNull(reader.GetOrdinal("CategoryName")) ? string.Empty : reader.GetString(reader.GetOrdinal("CategoryName")),
+                            ItemsSold = reader.IsDBNull(reader.GetOrdinal("ItemsSold")) ? 0 : reader.GetInt32(reader.GetOrdinal("ItemsSold")),
+                            Revenue = reader.IsDBNull(reader.GetOrdinal("Revenue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("Revenue")),
+                            AverageGP = reader.IsDBNull(reader.GetOrdinal("AverageGP")) ? 0 : reader.GetDecimal(reader.GetOrdinal("AverageGP"))
+                        });
+                    }
+                }
+
+                // Seasonal Trends (fourth result set)
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        viewModel.SeasonalTrends.Add(new SeasonalTrend
+                        {
+                            Period = reader.IsDBNull(reader.GetOrdinal("PeriodLabel")) ? string.Empty : reader.GetString(reader.GetOrdinal("PeriodLabel")),
+                            ItemsSold = reader.IsDBNull(reader.GetOrdinal("ItemsSold")) ? 0 : reader.GetInt32(reader.GetOrdinal("ItemsSold")),
+                            Revenue = reader.IsDBNull(reader.GetOrdinal("Revenue")) ? 0 : reader.GetDecimal(reader.GetOrdinal("Revenue"))
+                        });
+                    }
+                }
+
+                // Recommendations (fifth result set)
+                if (await reader.NextResultAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        viewModel.Recommendations.Add(new MenuRecommendation
+                        {
+                            Recommendation = reader.IsDBNull(reader.GetOrdinal("RecommendationText")) ? string.Empty : reader.GetString(reader.GetOrdinal("RecommendationText")),
+                            Rationale = reader.IsDBNull(reader.GetOrdinal("Rationale")) ? string.Empty : reader.GetString(reader.GetOrdinal("Rationale"))
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading menu report data: {ex.Message}");
+                viewModel.Summary = new MenuSummary();
             }
         }
     }

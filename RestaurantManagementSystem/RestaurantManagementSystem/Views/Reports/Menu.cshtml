@@ -1,3 +1,5 @@
+@model RestaurantManagementSystem.Models.MenuReportViewModel
+
 @{
     ViewData["Title"] = "Menu Analysis";
 }
@@ -18,30 +20,182 @@
         </div>
     </div>
 
+    <form method="post" asp-action="Menu" class="row g-3 align-items-end mb-4">
+        <div class="col-auto">
+            <label asp-for="Filter.From" class="form-label">From</label>
+            <input asp-for="Filter.From" class="form-control" />
+        </div>
+        <div class="col-auto">
+            <label asp-for="Filter.To" class="form-label">To</label>
+            <input asp-for="Filter.To" class="form-control" />
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Run Report</button>
+        </div>
+    </form>
+
     <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Menu Performance</h5>
-                </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
                 <div class="card-body">
-                    <div class="text-center py-5">
-                        <i class="fas fa-utensils fa-4x text-muted mb-3"></i>
-                        <h4>Menu Analysis Coming Soon</h4>
-                        <p class="text-muted">Comprehensive menu performance and analytics will be available here.</p>
-                        <div class="mt-4">
-                            <h6>Planned Features:</h6>
-                            <ul class="list-unstyled mt-3">
-                                <li><i class="fas fa-check text-success me-2"></i>Most Popular Items</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Item Profitability Analysis</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Menu Category Performance</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Seasonal Trends</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Item Recommendation Engine</li>
-                            </ul>
-                        </div>
-                    </div>
+                    <h5 class="card-title">Total Items Sold</h5>
+                    <p class="display-6">@Model.Summary.TotalItemsSold</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Revenue</h5>
+                    <p class="display-6">@Model.Summary.TotalRevenue.ToString("C")</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Average Price</h5>
+                    <p class="display-6">@Model.Summary.AveragePrice.ToString("C")</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Overall GP</h5>
+                    <p class="display-6">@Model.Summary.OverallGP.ToString("P2")</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-lg-6">
+            <div class="card mb-3">
+                <div class="card-header">Top Items</div>
+                <div class="card-body">
+                    <canvas id="topItemsChart"></canvas>
+                    <table class="table table-sm mt-3">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Revenue</th>
+                                <th>GP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var it in Model.TopItems)
+                            {
+                                <tr>
+                                    <td>@it.Name</td>
+                                    <td>@it.Quantity</td>
+                                    <td>@it.Revenue.ToString("C")</td>
+                                    <td>@(it.GP.ToString("F1")) %</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card mb-3">
+                <div class="card-header">Category Performance</div>
+                <div class="card-body">
+                    <canvas id="categoryChart"></canvas>
+                    <table class="table table-sm mt-3">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Items Sold</th>
+                                <th>Revenue</th>
+                                <th>Avg GP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in Model.CategoryPerformance)
+                            {
+                                <tr>
+                                    <td>@c.Category</td>
+                                    <td>@c.ItemsSold</td>
+                                    <td>@c.Revenue.ToString("C")</td>
+                                    <td>@c.AverageGP.ToString("P1")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card mb-3">
+                <div class="card-header">Seasonal Trends</div>
+                <div class="card-body">
+                    <canvas id="seasonalChart" style="height:300px"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card mb-3">
+                <div class="card-header">Recommendations</div>
+                <div class="card-body">
+                    <ul>
+                        @foreach (var r in Model.Recommendations)
+                        {
+                            <li><strong>@r.Recommendation</strong><br/><small class="text-muted">@r.Rationale</small></li>
+                        }
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        (function() {
+            var topItems = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TopItems.Select(x => new { x.Name, x.Quantity } )));
+            var categoryData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CategoryPerformance.Select(x => new { x.Category, x.Revenue })));
+            var seasonal = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SeasonalTrends.Select(x => new { x.Period, x.Revenue })));
+
+            // Top Items Bar
+            var ctx = document.getElementById('topItemsChart').getContext('2d');
+            var labels = topItems.map(i => i.Name);
+            var data = topItems.map(i => i.Quantity);
+            new Chart(ctx, {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Quantity Sold', data: data, backgroundColor: 'rgba(54, 162, 235, 0.7)' }] },
+                options: { responsive: true }
+            });
+
+            // Category Revenue Pie
+            var ctx2 = document.getElementById('categoryChart').getContext('2d');
+            var labels2 = categoryData.map(c => c.Category);
+            var data2 = categoryData.map(c => c.Revenue);
+            new Chart(ctx2, {
+                type: 'doughnut',
+                data: { labels: labels2, datasets: [{ label: 'Revenue', data: data2, backgroundColor: ['#007bff','#28a745','#ffc107','#dc3545','#6f42c1'] }] },
+                options: { responsive: true }
+            });
+
+            // Seasonal Line
+            var ctx3 = document.getElementById('seasonalChart').getContext('2d');
+            var labels3 = seasonal.map(s => s.Period);
+            var data3 = seasonal.map(s => s.Revenue);
+            new Chart(ctx3, {
+                type: 'line',
+                data: { labels: labels3, datasets: [{ label: 'Revenue', data: data3, borderColor: '#28a745', fill: false }] },
+                options: { responsive: true }
+            });
+        })();
+    </script>
+}
