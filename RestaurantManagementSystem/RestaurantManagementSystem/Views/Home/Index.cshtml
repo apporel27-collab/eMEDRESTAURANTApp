@@ -539,10 +539,12 @@
                                 var pluCode = $(this).find('td:eq(0)').text().trim();
                                 var name = $(this).find('td:eq(2)').text().trim();
                                 var category = $(this).find('td:eq(3)').text().trim();
-                                var price = $(this).find('td:eq(4)').text().trim();
-                                
-                                // Extract numeric price value
-                                var numericPrice = price.replace(/[^\d.]/g, ''); // Remove all non-numeric characters except decimal
+                                // Menu Index columns: 0=PLU,1=Image,2=Name,3=Category,4=SubCategory,5=Price
+                                var price = $(this).find('td:eq(5)').text().trim();
+
+                                // Extract numeric price value robustly (handles currency symbols and words)
+                                var numericPriceMatch = price.match(/([0-9]+([.,][0-9]+)?)/);
+                                var numericPrice = numericPriceMatch ? numericPriceMatch[0].replace(',', '') : '';
                                 
                                 tableBody.append(`
                                     <tr data-price="${numericPrice}">
