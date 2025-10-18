@@ -1,0 +1,105 @@
+@model RestaurantManagementSystem.Models.KitchenReportViewModel
+@{
+    ViewData["Title"] = "Kitchen KOT Report";
+}
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <h2><i class="fas fa-hamburger me-2"></i>Kitchen (KOT) Report</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Reports" asp-action="Index">Reports</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Kitchen KOT</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label>From</label>
+            <input type="date" id="fromDate" class="form-control" value="@Model.Filter.FromDate?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-md-3">
+            <label>To</label>
+            <input type="date" id="toDate" class="form-control" value="@Model.Filter.ToDate?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-md-3">
+            <label>Station</label>
+            <select id="stationFilter" class="form-control">
+                <option value="">All Stations</option>
+                @foreach(var s in Model.AvailableStations)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <div>
+                <button id="applyFilter" class="btn btn-primary me-2">Apply</button>
+                <button id="exportCsv" class="btn btn-outline-secondary">Export CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="data-table-container">
+                <table id="kotTable" class="table table-striped table-hover table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Order #</th>
+                            <th>Table</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Station</th>
+                            <th>Status</th>
+                            <th>Requested At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach(var it in Model.Items)
+                        {
+                            <tr>
+                                <td>@it.OrderNumber</td>
+                                <td>@it.TableName</td>
+                                <td>@it.ItemName</td>
+                                <td>@it.Quantity</td>
+                                <td>@it.Station</td>
+                                <td>@it.Status</td>
+                                <td>@it.RequestedAt.ToString("g")</td>
+                            </tr>
+                        }
+                        @if(!Model.Items.Any())
+                        {
+                            <tr><td colspan="7" class="text-center">No items found for selected criteria</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(function(){
+            $('#kotTable').DataTable({"pageLength":50, "order": [[6, 'desc']]});
+
+            $('#applyFilter').on('click', function(){
+                var from = $('#fromDate').val();
+                var to = $('#toDate').val();
+                var station = $('#stationFilter').val();
+                var query = `?from=${from}&to=${to}&station=${encodeURIComponent(station||'')}`;
+                window.location = '/Reports/Kitchen' + query;
+            });
+
+            $('#exportCsv').on('click', function(){
+                var from = $('#fromDate').val();
+                var to = $('#toDate').val();
+                var station = $('#stationFilter').val();
+                window.location = `/Reports/KitchenExport?from=${from}&to=${to}&station=${encodeURIComponent(station||'')}`;
+            });
+        });
+    </script>
+
+</div>

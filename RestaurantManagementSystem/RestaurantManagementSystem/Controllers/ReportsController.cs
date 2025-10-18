@@ -136,6 +136,91 @@ namespace RestaurantManagementSystem.Controllers
             return View();
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Kitchen(DateTime? from, DateTime? to, string station)
+        {
+            ViewData["Title"] = "Kitchen KOT Report";
+            var model = new KitchenReportViewModel();
+
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var cmd = new SqlCommand("usp_GetKitchenKOTReport", connection) { CommandType = CommandType.StoredProcedure };
+                cmd.Parameters.AddWithValue("@FromDate", from.HasValue ? (object)from.Value.Date : DBNull.Value);
+                cmd.Parameters.AddWithValue("@ToDate", to.HasValue ? (object)to.Value.Date : DBNull.Value);
+                cmd.Parameters.AddWithValue("@Station", !string.IsNullOrWhiteSpace(station) ? (object)station : DBNull.Value);
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    model.Items.Add(new KOTItem
+                    {
+                        OrderId = reader.GetInt32("OrderId"),
+                        OrderNumber = reader.GetString("OrderNumber"),
+                        TableName = reader.IsDBNull("TableName") ? "" : reader.GetString("TableName"),
+                        ItemName = reader.IsDBNull("ItemName") ? "" : reader.GetString("ItemName"),
+                        Quantity = reader.IsDBNull("Quantity") ? 0 : reader.GetInt32("Quantity"),
+                        Station = reader.IsDBNull("Station") ? "" : reader.GetString("Station"),
+                        Status = reader.IsDBNull("Status") ? "" : reader.GetString("Status"),
+                        RequestedAt = reader.IsDBNull("RequestedAt") ? DateTime.MinValue : reader.GetDateTime("RequestedAt")
+                    });
+                }
+
+                // Load stations list
+                using var cmd2 = new SqlCommand(@"SELECT DISTINCT s.Name FROM Stations s ORDER BY s.Name", connection);
+                using var reader2 = await cmd2.ExecuteReaderAsync();
+                while (await reader2.ReadAsync()) model.AvailableStations.Add(reader2.GetString(0));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading kitchen report: {ex.Message}");
+            }
+
+            return View(model);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> KitchenExport(DateTime? from, DateTime? to, string station)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("OrderNumber,TableName,ItemName,Quantity,Station,Status,RequestedAt");
+
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var cmd = new SqlCommand("usp_GetKitchenKOTReport", connection) { CommandType = CommandType.StoredProcedure };
+                cmd.Parameters.AddWithValue("@FromDate", from.HasValue ? (object)from.Value.Date : DBNull.Value);
+                cmd.Parameters.AddWithValue("@ToDate", to.HasValue ? (object)to.Value.Date : DBNull.Value);
+                cmd.Parameters.AddWithValue("@Station", !string.IsNullOrWhiteSpace(station) ? (object)station : DBNull.Value);
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var line = string.Format("\"{0}\",\"{1}\",\"{2}\",{3},\"{4}\",\"{5}\",\"{6}\"",
+                        reader.GetString(reader.GetOrdinal("OrderNumber")),
+                        reader.IsDBNull(reader.GetOrdinal("TableName")) ? "" : reader.GetString(reader.GetOrdinal("TableName")),
+                        reader.IsDBNull(reader.GetOrdinal("ItemName")) ? "" : reader.GetString(reader.GetOrdinal("ItemName")),
+                        reader.IsDBNull(reader.GetOrdinal("Quantity")) ? 0 : reader.GetInt32(reader.GetOrdinal("Quantity")),
+                        reader.IsDBNull(reader.GetOrdinal("Station")) ? "" : reader.GetString(reader.GetOrdinal("Station")),
+                        reader.IsDBNull(reader.GetOrdinal("Status")) ? "" : reader.GetString(reader.GetOrdinal("Status")),
+                        reader.IsDBNull(reader.GetOrdinal("RequestedAt")) ? "" : reader.GetDateTime(reader.GetOrdinal("RequestedAt")).ToString("o")
+                    );
+                    sb.AppendLine(line);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error exporting kitchen report: {ex.Message}");
+            }
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            return File(bytes, "text/csv", "KitchenKOTReport.csv");
+        }
+
         private async Task LoadAvailableUsersAsync(SalesReportViewModel viewModel)
         {
             try
