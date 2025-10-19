@@ -510,6 +510,27 @@ END", connection))
                                         if (paymentStatus == 1) // Approved
                                         {
                                             TempData["SuccessMessage"] = "Payment processed successfully.";
+                                            // If approved, attempt to mark order as completed when fully paid
+                                            try
+                                            {
+                                                if (!reader.IsClosed) reader.Close();
+                                                using (var orderUpdateCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                                    UPDATE Orders
+                                                    SET Status = 3, -- Completed
+                                                        CompletedAt = CASE WHEN Status < 3 AND CompletedAt IS NULL THEN GETDATE() ELSE CompletedAt END,
+                                                        UpdatedAt = GETDATE()
+                                                    WHERE Id = @OrderId
+                                                      AND Status < 3
+                                                      AND (
+                                                          SELECT ISNULL(SUM(Amount + TipAmount), 0) FROM Payments WHERE OrderId = @OrderId AND Status = 1
+                                                      ) >= TotalAmount
+                                                ", connection))
+                                                {
+                                                    orderUpdateCmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                                    orderUpdateCmd.ExecuteNonQuery();
+                                                }
+                                            }
+                                            catch { /* ignore order update failures */ }
                                         }
                                         else // Pending
                                         {
@@ -828,6 +849,28 @@ END", connection))
                                     {
                                         return RedirectToAction("Dashboard");
                                     }
+                                    // After approval, ensure order status is updated if fully paid
+                                    try
+                                    {
+                                        if (!reader.IsClosed) reader.Close();
+                                        using (var orderUpdateCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                            UPDATE Orders
+                                            SET Status = 3, -- Completed
+                                                CompletedAt = CASE WHEN Status < 3 AND CompletedAt IS NULL THEN GETDATE() ELSE CompletedAt END,
+                                                UpdatedAt = GETDATE()
+                                            WHERE Id = @OrderId
+                                              AND Status < 3
+                                              AND (
+                                                  SELECT ISNULL(SUM(Amount + TipAmount), 0) FROM Payments WHERE OrderId = @OrderId AND Status = 1
+                                              ) >= TotalAmount
+                                        ", connection))
+                                        {
+                                            orderUpdateCmd.Parameters.AddWithValue("@OrderId", orderId);
+                                            orderUpdateCmd.ExecuteNonQuery();
+                                        }
+                                    }
+                                    catch { /* don't block UI on order update failure */ }
+
                                     return RedirectToAction("Index", new { id = orderId });
                                 }
                                 else
@@ -952,6 +995,28 @@ END", connection))
                                 
                                 if (rowsAffected > 0)
                                 {
+                                    // After approval, ensure order status is updated if fully paid
+                                    try
+                                    {
+                                        if (!reader.IsClosed) reader.Close();
+                                        using (var orderUpdateCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                            UPDATE Orders
+                                            SET Status = 3, -- Completed
+                                                CompletedAt = CASE WHEN Status < 3 AND CompletedAt IS NULL THEN GETDATE() ELSE CompletedAt END,
+                                                UpdatedAt = GETDATE()
+                                            WHERE Id = @OrderId
+                                              AND Status < 3
+                                              AND (
+                                                  SELECT ISNULL(SUM(Amount + TipAmount), 0) FROM Payments WHERE OrderId = @OrderId AND Status = 1
+                                              ) >= TotalAmount
+                                        ", connection))
+                                        {
+                                            orderUpdateCmd.Parameters.AddWithValue("@OrderId", orderId);
+                                            orderUpdateCmd.ExecuteNonQuery();
+                                        }
+                                    }
+                                    catch { /* ignore */ }
+
                                     return Json(new { 
                                         success = true, 
                                         message = $"Payment for order #{orderNumber} approved successfully.",
