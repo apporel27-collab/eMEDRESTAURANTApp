@@ -26,6 +26,15 @@ BEGIN
         ('COMP', 'Complimentary', 0, 0, 1)
 END
 
+-- Ensure existing databases get the DiscAmount column on Payments if it's missing
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Payments]') AND type in (N'U'))
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE Name = N'DiscAmount' AND Object_ID = OBJECT_ID(N'dbo.Payments'))
+    BEGIN
+        ALTER TABLE dbo.Payments ADD DiscAmount DECIMAL(18,2) NOT NULL DEFAULT(0);
+    END
+END
+
 -- Create Payments table if it doesn't exist
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Payments]') AND type in (N'U'))
 BEGIN
@@ -34,6 +43,7 @@ BEGIN
         [OrderId] [int] NOT NULL,
         [PaymentMethodId] [int] NOT NULL,
         [Amount] [decimal](18,2) NOT NULL,
+        [DiscAmount] [decimal](18,2) NOT NULL DEFAULT(0),
         [TipAmount] [decimal](18,2) NOT NULL DEFAULT(0),
         [Status] [int] NOT NULL DEFAULT(0), -- 0=Pending, 1=Approved, 2=Rejected, 3=Voided
         [ReferenceNumber] [nvarchar](100) NULL,
@@ -188,7 +198,7 @@ BEGIN
 END
 GO
 
--- Create stored procedure to process a payment
+-- Create stored procedure to process a payment (GST-aware)
 IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[usp_ProcessPayment]') AND type in (N'P', N'PC'))
     DROP PROCEDURE [dbo].[usp_ProcessPayment]
 GO
@@ -197,66 +207,48 @@ CREATE PROCEDURE [dbo].[usp_ProcessPayment]
     @OrderId INT,
     @PaymentMethodId INT,
     @Amount DECIMAL(18,2),
-    @TipAmount DECIMAL(18,2),
+    @TipAmount DECIMAL(18,2) = 0,
     @ReferenceNumber NVARCHAR(100) = NULL,
     @LastFourDigits NVARCHAR(4) = NULL,
     @CardType NVARCHAR(50) = NULL,
     @AuthorizationCode NVARCHAR(50) = NULL,
     @Notes NVARCHAR(500) = NULL,
     @ProcessedBy INT = NULL,
-    @ProcessedByName NVARCHAR(100) = NULL
+    @ProcessedByName NVARCHAR(100) = NULL,
+    @GSTAmount DECIMAL(18,2) = NULL,
+    @CGSTAmount DECIMAL(18,2) = NULL,
+    @SGSTAmount DECIMAL(18,2) = NULL,
+    @DiscAmount DECIMAL(18,2) = NULL,
+    @GST_Perc DECIMAL(10,4) = NULL,
+    @CGST_Perc DECIMAL(10,4) = NULL,
+    @SGST_Perc DECIMAL(10,4) = NULL,
+    @Amount_ExclGST DECIMAL(18,2) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     
-    DECLARE @OrderStatus INT;
-    DECLARE @OrderTotal DECIMAL(18,2);
-    DECLARE @CurrentlyPaid DECIMAL(18,2);
-    DECLARE @PaymentStatus INT = 1; -- Default to approved
     DECLARE @PaymentId INT;
-    DECLARE @ErrorMessage NVARCHAR(200);
-    
+    DECLARE @PaymentStatus INT;
+    DECLARE @Message NVARCHAR(500);
+    DECLARE @RequiresApproval BIT;
+
     BEGIN TRY
-        BEGIN TRANSACTION;
-        
-        -- Validate the order
-        SELECT @OrderStatus = Status, @OrderTotal = TotalAmount
-        FROM Orders
-        WHERE Id = @OrderId;
-        
-        IF @OrderStatus IS NULL
+        -- Validate order exists
+        IF NOT EXISTS (SELECT 1 FROM Orders WHERE Id = @OrderId)
         BEGIN
-            SET @ErrorMessage = 'Order not found.';
-            RAISERROR(@ErrorMessage, 16, 1);
+            SELECT 0 AS PaymentId, 0 AS PaymentStatus, 'Order not found' AS Message;
             RETURN;
         END
         
-        IF @OrderStatus = 4 -- Cancelled
-        BEGIN
-            SET @ErrorMessage = 'Cannot process payment for a cancelled order.';
-            RAISERROR(@ErrorMessage, 16, 1);
-            RETURN;
-        END
+        -- Get payment method details
+        SELECT @RequiresApproval = RequiresApproval
+        FROM PaymentMethods
+        WHERE Id = @PaymentMethodId;
         
-        IF @OrderStatus = 3 -- Completed
-        BEGIN
-            SET @ErrorMessage = 'Order is already completed. Additional payments require manager approval.';
-            SET @PaymentStatus = 0; -- Set to pending
-        END
+        -- Set payment status based on approval requirement
+        SET @PaymentStatus = CASE WHEN @RequiresApproval = 1 THEN 0 ELSE 1 END;
         
-        -- Calculate currently paid amount
-        SELECT @CurrentlyPaid = ISNULL(SUM(Amount + TipAmount), 0)
-        FROM Payments
-        WHERE OrderId = @OrderId AND Status = 1; -- Approved payments only
-        
-        -- Validate payment amount
-        IF (@CurrentlyPaid + @Amount + @TipAmount) > (@OrderTotal * 1.1) -- Allow up to 10% overpayment
-        BEGIN
-            SET @ErrorMessage = 'Payment amount exceeds order total by more than 10%.';
-            THROW 51000, @ErrorMessage, 1;
-        END
-        
-        -- Create payment record
+        -- Insert payment with GST information
         INSERT INTO Payments (
             OrderId,
             PaymentMethodId,
@@ -269,7 +261,17 @@ BEGIN
             AuthorizationCode,
             Notes,
             ProcessedBy,
-            ProcessedByName
+            ProcessedByName,
+            GSTAmount,
+            CGSTAmount,
+            SGSTAmount,
+            DiscAmount,
+            GST_Perc,
+            CGST_Perc,
+            SGST_Perc,
+            Amount_ExclGST,
+            CreatedAt,
+            UpdatedAt
         )
         VALUES (
             @OrderId,
@@ -283,43 +285,55 @@ BEGIN
             @AuthorizationCode,
             @Notes,
             @ProcessedBy,
-            @ProcessedByName
+            @ProcessedByName,
+            @GSTAmount,
+            @CGSTAmount,
+            @SGSTAmount,
+            @DiscAmount,
+            @GST_Perc,
+            @CGST_Perc,
+            @SGST_Perc,
+            @Amount_ExclGST,
+            GETDATE(),
+            GETDATE()
         );
         
         SET @PaymentId = SCOPE_IDENTITY();
         
-        -- Update order if fully paid
-        IF (@CurrentlyPaid + @Amount + @TipAmount) >= @OrderTotal AND @OrderStatus < 3
+        -- Check if order is fully paid
+        DECLARE @TotalPaid DECIMAL(18,2);
+        DECLARE @OrderTotal DECIMAL(18,2);
+        
+        SELECT @TotalPaid = ISNULL(SUM(Amount + TipAmount), 0)
+        FROM Payments
+        WHERE OrderId = @OrderId AND Status = 1; -- Approved payments only
+        
+        SELECT @OrderTotal = TotalAmount
+        FROM Orders
+        WHERE Id = @OrderId;
+        
+        -- Update order status if fully paid
+        IF @TotalPaid >= @OrderTotal
         BEGIN
-            -- Update order status to completed
             UPDATE Orders
-            SET Status = 3, -- Completed
-                CompletedAt = GETDATE(),
-                UpdatedAt = GETDATE(),
-                TipAmount = TipAmount + @TipAmount -- Add this payment's tip to order total tip
-            WHERE Id = @OrderId;
-        END
-        ELSE IF @TipAmount > 0
-        BEGIN
-            -- Update order with additional tip amount
-            UPDATE Orders
-            SET TipAmount = TipAmount + @TipAmount,
+            SET Status = CASE WHEN Status < 3 THEN 3 ELSE Status END, -- Set to Completed if not already completed or cancelled
+                CompletedAt = CASE WHEN Status < 3 AND CompletedAt IS NULL THEN GETDATE() ELSE CompletedAt END,
                 UpdatedAt = GETDATE()
             WHERE Id = @OrderId;
         END
         
-        COMMIT TRANSACTION;
+        SET @Message = CASE 
+            WHEN @PaymentStatus = 1 THEN 'Payment processed successfully'
+            ELSE 'Payment saved for approval'
+        END;
         
-        -- Return payment ID and status
-        SELECT @PaymentId AS PaymentId, @PaymentStatus AS Status, 'Payment processed successfully.' AS Message;
+        SELECT @PaymentId AS PaymentId, @PaymentStatus AS PaymentStatus, @Message AS Message;
+        
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-            
-        -- Return error
-        SELECT 0 AS PaymentId, -1 AS Status, ERROR_MESSAGE() AS Message;
-    END CATCH;
+        SET @Message = 'Error processing payment: ' + ERROR_MESSAGE();
+        SELECT 0 AS PaymentId, -1 AS PaymentStatus, @Message AS Message;
+    END CATCH
 END
 GO
 
@@ -345,7 +359,7 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         
-        -- Get payment information
+        -- Get payment information (including per-payment discount)
         SELECT 
             @OrderId = OrderId,
             @PaymentAmount = Amount,
@@ -368,11 +382,15 @@ BEGIN
             RETURN;
         END
         
-        -- Update payment status to voided
+        -- Update payment status to voided (capture DiscAmount before update)
+        DECLARE @PaymentDiscAmount DECIMAL(18,2) = 0;
+        SELECT @PaymentDiscAmount = ISNULL(DiscAmount, 0) FROM Payments WHERE Id = @PaymentId;
+
         UPDATE Payments
         SET Status = 3, -- Voided
             Notes = ISNULL(Notes + ' | ', '') + 'VOIDED: ' + @Reason,
-            UpdatedAt = GETDATE()
+            UpdatedAt = GETDATE(),
+            DiscAmount = 0 -- clear per-payment discount for voided payment
         WHERE Id = @PaymentId;
         
         -- Update order to reduce tip amount
@@ -380,6 +398,41 @@ BEGIN
         BEGIN
             UPDATE Orders
             SET TipAmount = TipAmount - @TipAmount,
+                UpdatedAt = GETDATE()
+            WHERE Id = @OrderId;
+        END
+
+        -- If the voided payment had a discount amount, subtract it from Orders.DiscountAmount
+        IF @PaymentDiscAmount > 0
+        BEGIN
+            -- Subtract the disc amount and recalculate TaxAmount and TotalAmount based on the order's subtotal
+            DECLARE @CurrentDiscount DECIMAL(18,2);
+            DECLARE @OrderSubtotal DECIMAL(18,2);
+            DECLARE @OrderTip DECIMAL(18,2);
+            DECLARE @GSTPerc DECIMAL(10,4) = 0;
+
+            SELECT @CurrentDiscount = ISNULL(DiscountAmount, 0),
+                   @OrderSubtotal = Subtotal,
+                   @OrderTip = ISNULL(TipAmount, 0)
+            FROM Orders WHERE Id = @OrderId;
+
+            -- Get GST percentage from settings if available
+            SELECT @GSTPerc = ISNULL(DefaultGSTPercentage, 0) FROM dbo.RestaurantSettings;
+
+            DECLARE @NewDiscount DECIMAL(18,2) = CASE WHEN @CurrentDiscount - @PaymentDiscAmount >= 0 THEN @CurrentDiscount - @PaymentDiscAmount ELSE 0 END;
+            DECLARE @NetSubtotal DECIMAL(18,2) = @OrderSubtotal - @NewDiscount;
+            IF @NetSubtotal < 0 SET @NetSubtotal = 0;
+
+            DECLARE @NewTaxAmount DECIMAL(18,2) = 0;
+            IF @GSTPerc > 0
+                SET @NewTaxAmount = ROUND(@NetSubtotal * @GSTPerc / 100.0, 2);
+
+            DECLARE @NewTotalAmount DECIMAL(18,2) = @NetSubtotal + @NewTaxAmount + @OrderTip;
+
+            UPDATE Orders
+            SET DiscountAmount = @NewDiscount,
+                TaxAmount = @NewTaxAmount,
+                TotalAmount = @NewTotalAmount,
                 UpdatedAt = GETDATE()
             WHERE Id = @OrderId;
         END
@@ -549,7 +602,7 @@ BEGIN
             INSERT INTO SplitBillItems (
                 SplitBillId,
                 OrderItemId,
-                LastQuantity,
+                Quantity,
                 Amount
             )
             VALUES (
