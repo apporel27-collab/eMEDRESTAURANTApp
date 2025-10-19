@@ -88,9 +88,13 @@
                                                         <div class="flex-grow-1">
                                                             <h6 class="text-primary fw-bold mb-1">@paymentMethod.PaymentMethodDisplayName</h6>
                                                             <h4 class="text-dark mb-1 fw-bold">₹@paymentMethod.TotalAmount.ToString("N2")</h4>
-                                                            <small class="text-muted">
+                                                            <small class="text-muted d-block">
                                                                 <i class="fas fa-receipt me-1"></i>@paymentMethod.TransactionCount transaction@(paymentMethod.TransactionCount != 1 ? "s" : "")
                                                             </small>
+                                                            @if (paymentMethod.TotalGST > 0)
+                                                            {
+                                                                <small class="text-muted d-block">GST: ₹@paymentMethod.TotalGST.ToString("N2")</small>
+                                                            }
                                                         </div>
                                                         <div class="text-primary">
                                                             @switch (paymentMethod.PaymentMethodName.ToLower())

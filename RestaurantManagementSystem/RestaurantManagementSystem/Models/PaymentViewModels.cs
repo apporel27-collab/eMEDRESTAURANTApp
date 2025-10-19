@@ -202,6 +202,8 @@ namespace RestaurantManagementSystem.Models
         public string PaymentMethodName { get; set; }
         public string PaymentMethodDisplayName { get; set; }
         public decimal TotalAmount { get; set; }
+        // New: total GST collected via this payment method (CGST + SGST)
+        public decimal TotalGST { get; set; }
         public int TransactionCount { get; set; }
     }
     

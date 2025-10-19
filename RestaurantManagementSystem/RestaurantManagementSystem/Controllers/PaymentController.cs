@@ -1457,11 +1457,10 @@ END", connection))
                     }
                 }
 
-                // Calculate today's GST from actual processed payments (Payment Amount - Order Subtotal)
+                // Calculate today's GST from actual processed payments (use CGST + SGST when available)
                 using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    SELECT ISNULL(SUM(p.Amount - o.Subtotal), 0) AS TotalGST
+                    SELECT ISNULL(SUM(ISNULL(p.CGSTAmount,0) + ISNULL(p.SGSTAmount,0)), 0) AS TotalGST
                     FROM Payments p
-                    INNER JOIN Orders o ON p.OrderId = o.Id
                     WHERE p.Status = 1 -- Approved payments only
                         AND CAST(p.CreatedAt AS DATE) = CAST(GETDATE() AS DATE)", connection))
                 {
@@ -1481,6 +1480,7 @@ END", connection))
                         pm.Name AS PaymentMethodName,
                         pm.DisplayName AS PaymentMethodDisplayName,
                         ISNULL(SUM(p.Amount), 0) AS TotalAmount,
+                        ISNULL(SUM(ISNULL(p.CGSTAmount,0) + ISNULL(p.SGSTAmount,0)), 0) AS TotalGST,
                         COUNT(p.Id) AS TransactionCount
                     FROM PaymentMethods pm
                     LEFT JOIN Payments p ON pm.Id = p.PaymentMethodId 
@@ -1500,6 +1500,7 @@ END", connection))
                                 PaymentMethodName = reader.GetString("PaymentMethodName"),
                                 PaymentMethodDisplayName = reader.GetString("PaymentMethodDisplayName"),
                                 TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                                TotalGST = Convert.ToDecimal(reader["TotalGST"]),
                                 TransactionCount = reader.GetInt32("TransactionCount")
                             });
                         }
