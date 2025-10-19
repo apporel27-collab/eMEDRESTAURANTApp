@@ -729,6 +729,38 @@ END", connection))
                                     
                                     if (result > 0)
                                     {
+                                        // Recalculate order discount/ tax / total from remaining non-voided payments
+                                        try
+                                        {
+                                            if (!reader.IsClosed) reader.Close();
+                                            using (var recalcCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                                DECLARE @OrderId INT = @OrderIdParam;
+                                                DECLARE @TotalDiscount DECIMAL(18,2) = ISNULL((SELECT SUM(ISNULL(DiscAmount,0)) FROM Payments WHERE OrderId = @OrderId AND Status <> 3), 0);
+                                                DECLARE @Subtotal DECIMAL(18,2) = ISNULL((SELECT Subtotal FROM Orders WHERE Id = @OrderId), 0);
+                                                DECLARE @Tip DECIMAL(18,2) = ISNULL((SELECT TipAmount FROM Orders WHERE Id = @OrderId), 0);
+                                                DECLARE @GSTPerc DECIMAL(10,4) = ISNULL((SELECT DefaultGSTPercentage FROM dbo.RestaurantSettings), 0);
+                                                DECLARE @NetSubtotal DECIMAL(18,2) = @Subtotal - @TotalDiscount;
+                                                IF @NetSubtotal < 0 SET @NetSubtotal = 0;
+                                                DECLARE @NewTax DECIMAL(18,2) = 0;
+                                                IF @GSTPerc > 0 SET @NewTax = ROUND(@NetSubtotal * @GSTPerc / 100.0, 2);
+                                                DECLARE @NewTotal DECIMAL(18,2) = @NetSubtotal + @NewTax + @Tip;
+                                                UPDATE Orders
+                                                SET DiscountAmount = @TotalDiscount,
+                                                    TaxAmount = @NewTax,
+                                                    TotalAmount = @NewTotal,
+                                                    UpdatedAt = GETDATE()
+                                                WHERE Id = @OrderId;", connection))
+                                            {
+                                                recalcCmd.Parameters.AddWithValue("@OrderIdParam", model.OrderId);
+                                                recalcCmd.ExecuteNonQuery();
+                                            }
+                                        }
+                                        catch
+                                        {
+                                            // Recalc failure should not block void success; log if logger available
+                                            try { _logger?.LogWarning("Failed to recalculate order totals after voiding payment {PaymentId}", model.PaymentId); } catch { }
+                                        }
+
                                         TempData["SuccessMessage"] = "Payment voided successfully.";
                                         return RedirectToAction("Index", new { id = model.OrderId });
                                     }
@@ -1541,21 +1573,38 @@ END", connection))
                     
                     using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                     {
-                        // First result set: Order details
+                        // Helper to get ordinal safely
+                        int OrdinalOrMinus(SqlDataReader r, string name)
+                        {
+                            try { return r.GetOrdinal(name); } catch (IndexOutOfRangeException) { return -1; }
+                        }
+
+                        // First result set: Order details (use ordinals to be resilient to schema changes)
                         if (reader.Read())
                         {
-                            model.OrderNumber = reader.GetString(1);
-                            model.Subtotal = reader.GetDecimal(2);
-                            model.TaxAmount = reader.GetDecimal(3);
-                            model.TipAmount = reader.GetDecimal(4);
-                            model.DiscountAmount = reader.GetDecimal(5);
-                            model.TotalAmount = reader.GetDecimal(6);
-                            model.PaidAmount = reader.GetDecimal(7);
-                            model.RemainingAmount = reader.GetDecimal(8);
-                            model.TableName = reader.GetString(9);
+                            int ordOrderNumber = OrdinalOrMinus(reader, "OrderNumber");
+                            int ordSubtotal = OrdinalOrMinus(reader, "Subtotal");
+                            int ordTaxAmount = OrdinalOrMinus(reader, "TaxAmount");
+                            int ordTipAmount = OrdinalOrMinus(reader, "TipAmount");
+                            int ordDiscountAmount = OrdinalOrMinus(reader, "DiscountAmount");
+                            int ordTotalAmount = OrdinalOrMinus(reader, "TotalAmount");
+                            int ordPaidAmount = OrdinalOrMinus(reader, "PaidAmount");
+                            int ordRemainingAmount = OrdinalOrMinus(reader, "RemainingAmount");
+                            int ordTableName = OrdinalOrMinus(reader, "TableName");
+                            int ordStatus = OrdinalOrMinus(reader, "Status");
+
+                            model.OrderNumber = (ordOrderNumber >= 0 && !reader.IsDBNull(ordOrderNumber)) ? reader.GetString(ordOrderNumber) : string.Empty;
+                            model.Subtotal = (ordSubtotal >= 0 && !reader.IsDBNull(ordSubtotal)) ? reader.GetDecimal(ordSubtotal) : 0m;
+                            model.TaxAmount = (ordTaxAmount >= 0 && !reader.IsDBNull(ordTaxAmount)) ? reader.GetDecimal(ordTaxAmount) : 0m;
+                            model.TipAmount = (ordTipAmount >= 0 && !reader.IsDBNull(ordTipAmount)) ? reader.GetDecimal(ordTipAmount) : 0m;
+                            model.DiscountAmount = (ordDiscountAmount >= 0 && !reader.IsDBNull(ordDiscountAmount)) ? reader.GetDecimal(ordDiscountAmount) : 0m;
+                            model.TotalAmount = (ordTotalAmount >= 0 && !reader.IsDBNull(ordTotalAmount)) ? reader.GetDecimal(ordTotalAmount) : 0m;
+                            model.PaidAmount = (ordPaidAmount >= 0 && !reader.IsDBNull(ordPaidAmount)) ? reader.GetDecimal(ordPaidAmount) : 0m;
+                            model.RemainingAmount = (ordRemainingAmount >= 0 && !reader.IsDBNull(ordRemainingAmount)) ? reader.GetDecimal(ordRemainingAmount) : 0m;
+                            model.TableName = (ordTableName >= 0 && !reader.IsDBNull(ordTableName)) ? reader.GetString(ordTableName) : string.Empty;
                             // Override with merged table names if available
                             model.TableName = GetMergedTableDisplayName(orderId, model.TableName);
-                            model.OrderStatus = reader.GetInt32(10);
+                            model.OrderStatus = (ordStatus >= 0 && !reader.IsDBNull(ordStatus)) ? reader.GetInt32(ordStatus) : 0;
                             model.OrderStatusDisplay = model.OrderStatus switch
                             {
                                 0 => "Open",
@@ -1596,35 +1645,62 @@ END", connection))
                         decimal totalSGSTFromPayments = 0m;
                         decimal gstPercentageFromPayments = 5.0m; // Default fallback
                         
+                        // compute ordinals for commonly expected columns (if present)
+                        int ordId = OrdinalOrMinus(reader, "Id");
+                        int ordPaymentMethodId = OrdinalOrMinus(reader, "PaymentMethodId");
+                        int ordPaymentMethodName = OrdinalOrMinus(reader, "PaymentMethod");
+                        if (ordPaymentMethodName == -1) ordPaymentMethodName = OrdinalOrMinus(reader, "PaymentMethodName");
+                        int ordPaymentMethodDisplay = OrdinalOrMinus(reader, "PaymentMethodDisplay");
+                        if (ordPaymentMethodDisplay == -1) ordPaymentMethodDisplay = OrdinalOrMinus(reader, "PaymentMethodDisplayName");
+                        int ordAmount = OrdinalOrMinus(reader, "Amount");
+                        int ordTip = OrdinalOrMinus(reader, "TipAmount");
+                        int ordPaymentStatus = OrdinalOrMinus(reader, "Status");
+                        int ordReference = OrdinalOrMinus(reader, "ReferenceNumber");
+                        int ordLastFour = OrdinalOrMinus(reader, "LastFourDigits");
+                        int ordCardType = OrdinalOrMinus(reader, "CardType");
+                        int ordAuthCode = OrdinalOrMinus(reader, "AuthorizationCode");
+                        int ordNotes = OrdinalOrMinus(reader, "Notes");
+                        int ordProcessedByName = OrdinalOrMinus(reader, "ProcessedByName");
+                        int ordCreatedAt = OrdinalOrMinus(reader, "CreatedAt");
+
+                        int ordGSTAmount = OrdinalOrMinus(reader, "GSTAmount");
+                        int ordCGSTAmount = OrdinalOrMinus(reader, "CGSTAmount");
+                        int ordSGSTAmount = OrdinalOrMinus(reader, "SGSTAmount");
+                        int ordDiscAmount = OrdinalOrMinus(reader, "DiscAmount");
+                        int ordGSTPerc = OrdinalOrMinus(reader, "GST_Perc");
+                        int ordCGSTPerc = OrdinalOrMinus(reader, "CGST_Perc");
+                        int ordSGSTPerc = OrdinalOrMinus(reader, "SGST_Perc");
+                        int ordAmountExcl = OrdinalOrMinus(reader, "Amount_ExclGST");
+
                         while (reader.Read())
                         {
-                            var payment = new Payment
-                            {
-                                Id = reader.GetInt32(0),
-                                PaymentMethodId = reader.GetInt32(1),
-                                PaymentMethodName = reader.GetString(2),
-                                PaymentMethodDisplay = reader.GetString(3),
-                                Amount = reader.GetDecimal(4),
-                                TipAmount = reader.GetDecimal(5),
-                                Status = reader.GetInt32(6),
-                                ReferenceNumber = reader.IsDBNull(7) ? null : reader.GetString(7),
-                                LastFourDigits = reader.IsDBNull(8) ? null : reader.GetString(8),
-                                CardType = reader.IsDBNull(9) ? null : reader.GetString(9),
-                                AuthorizationCode = reader.IsDBNull(10) ? null : reader.GetString(10),
-                                Notes = reader.IsDBNull(11) ? null : reader.GetString(11),
-                                ProcessedByName = reader.IsDBNull(12) ? null : reader.GetString(12),
-                                CreatedAt = reader.GetDateTime(13),
-                                // Read GST information from database
-                                GSTAmount = reader.IsDBNull(14) ? null : reader.GetDecimal(14),
-                                CGSTAmount = reader.IsDBNull(15) ? null : reader.GetDecimal(15),
-                                SGSTAmount = reader.IsDBNull(16) ? null : reader.GetDecimal(16),
-                                DiscAmount = reader.IsDBNull(17) ? null : reader.GetDecimal(17),
-                                GST_Perc = reader.IsDBNull(18) ? null : reader.GetDecimal(18),
-                                CGST_Perc = reader.IsDBNull(19) ? null : reader.GetDecimal(19),
-                                SGST_Perc = reader.IsDBNull(20) ? null : reader.GetDecimal(20),
-                                Amount_ExclGST = reader.IsDBNull(21) ? null : reader.GetDecimal(21)
-                            };
-                            
+                            var payment = new Payment();
+
+                            if (ordId >= 0 && !reader.IsDBNull(ordId)) payment.Id = reader.GetInt32(ordId);
+                            if (ordPaymentMethodId >= 0 && !reader.IsDBNull(ordPaymentMethodId)) payment.PaymentMethodId = reader.GetInt32(ordPaymentMethodId);
+                            if (ordPaymentMethodName >= 0 && !reader.IsDBNull(ordPaymentMethodName)) payment.PaymentMethodName = reader.GetString(ordPaymentMethodName);
+                            if (ordPaymentMethodDisplay >= 0 && !reader.IsDBNull(ordPaymentMethodDisplay)) payment.PaymentMethodDisplay = reader.GetString(ordPaymentMethodDisplay);
+                            if (ordAmount >= 0 && !reader.IsDBNull(ordAmount)) payment.Amount = reader.GetDecimal(ordAmount);
+                            if (ordTip >= 0 && !reader.IsDBNull(ordTip)) payment.TipAmount = reader.GetDecimal(ordTip);
+                            if (ordPaymentStatus >= 0 && !reader.IsDBNull(ordPaymentStatus)) payment.Status = reader.GetInt32(ordPaymentStatus);
+                            if (ordReference >= 0 && !reader.IsDBNull(ordReference)) payment.ReferenceNumber = reader.GetString(ordReference);
+                            if (ordLastFour >= 0 && !reader.IsDBNull(ordLastFour)) payment.LastFourDigits = reader.GetString(ordLastFour);
+                            if (ordCardType >= 0 && !reader.IsDBNull(ordCardType)) payment.CardType = reader.GetString(ordCardType);
+                            if (ordAuthCode >= 0 && !reader.IsDBNull(ordAuthCode)) payment.AuthorizationCode = reader.GetString(ordAuthCode);
+                            if (ordNotes >= 0 && !reader.IsDBNull(ordNotes)) payment.Notes = reader.GetString(ordNotes);
+                            if (ordProcessedByName >= 0 && !reader.IsDBNull(ordProcessedByName)) payment.ProcessedByName = reader.GetString(ordProcessedByName);
+                            if (ordCreatedAt >= 0 && !reader.IsDBNull(ordCreatedAt)) payment.CreatedAt = reader.GetDateTime(ordCreatedAt);
+
+                            // GST fields (optional)
+                            if (ordGSTAmount >= 0 && !reader.IsDBNull(ordGSTAmount)) payment.GSTAmount = reader.GetDecimal(ordGSTAmount);
+                            if (ordCGSTAmount >= 0 && !reader.IsDBNull(ordCGSTAmount)) payment.CGSTAmount = reader.GetDecimal(ordCGSTAmount);
+                            if (ordSGSTAmount >= 0 && !reader.IsDBNull(ordSGSTAmount)) payment.SGSTAmount = reader.GetDecimal(ordSGSTAmount);
+                            if (ordDiscAmount >= 0 && !reader.IsDBNull(ordDiscAmount)) payment.DiscAmount = reader.GetDecimal(ordDiscAmount);
+                            if (ordGSTPerc >= 0 && !reader.IsDBNull(ordGSTPerc)) payment.GST_Perc = reader.GetDecimal(ordGSTPerc);
+                            if (ordCGSTPerc >= 0 && !reader.IsDBNull(ordCGSTPerc)) payment.CGST_Perc = reader.GetDecimal(ordCGSTPerc);
+                            if (ordSGSTPerc >= 0 && !reader.IsDBNull(ordSGSTPerc)) payment.SGST_Perc = reader.GetDecimal(ordSGSTPerc);
+                            if (ordAmountExcl >= 0 && !reader.IsDBNull(ordAmountExcl)) payment.Amount_ExclGST = reader.GetDecimal(ordAmountExcl);
+
                             model.Payments.Add(payment);
                             
                             // If this is an approved payment with GST data, accumulate GST information
