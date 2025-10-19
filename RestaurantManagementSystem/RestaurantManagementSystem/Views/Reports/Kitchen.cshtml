@@ -1,105 +1,142 @@
 @model RestaurantManagementSystem.Models.KitchenReportViewModel
+
 @{
     ViewData["Title"] = "Kitchen KOT Report";
 }
 
 <div class="container-fluid">
-    <div class="row mb-3">
+    <div class="row">
         <div class="col-12">
-            <h2><i class="fas fa-hamburger me-2"></i>Kitchen (KOT) Report</h2>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a asp-controller="Reports" asp-action="Index">Reports</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Kitchen KOT</li>
-                </ol>
-            </nav>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-hamburger me-2"></i>Kitchen (KOT) Report</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                        <li class="breadcrumb-item">Reports</li>
+                        <li class="breadcrumb-item active">Kitchen</li>
+                    </ol>
+                </nav>
+            </div>
         </div>
     </div>
 
-    <div class="row mb-3">
-        <div class="col-md-3">
-            <label>From</label>
-            <input type="date" id="fromDate" class="form-control" value="@Model.Filter.FromDate?.ToString("yyyy-MM-dd")" />
+    <form method="get" asp-action="Kitchen" class="row g-3 align-items-end mb-4">
+        <div class="col-auto">
+            <label class="form-label">From</label>
+            <input name="from" type="date" class="form-control" value="@Model.Filter.FromDate?.ToString("yyyy-MM-dd")" />
         </div>
-        <div class="col-md-3">
-            <label>To</label>
-            <input type="date" id="toDate" class="form-control" value="@Model.Filter.ToDate?.ToString("yyyy-MM-dd")" />
+        <div class="col-auto">
+            <label class="form-label">To</label>
+            <input name="to" type="date" class="form-control" value="@Model.Filter.ToDate?.ToString("yyyy-MM-dd")" />
         </div>
-        <div class="col-md-3">
-            <label>Station</label>
-            <select id="stationFilter" class="form-control">
+        <div class="col-auto">
+            <label class="form-label">Station</label>
+            <select name="station" class="form-control">
                 <option value="">All Stations</option>
                 @foreach(var s in Model.AvailableStations)
                 {
-                    <option value="@s">@s</option>
+                    <option value="@s" selected="@(Model.Filter.Station == s ? "selected" : null)">@s</option>
                 }
             </select>
         </div>
-        <div class="col-md-3 d-flex align-items-end">
-            <div>
-                <button id="applyFilter" class="btn btn-primary me-2">Apply</button>
-                <button id="exportCsv" class="btn btn-outline-secondary">Export CSV</button>
-            </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Run Report</button>
+            <a class="btn btn-outline-secondary ms-2" href="@Url.Action("KitchenExport", "Reports", new { from = Model.Filter.FromDate?.ToString("yyyy-MM-dd"), to = Model.Filter.ToDate?.ToString("yyyy-MM-dd"), station = Model.Filter.Station })">Export CSV</a>
         </div>
-    </div>
+    </form>
 
     <div class="row">
-        <div class="col-12">
-            <div class="data-table-container">
-                <table id="kotTable" class="table table-striped table-hover table-sm">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Order #</th>
-                            <th>Table</th>
-                            <th>Item</th>
-                            <th>Qty</th>
-                            <th>Station</th>
-                            <th>Status</th>
-                            <th>Requested At</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach(var it in Model.Items)
-                        {
-                            <tr>
-                                <td>@it.OrderNumber</td>
-                                <td>@it.TableName</td>
-                                <td>@it.ItemName</td>
-                                <td>@it.Quantity</td>
-                                <td>@it.Station</td>
-                                <td>@it.Status</td>
-                                <td>@it.RequestedAt.ToString("g")</td>
-                            </tr>
-                        }
-                        @if(!Model.Items.Any())
-                        {
-                            <tr><td colspan="7" class="text-center">No items found for selected criteria</td></tr>
-                        }
-                    </tbody>
-                </table>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Items</h5>
+                    <p class="display-6">@Model.Items.Count()</p>
+                    <small class="text-muted">Showing items matching filters</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Pending</h5>
+                    <p class="display-6">@Model.Items.Count(i => i.Status == "Pending")</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Completed</h5>
+                    <p class="display-6">@Model.Items.Count(i => i.Status == "Completed")</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Stations</h5>
+                    <p class="display-6">@Model.AvailableStations.Count()</p>
+                </div>
             </div>
         </div>
     </div>
 
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">KOT Items</div>
+                <div class="card-body p-0">
+                    <table id="kotTable" class="table table-striped table-hover table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Order #</th>
+                                <th>Table</th>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Station</th>
+                                <th>Status</th>
+                                <th>Requested At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach(var it in Model.Items)
+                            {
+                                <tr>
+                                    <td>@it.OrderNumber</td>
+                                    <td>@it.TableName</td>
+                                    <td>@it.ItemName</td>
+                                    <td>@it.Quantity</td>
+                                    <td>@it.Station</td>
+                                    <td>@it.Status</td>
+                                    <td>@it.RequestedAt.ToString("g")</td>
+                                </tr>
+                            }
+                            @if(!Model.Items.Any())
+                            {
+                                <tr>
+                                    <td class="text-center">No items found for selected criteria</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         $(function(){
             $('#kotTable').DataTable({"pageLength":50, "order": [[6, 'desc']]});
-
-            $('#applyFilter').on('click', function(){
-                var from = $('#fromDate').val();
-                var to = $('#toDate').val();
-                var station = $('#stationFilter').val();
-                var query = `?from=${from}&to=${to}&station=${encodeURIComponent(station||'')}`;
-                window.location = '/Reports/Kitchen' + query;
-            });
-
-            $('#exportCsv').on('click', function(){
-                var from = $('#fromDate').val();
-                var to = $('#toDate').val();
-                var station = $('#stationFilter').val();
-                window.location = `/Reports/KitchenExport?from=${from}&to=${to}&station=${encodeURIComponent(station||'')}`;
-            });
         });
     </script>
+}
 
-</div>

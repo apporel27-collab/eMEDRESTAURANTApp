@@ -118,6 +118,13 @@
                                         @(Model.IsTakeAwayGSTRequired ? "Yes" : "No")
                                     </span>
                                 </dd>
+
+                                <dt class="col-sm-6">Take Away GST Included Required</dt>
+                                <dd class="col-sm-6">
+                                    <span class="badge @(Model.IsTakeawayIncludedGSTReq ? "bg-success" : "bg-danger")">
+                                        @(Model.IsTakeawayIncludedGSTReq ? "Yes" : "No")
+                                    </span>
+                                </dd>
                                 
                                 <dt class="col-sm-6">Bill Format</dt>
                                 <dd class="col-sm-6">

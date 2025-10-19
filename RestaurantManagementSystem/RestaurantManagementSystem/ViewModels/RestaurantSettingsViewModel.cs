@@ -86,6 +86,9 @@ namespace RestaurantManagementSystem.ViewModels
         [Display(Name = "Is Take Away GST Required")]
         public bool IsTakeAwayGSTRequired { get; set; } = true;
 
+            [Display(Name = "Take Away GST Included Required")]
+            public bool IsTakeawayIncludedGSTReq { get; set; } = false;
+
     [Display(Name = "Is Discount Approval Required")]
     public bool IsDiscountApprovalRequired { get; set; } = false;
 

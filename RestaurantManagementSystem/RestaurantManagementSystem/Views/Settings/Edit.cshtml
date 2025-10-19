@@ -245,6 +245,19 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group mb-3">
+                                            <label asp-for="IsTakeawayIncludedGSTReq" class="control-label"></label>
+                                            <div class="form-check form-switch">
+                                                <input asp-for="IsTakeawayIncludedGSTReq" class="form-check-input" type="checkbox" id="isTakeawayIncludedGSTReq">
+                                                <label class="form-check-label" for="isTakeawayIncludedGSTReq">
+                                                    Take Away GST Included Required
+                                                </label>
+                                            </div>
+                                            <span asp-validation-for="IsTakeawayIncludedGSTReq" class="field-validation-error"></span>
+                                            <div class="help-text">When enabled, take-away items are treated as GST-included by default</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-3">
                                             <label asp-for="BillFormat" class="control-label"></label>
                                             <select asp-for="BillFormat" class="form-select">
                                                 <option value="A4">A4 Format</option>
