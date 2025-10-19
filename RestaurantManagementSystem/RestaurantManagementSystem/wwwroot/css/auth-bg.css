@@ -1,0 +1,56 @@
+/* Login background styles: restaurant/bar themed */
+.auth-bg-hero {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    /* Primary: local image if present. Fallback: Unsplash restaurant interior to ensure visible background in dev. */
+    background-image: url('/images/login-bg-restaurant.jpg'), url('https://images.unsplash.com/photo-1541542684-42d6b6f5b1b6?q=80&w=1600&auto=format&fit=crop&ixlib=rb-4.0.3&s=8f5e9a5b6c0b1f1e8a2c3e4d5f6a7b8c');
+    background-size: cover, cover;
+    background-position: center center, center center;
+    background-repeat: no-repeat, no-repeat;
+    background-attachment: fixed;
+    filter: saturate(0.9) contrast(0.92);
+}
+
+/* Override the default auth-body background so the hero image shows through */
+.auth-body {
+    background: none !important;
+}
+
+.auth-bg-overlay {
+    position: fixed;
+    inset: 0;
+    /* stronger gradient overlay to ensure form readability */
+    background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.55) 100%);
+    z-index: 1;
+}
+
+.auth-body .auth-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2; /* above overlay */
+}
+
+.login-container {
+    width: 100%;
+    max-width: 420px;
+    margin: 24px;
+}
+
+.login-card {
+    background: rgba(255,255,255,0.96);
+    border-radius: 12px;
+    padding: 26px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+
+.login-header { text-align: center; margin-bottom: 12px; }
+.login-logo { width: 84px; height: auto; display: inline-block; margin-bottom: 8px; }
+.login-form .input-group-text { width: 42px; justify-content: center; }
+
+@media (max-width: 576px) {
+    .login-card { padding: 18px; margin: 12px; }
+}
