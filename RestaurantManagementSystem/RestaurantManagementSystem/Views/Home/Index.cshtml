@@ -623,9 +623,9 @@
                         `);
                     });
                     
-                    // Add tax calculation (assuming 5% GST)
-                    var tax = total * 0.05;
-                    var grandTotal = total + tax;
+                    // No GST displayed in estimation widget on home — show subtotal and grand total equal to subtotal
+                    var tax = 0.00;
+                    var grandTotal = total;
                     
                     // Add tax and total rows
                     estimationBody.append(`
@@ -667,9 +667,9 @@
                     // Warning message
                     showToast('Please select items and enter quantities to generate estimate', 'warning');
                 }
-            }
-            
-            // Function to print estimate
+                                        <tr class="table-success">
+                                            <td colspan="3" class="text-end fw-bold fs-5">Grand Total:</td>
+                                            <td class="text-bold fs-5">₹${grandTotal.toFixed(2)}</td>
             function printEstimate() {
                 var currentDate = new Date();
                 var estimateNumber = 'EST-' + currentDate.getFullYear() + (currentDate.getMonth() + 1).toString().padStart(2, '0') + currentDate.getDate().toString().padStart(2, '0') + '-' + Math.floor(Math.random() * 1000);

@@ -210,18 +210,18 @@ $(document).ready(function() {
             `);
         });
         
-    const tax = total * 0.05;
-    const grand = total + tax;
+    // GST/Tax is not required for the estimation page — show zero to avoid confusion
+    const tax = 0.00;
+    const grand = total; // No tax applied on the estimation page
         
         tbody.append(`
             <tr class="border-top subtotal-row"><td colspan="3" class="text-end fw-semibold">Subtotal</td><td class="text-end fw-semibold">₹${total.toFixed(2)}</td></tr>
-            <tr class="gst-row"><td colspan="3" class="text-end small">GST (5%)</td><td class="text-end small">₹${tax.toFixed(2)}</td></tr>
             <tr class="total-row"><td colspan="3" class="text-end fw-bold">Grand Total</td><td class="text-end fw-bold">₹${grand.toFixed(2)}</td></tr>
         `);
 
-        // Update side summary card
+        // Update side summary card (no GST shown on estimation)
         $('#subtotalValue').text(`₹${total.toFixed(2)}`);
-        $('#gstValue').text(`₹${tax.toFixed(2)}`);
+        $('#gstValue').text(`₹0.00`); // keep element for layout but show zero
         $('#grandTotalValue').text(`₹${grand.toFixed(2)}`);
         $('#estimateMeta').text(`${items.length} item(s) • Updated ${new Date().toLocaleTimeString()}`);
         
@@ -287,9 +287,8 @@ $(document).ready(function() {
             <table><thead><tr><th>Item</th><th class='text-right'>Unit Price</th><th class='text-center'>Qty</th><th class='text-right'>Amount</th></tr></thead><tbody>${rowsHtml}</tbody></table>
             <div class='totals'>
                 <table style='width:100%;border-collapse:collapse;'>
-                    <tr><td>Subtotal</td><td class='text-right'>${subtotal}</td></tr>
-                    <tr><td>GST (5%)</td><td class='text-right'>${gst}</td></tr>
-                    <tr class='divider grand'><td>Total</td><td class='text-right'>${grand}</td></tr>
+                        <tr><td>Subtotal</td><td class='text-right'>${subtotal}</td></tr>
+                        <tr class='divider grand'><td>Total</td><td class='text-right'>${grand}</td></tr>
                 </table>
             </div>
             <div class='footer'>Thank you for choosing our restaurant!</div>

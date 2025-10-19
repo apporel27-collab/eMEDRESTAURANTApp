@@ -489,19 +489,14 @@
                         `);
                     });
                     
-                    // Add tax calculation (assuming 5% GST)
-                    var tax = total * 0.05;
-                    var grandTotal = total + tax;
-                    
-                    // Add tax and total rows
+                    // No GST displayed in estimation widget — show subtotal and grand total equal to subtotal
+                    var tax = 0.00;
+                    var grandTotal = total;
+
                     estimationBody.append(`
                         <tr class="border-top">
                             <td colspan="3" class="text-end fw-bold">Subtotal:</td>
                             <td class="text-end fw-bold">₹${total.toFixed(2)}</td>
-                        </tr>
-                        <tr>
-                            <td colspan="3" class="text-end">GST (5%):</td>
-                            <td class="text-end">₹${tax.toFixed(2)}</td>
                         </tr>
                         <tr class="table-success">
                             <td colspan="3" class="text-end fw-bold fs-5">Grand Total:</td>
