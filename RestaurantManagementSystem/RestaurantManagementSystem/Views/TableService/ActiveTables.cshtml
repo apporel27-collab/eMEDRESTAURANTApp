@@ -120,16 +120,7 @@
                                                                 </form>
                                                             </li>
                                                         }
-                                                        @if (table.Status < 4)
-                                                        {
-                                                            <li>
-                                                                <form asp-action="UpdateTableStatus" method="post">
-                                                                    <input type="hidden" name="turnoverId" value="@table.TurnoverId" />
-                                                                    <input type="hidden" name="newStatus" value="4" />
-                                                                    <button type="submit" class="dropdown-item">Mark as Completed</button>
-                                                                </form>
-                                                            </li>
-                                                        }
+                                                        @* "Mark as Completed" removed to enforce automatic completion when no due *@
                                                         @if (table.Status < 5)
                                                         {
                                                             <li>

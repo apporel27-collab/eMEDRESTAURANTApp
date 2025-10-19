@@ -236,6 +236,34 @@ END", connection))
                     bool requiresCardInfo = false;
                     string paymentMethodName = string.Empty;
                     
+                    // Read approval settings to decide if discounts or card payments need approval
+                    bool discountApprovalRequired = false;
+                    bool cardPaymentApprovalRequired = false;
+                    try
+                    {
+                        using (var settingsConn = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                        {
+                            settingsConn.Open();
+                            using (var settingsCmd = new Microsoft.Data.SqlClient.SqlCommand(@"SELECT TOP 1 IsDiscountApprovalRequired, IsCardPaymentApprovalRequired FROM dbo.RestaurantSettings ORDER BY Id DESC", settingsConn))
+                            {
+                                using (var rs = settingsCmd.ExecuteReader())
+                                {
+                                    if (rs.Read())
+                                    {
+                                        if (!rs.IsDBNull(0)) discountApprovalRequired = rs.GetBoolean(0);
+                                        if (!rs.IsDBNull(1)) cardPaymentApprovalRequired = rs.GetBoolean(1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // If settings read fails, default to existing behavior (no extra approvals)
+                        discountApprovalRequired = false;
+                        cardPaymentApprovalRequired = false;
+                    }
+
                     using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                     {
                         connection.Open();
@@ -418,36 +446,80 @@ END", connection))
                                     
                                     if (paymentId > 0)
                                     {
-                                        // DISCOUNT APPROVAL WORKFLOW: Force pending status if discount is applied
-                                        if (model.DiscountAmount > 0 && paymentStatus == 1)
+                                        // Decide whether this payment should be pending based on settings and payment details
+                                        bool needsApproval = false;
+
+                                        // If a discount was applied and discount approvals are required
+                                        if (model.DiscountAmount > 0 && discountApprovalRequired)
                                         {
-                                            reader.Close();
-                                            // Force payment to pending status for approval when discount is given
-                                            using (var forceApprovalCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
-                                                UPDATE Payments 
-                                                SET Status = 0, 
-                                                    UpdatedAt = GETDATE(),
-                                                    Notes = CASE 
-                                                        WHEN Notes IS NULL OR Notes = '' THEN 'Discount applied - requires approval'
-                                                        ELSE Notes + ' | Discount applied - requires approval'
-                                                    END
-                                                WHERE Id = @PaymentId", connection))
-                                            {
-                                                forceApprovalCmd.Parameters.AddWithValue("@PaymentId", paymentId);
-                                                forceApprovalCmd.ExecuteNonQuery();
-                                            }
-                                            paymentStatus = 0; // Update local variable to reflect pending status
+                                            needsApproval = true;
                                         }
-                                        
+
+                                        // If payment method requires card info (a card payment) and card approvals are required
+                                        if (requiresCardInfo && cardPaymentApprovalRequired)
+                                        {
+                                            needsApproval = true;
+                                        }
+
+                                        // If needsApproval is true, ensure the payment is pending (Status = 0)
+                                        // Otherwise, ensure the payment is approved (Status = 1)
+                                        if (needsApproval)
+                                        {
+                                            if (paymentStatus == 1)
+                                            {
+                                                // Update DB to mark pending
+                                                reader.Close();
+                                                using (var forceApprovalCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                                    UPDATE Payments 
+                                                    SET Status = 0, 
+                                                        UpdatedAt = GETDATE(),
+                                                        Notes = CASE 
+                                                            WHEN Notes IS NULL OR Notes = '' THEN @Note
+                                                            ELSE Notes + ' | ' + @Note
+                                                        END
+                                                    WHERE Id = @PaymentId", connection))
+                                                {
+                                                    string note = "Requires approval";
+                                                    if (model.DiscountAmount > 0) note = $"Discount applied - requires approval";
+                                                    forceApprovalCmd.Parameters.AddWithValue("@PaymentId", paymentId);
+                                                    forceApprovalCmd.Parameters.AddWithValue("@Note", note);
+                                                    forceApprovalCmd.ExecuteNonQuery();
+                                                }
+                                                paymentStatus = 0; // Update local variable to reflect pending status
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // Ensure payment is approved if it was created as pending by payment method or DB defaults
+                                            if (paymentStatus == 0)
+                                            {
+                                                reader.Close();
+                                                using (var approveCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                                    UPDATE Payments 
+                                                    SET Status = 1, 
+                                                        UpdatedAt = GETDATE()
+                                                    WHERE Id = @PaymentId", connection))
+                                                {
+                                                    approveCmd.Parameters.AddWithValue("@PaymentId", paymentId);
+                                                    approveCmd.ExecuteNonQuery();
+                                                }
+                                                paymentStatus = 1;
+                                            }
+                                        }
+
                                         if (paymentStatus == 1) // Approved
                                         {
                                             TempData["SuccessMessage"] = "Payment processed successfully.";
                                         }
                                         else // Pending
                                         {
-                                            if (model.DiscountAmount > 0)
+                                            if (model.DiscountAmount > 0 && discountApprovalRequired)
                                             {
                                                 TempData["InfoMessage"] = $"Payment with discount of ₹{model.DiscountAmount:F2} requires approval. It has been saved as pending.";
+                                            }
+                                            else if (requiresCardInfo && cardPaymentApprovalRequired)
+                                            {
+                                                TempData["InfoMessage"] = "Card payment requires approval. It has been saved as pending.";
                                             }
                                             else
                                             {
