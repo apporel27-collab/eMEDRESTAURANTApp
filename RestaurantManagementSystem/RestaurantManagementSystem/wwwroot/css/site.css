@@ -63,6 +63,34 @@ body {
   font-weight: 500;
 }
 
+/* Improve contrast for status badges in the menu items table */
+#menuItemsTable .badge {
+  color: #fff !important; /* ensure white text */
+  font-weight: 600;
+  padding: 0.35em 0.6em;
+  border-radius: 0.35rem;
+}
+
+/* Make success and danger badges more visible against light backgrounds */
+#menuItemsTable .badge-success,
+#menuItemsTable .badge.bg-success,
+#menuItemsTable .badge-success { /* fallback */
+  background-color: #198754 !important; /* Bootstrap-5 green but slightly darker */
+  color: #fff !important;
+  box-shadow: none;
+}
+
+#menuItemsTable .badge-danger,
+#menuItemsTable .badge.bg-danger,
+#menuItemsTable .badge-danger {
+  background-color: #c82333 !important; /* darker red */
+  color: #fff !important;
+  box-shadow: none;
+}
+
+/* In case the table rows use a gray background, add a subtle border to badges */
+#menuItemsTable .badge { border: 1px solid rgba(0,0,0,0.06); }
+
 /* Process Payment Page Styling */
 .payment-method-selector {
   position: relative;
