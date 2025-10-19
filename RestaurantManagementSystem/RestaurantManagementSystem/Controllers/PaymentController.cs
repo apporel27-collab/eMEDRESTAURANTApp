@@ -522,8 +522,8 @@ END", connection))
                                                     WHERE Id = @OrderId
                                                       AND Status < 3
                                                       AND (
-                                                          SELECT ISNULL(SUM(Amount + TipAmount), 0) FROM Payments WHERE OrderId = @OrderId AND Status = 1
-                                                      ) >= TotalAmount
+                                                          TotalAmount - ISNULL((SELECT SUM(Amount + TipAmount) FROM Payments WHERE OrderId = @OrderId AND Status = 1), 0)
+                                                      ) <= 0.01
                                                 ", connection))
                                                 {
                                                     orderUpdateCmd.Parameters.AddWithValue("@OrderId", model.OrderId);
@@ -583,6 +583,26 @@ END", connection))
                                                 discountCmd.Parameters.AddWithValue("@GSTPerc", paymentGstPercentage);
                                                 discountCmd.ExecuteNonQuery();
                                             }
+                                            // Re-check order completion after discount/total recalculation
+                                            try
+                                            {
+                                                using (var orderUpdateAfterDiscountCmd = new Microsoft.Data.SqlClient.SqlCommand(@"
+                                                    UPDATE Orders
+                                                    SET Status = 3, -- Completed
+                                                        CompletedAt = CASE WHEN Status < 3 AND CompletedAt IS NULL THEN GETDATE() ELSE CompletedAt END,
+                                                        UpdatedAt = GETDATE()
+                                                    WHERE Id = @OrderId
+                                                      AND Status < 3
+                                                      AND (
+                                                          TotalAmount - ISNULL((SELECT SUM(Amount + TipAmount) FROM Payments WHERE OrderId = @OrderId AND Status = 1), 0)
+                                                      ) <= 0.01
+                                                ", connection))
+                                                {
+                                                    orderUpdateAfterDiscountCmd.Parameters.AddWithValue("@OrderId", model.OrderId);
+                                                    orderUpdateAfterDiscountCmd.ExecuteNonQuery();
+                                                }
+                                            }
+                                            catch { /* ignore order completion re-check failures */ }
                                         }
                                         return RedirectToAction("Index", new { id = model.OrderId });
                                     }
