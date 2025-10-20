@@ -2011,5 +2011,72 @@ END", connection))
                 return RedirectToAction("Index", new { id = orderId });
             }
         }
+
+        // GET: Payment/PrintPOS
+        public IActionResult PrintPOS(int orderId)
+        {
+            try
+            {
+                var model = GetPaymentViewModel(orderId);
+                if (model == null)
+                {
+                    TempData["ErrorMessage"] = "Order not found.";
+                    return RedirectToAction("Index", "Order");
+                }
+
+                // Get restaurant settings for bill header (reuse same logic as PrintBill)
+                RestaurantSettings settings = null;
+                using (var connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (var command = new SqlCommand("SELECT * FROM dbo.RestaurantSettings", connection))
+                    {
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                settings = new RestaurantSettings
+                                {
+                                    RestaurantName = reader["RestaurantName"].ToString(),
+                                    StreetAddress = reader["StreetAddress"].ToString(),
+                                    City = reader["City"].ToString(),
+                                    State = reader["State"].ToString(),
+                                    Pincode = reader["Pincode"].ToString(),
+                                    Country = reader["Country"].ToString(),
+                                    GSTCode = reader["GSTCode"].ToString(),
+                                    PhoneNumber = reader["PhoneNumber"].ToString(),
+                                    Email = reader["Email"].ToString(),
+                                    Website = reader["Website"].ToString(),
+                                    CurrencySymbol = reader["CurrencySymbol"].ToString(),
+                                    DefaultGSTPercentage = reader["DefaultGSTPercentage"] != DBNull.Value 
+                                        ? Convert.ToDecimal(reader["DefaultGSTPercentage"]) 
+                                        : 0
+                                };
+                            }
+                        }
+                    }
+                }
+
+                ViewBag.RestaurantSettings = settings ?? new RestaurantSettings
+                {
+                    RestaurantName = "Restaurant Management System",
+                    GSTCode = "Not Configured",
+                    StreetAddress = "",
+                    City = "",
+                    State = "",
+                    Pincode = "",
+                    Country = "",
+                    PhoneNumber = "",
+                    Email = ""
+                };
+
+                return View("PrintPOS", model);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error loading POS bill for printing: {ex.Message}";
+                return RedirectToAction("Index", new { id = orderId });
+            }
+        }
     }
 }

@@ -141,6 +141,9 @@
                                 <a asp-action="PrintBill" asp-route-orderId="@Model.OrderId" class="btn btn-outline-success btn-lg" target="_blank">
                                     <i class="fas fa-print me-1"></i> Print Bill(A4)
                                 </a>
+                                <a asp-action="PrintPOS" asp-route-orderId="@Model.OrderId" class="btn btn-outline-dark btn-lg" target="_blank">
+                                    <i class="fas fa-print me-1"></i> POS Print Bill
+                                </a>
                                 
                                 @* Manual 'Mark as Completed' removed — orders will be auto-completed when there is no due. *@
                             </div>
@@ -365,171 +368,12 @@
 
 @section Scripts {
     <script>
-        function printBill(orderId) {
-            // Open a new window with print-friendly layout
-            var printWindow = window.open('', '_blank');
-            
-            // Create print-friendly content
-            var content = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Print Bill(A4) - Order #@Model.OrderNumber</title>
-                    <style>
-                        body {
-                            font-family: Arial, sans-serif;
-                            margin: 20px;
-                            font-size: 12pt;
-                        }
-                        .header {
-                            text-align: center;
-                            margin-bottom: 20px;
-                        }
-                        .info {
-                            display: flex;
-                            justify-content: space-between;
-                            margin-bottom: 20px;
-                        }
-                        .table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            margin-bottom: 20px;
-                        }
-                        .table th, .table td {
-                            padding: 8px;
-                            border-bottom: 1px solid #ddd;
-                            text-align: left;
-                        }
-                        .table th {
-                            border-top: 1px solid #ddd;
-                        }
-                        .text-end {
-                            text-align: right;
-                        }
-                        .text-center {
-                            text-align: center;
-                        }
-                        .totals {
-                            width: 50%;
-                            margin-left: auto;
-                        }
-                        .footer {
-                            text-align: center;
-                            margin-top: 30px;
-                            border-top: 1px solid #ddd;
-                            padding-top: 20px;
-                        }
-                        @@media print {
-                            .no-print {
-                                display: none;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h2>Restaurant Management System</h2>
-                        <h3>Print Bill(A4)</h3>
-                    </div>
-                    
-                    <div class="info">
-                        <div>
-                            <p><strong>Order #:</strong> @Model.OrderNumber</p>
-                            <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-                        </div>
-                        <div>
-                            <p><strong>Table:</strong> @Model.TableName</p>
-                            <p><strong>Status:</strong> @Model.OrderStatusDisplay</p>
-                        </div>
-                    </div>
-                    
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th class="text-center">Qty</th>
-                                <th class="text-end">Price</th>
-                                <th class="text-end">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var item in Model.OrderItems)
-                            {
-                                <tr>
-                                    <td>@item.MenuItemName</td>
-                                    <td class="text-center">@item.Quantity</td>
-                                    <td class="text-end">₹@item.UnitPrice.ToString("F2")</td>
-                                    <td class="text-end">₹@item.Subtotal.ToString("F2")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                    
-                    <table class="totals">
-                        <tr>
-                            <td>Subtotal:</td>
-                            <td class="text-end">₹@Model.Subtotal.ToString("F2")</td>
-                        </tr>
-                        <tr>
-                            <td>GST (@Model.GSTPercentage.ToString("F2")%):</td>
-                            <td class="text-end">₹@Model.TaxAmount.ToString("F2")</td>
-                        </tr>
-                        <tr>
-                            <td>&nbsp;&nbsp;CGST:</td>
-                            <td class="text-end">₹@Model.CGSTAmount.ToString("F2")</td>
-                        </tr>
-                        <tr>
-                            <td>&nbsp;&nbsp;SGST:</td>
-                            <td class="text-end">₹@Model.SGSTAmount.ToString("F2")</td>
-                        </tr>
-                        @if (Model.DiscountAmount > 0)
-                        {
-                            <tr>
-                                <td>Discount:</td>
-                                <td class="text-end">-₹@Model.DiscountAmount.ToString("F2")</td>
-                            </tr>
-                        }
-                        @if (Model.TipAmount > 0)
-                        {
-                            <tr>
-                                <td>Tip:</td>
-                                <td class="text-end">₹@Model.TipAmount.ToString("F2")</td>
-                            </tr>
-                        }
-                        <tr style="font-weight: bold;">
-                            <td>Total:</td>
-                            <td class="text-end">₹@Model.TotalAmount.ToString("F2")</td>
-                        </tr>
-                        <tr>
-                            <td>Paid:</td>
-                            <td class="text-end">₹@Model.PaidAmount.ToString("F2")</td>
-                        </tr>
-                        <tr style="font-weight: bold;">
-                            <td>Remaining:</td>
-                            <td class="text-end">₹@Model.RemainingAmount.ToString("F2")</td>
-                        </tr>
-                    </table>
-                    
-                    <div class="footer">
-                        <p>Thank you for dining with us!</p>
-                        <p class="small">For questions about your bill, please contact the restaurant.</p>
-                    </div>
-                    
-                    <div class="no-print" style="text-align: center; margin-top: 20px;">
-                        <button onclick="window.print();" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Print Bill
-                        </button>
-                    </div>
-                </body>
-                </html>
-            `;
-            
-            // Write content to the new window
-            printWindow.document.write(content);
-            printWindow.document.close();
-            
-            // Focus on the new window
-            printWindow.focus();
+        // Printing is handled by server-rendered actions:
+        // - /Payment/PrintBill/{orderId} (A4)
+        // - /Payment/PrintPOS/{orderId} (POS receipt)
+        // Anchor buttons on the page open these in a new tab/window.
+        function openPrintBill(orderId) {
+            window.open('/Payment/PrintBill/' + orderId, '_blank');
         }
     </script>
 }
