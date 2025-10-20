@@ -364,10 +364,10 @@
                     <i class="fas fa-calendar-plus"></i>
                     <span>Reservation</span>
                 </a>
-                <div class="quick-action-btn" id="menuItemsBtn" data-toggle="modal" data-target="#menuItemsModal">
+                <a href="/Order/Estimation" class="quick-action-btn" id="menuItemsBtn" target="_blank" rel="noopener">
                     <i class="fas fa-hamburger"></i>
                     <span>Menu Items</span>
-                </div>
+                </a>
                 <a href="/TableService/Dashboard" class="quick-action-btn" target="_blank" rel="noopener">
                     <i class="fas fa-th-large"></i>
                     <span>Available Table</span>
@@ -462,18 +462,9 @@
 
             // Reservation Date/Time pickers and menu modal functionality remain
             
-            // Initialize Menu Items Modal functionality
-            $('#menuItemsBtn').click(function() {
-                loadMenuItems();
-                var menuModal = new bootstrap.Modal(document.getElementById('menuItemsModal'));
-                menuModal.show();
-                
-                // Reset estimation section
-                $('.estimation-section').hide();
-                $('#printEstimateBtn').hide();
-                $('#clearEstimateBtn').hide();
-                $('#estimationTableBody').empty();
-            });
+            // The Menu Items quick action now opens the Estimation page in a new tab.
+            // The modal-based menu items flow is preserved below for backward compatibility,
+            // but the dashboard button no longer triggers it.
             
             // Menu Items search functionality
             $('#menuItemSearch').on('keyup', function() {
