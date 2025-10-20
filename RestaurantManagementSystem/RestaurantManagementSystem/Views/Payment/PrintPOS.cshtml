@@ -107,7 +107,7 @@
 
     <div class="dashed"></div>
     <div class="center tiny">
-        <div>FSSAI Lic No: 128200130000410</div>
+        @if (!string.IsNullOrWhiteSpace(settings.FssaiNo)) { <div>FSSAI Lic No: @settings.FssaiNo</div> }
         <div style="margin-top:6px;">Thanks For Visit Again !!</div>
     </div>
 

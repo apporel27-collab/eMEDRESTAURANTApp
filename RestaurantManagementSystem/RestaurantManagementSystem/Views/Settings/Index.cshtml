@@ -69,6 +69,10 @@
                                             {
                                                 <div><i class="fas fa-globe me-1 text-primary"></i> <a href="@Model.Website" target="_blank">@Model.Website</a></div>
                                             }
+                                            @if (!string.IsNullOrEmpty(Model.FssaiNo))
+                                            {
+                                                <div class="mt-2"><strong>FSSAI:</strong> @Model.FssaiNo</div>
+                                            }
                                         </dd>
                                     </dl>
                                 </div>

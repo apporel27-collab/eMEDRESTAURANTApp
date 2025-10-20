@@ -170,6 +170,7 @@ namespace RestaurantManagementSystem.Controllers
                 IsDiscountApprovalRequired = model.IsDiscountApprovalRequired,
                 IsCardPaymentApprovalRequired = model.IsCardPaymentApprovalRequired,
                 BillFormat = model.BillFormat,
+                	FssaiNo = model.FssaiNo,
                 CreatedAt = model.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
                 UpdatedAt = model.UpdatedAt.ToString("dd MMM yyyy, hh:mm tt")
             };
@@ -200,6 +201,7 @@ namespace RestaurantManagementSystem.Controllers
                 IsDiscountApprovalRequired = viewModel.IsDiscountApprovalRequired,
                 IsCardPaymentApprovalRequired = viewModel.IsCardPaymentApprovalRequired,
                 BillFormat = viewModel.BillFormat,
+                FssaiNo = viewModel.FssaiNo,
                 UpdatedAt = DateTime.Now
             };
         }

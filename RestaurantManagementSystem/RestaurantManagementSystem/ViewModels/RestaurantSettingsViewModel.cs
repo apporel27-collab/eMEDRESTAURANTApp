@@ -64,6 +64,10 @@ namespace RestaurantManagementSystem.ViewModels
         [Display(Name = "Logo Path")]
         public string LogoPath { get; set; }
 
+    [StringLength(32)]
+    [Display(Name = "FSSAI No")]
+    public string FssaiNo { get; set; }
+
         [Required]
         [StringLength(50, ErrorMessage = "Currency symbol cannot exceed 50 characters")]
         [Display(Name = "Currency Symbol")]

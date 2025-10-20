@@ -174,6 +174,13 @@ namespace RestaurantManagementSystem.Services
                                 ord = reader.GetOrdinal("LogoPath");
                                 s.LogoPath = reader.IsDBNull(ord) ? null : reader.GetString(ord);
 
+                                    // FSSAI column (new)
+                                    if (ColumnExists(reader, "FssaiNo"))
+                                    {
+                                        ord = reader.GetOrdinal("FssaiNo");
+                                        s.FssaiNo = reader.IsDBNull(ord) ? string.Empty : reader.GetString(ord);
+                                    }
+
                                 ord = reader.GetOrdinal("CurrencySymbol");
                                 s.CurrencySymbol = reader.IsDBNull(ord) ? "₹" : reader.GetString(ord);
 
@@ -357,6 +364,7 @@ INSERT INTO dbo.RestaurantSettings (
                     currentSettings.IsDiscountApprovalRequired = settings.IsDiscountApprovalRequired;
                     currentSettings.IsCardPaymentApprovalRequired = settings.IsCardPaymentApprovalRequired;
                     currentSettings.BillFormat = settings.BillFormat;
+                    currentSettings.FssaiNo = settings.FssaiNo;
                     currentSettings.UpdatedAt = DateTime.Now;
 
                     await _dbContext.SaveChangesAsync();
@@ -430,7 +438,9 @@ END";
                             cmd.Parameters.AddWithValue("@CurrencySymbol", (object)settings.CurrencySymbol ?? "₹");
                             cmd.Parameters.AddWithValue("@DefaultGSTPercentage", settings.DefaultGSTPercentage);
                             cmd.Parameters.AddWithValue("@TakeAwayGSTPercentage", settings.TakeAwayGSTPercentage);
+                                cmd.Parameters.AddWithValue("@FssaiNo", (object)settings.FssaiNo ?? DBNull.Value);
                             cmd.Parameters.AddWithValue("@IsDefaultGSTRequired", settings.IsDefaultGSTRequired);
+                                cmd.Parameters.AddWithValue("@FssaiNo", (object)settings.FssaiNo ?? DBNull.Value);
                             cmd.Parameters.AddWithValue("@IsTakeAwayGSTRequired", settings.IsTakeAwayGSTRequired);
                             cmd.Parameters.AddWithValue("@IsTakeawayIncludedGSTReq", settings.IsTakeawayIncludedGSTReq);
                             cmd.Parameters.AddWithValue("@IsDiscountApprovalRequired", settings.IsDiscountApprovalRequired);
@@ -552,6 +562,21 @@ END";
                     await addColumn5.ExecuteNonQueryAsync();
                 }
 
+                // Ensure FssaiNo column exists
+                var checkFssai = new SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'RestaurantSettings' 
+                    AND COLUMN_NAME = 'FssaiNo'
+                    AND TABLE_SCHEMA = 'dbo'", connection);
+                var fssaiExists = (int)await checkFssai.ExecuteScalarAsync() > 0;
+                if (!fssaiExists)
+                {
+                    var addFssai = new SqlCommand(@"
+                        ALTER TABLE [dbo].[RestaurantSettings]
+                        ADD [FssaiNo] NVARCHAR(32) NULL", connection);
+                    await addFssai.ExecuteNonQueryAsync();
+                }
+
                 // Normalize existing rows: replace NULLs with sensible defaults to avoid EF materialization errors
                 try
                 {
@@ -566,6 +591,7 @@ SET IsDefaultGSTRequired = ISNULL(IsDefaultGSTRequired, 1),
     TakeAwayGSTPercentage = ISNULL(TakeAwayGSTPercentage, 5.00),
     CurrencySymbol = ISNULL(CurrencySymbol, N'₹'),
     BillFormat = ISNULL(BillFormat, N'A4')
+    , FssaiNo = ISNULL(FssaiNo, N'')
 WHERE Id IS NOT NULL";
 
                     using (var normalizeCmd = new SqlCommand(normalizeSql, connection))

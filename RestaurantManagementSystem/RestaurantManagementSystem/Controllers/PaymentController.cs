@@ -1985,6 +1985,8 @@ END", connection))
                                         ? Convert.ToDecimal(reader["DefaultGSTPercentage"]) 
                                         : 0
                                 };
+                                    // Read FssaiNo if present
+                                    try { settings.FssaiNo = reader["FssaiNo"].ToString(); } catch { /* ignore if column missing */ }
                             }
                         }
                     }
@@ -2069,6 +2071,30 @@ END", connection))
                     PhoneNumber = "",
                     Email = ""
                 };
+                // If FssaiNo wasn't present from the full SELECT (older DBs), try a lightweight read of the column
+                try
+                {
+                    var existing = ViewBag.RestaurantSettings as RestaurantSettings;
+                    if (existing != null && string.IsNullOrWhiteSpace(existing.FssaiNo))
+                    {
+                        using (var conn2 = new SqlConnection(_connectionString))
+                        {
+                            conn2.Open();
+                            using (var cmd2 = new SqlCommand("SELECT TOP 1 FssaiNo FROM dbo.RestaurantSettings WHERE FssaiNo IS NOT NULL AND LTRIM(RTRIM(FssaiNo)) <> ''", conn2))
+                            {
+                                var val = cmd2.ExecuteScalar();
+                                if (val != null && val != DBNull.Value)
+                                {
+                                    existing.FssaiNo = val.ToString();
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore - column may not exist or DB user may not have permissions
+                }
 
                 return View("PrintPOS", model);
             }

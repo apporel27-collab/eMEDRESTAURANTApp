@@ -71,6 +71,10 @@ namespace RestaurantManagementSystem.Models
     [Range(0, 100, ErrorMessage = "Take Away GST percentage must be between 0 and 100")]
     [Display(Name = "Take Away GST Percentage")]
     public decimal TakeAwayGSTPercentage { get; set; } = 5.00m; // New field
+
+        [StringLength(32, ErrorMessage = "FSSAI number cannot exceed 32 characters")]
+        [Display(Name = "FSSAI No")]
+        public string FssaiNo { get; set; }
     
         // Parameter Setup Section
         [Display(Name = "Is Default GST Required")]

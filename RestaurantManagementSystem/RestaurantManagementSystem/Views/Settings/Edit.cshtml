@@ -171,6 +171,14 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group mb-3">
+                                            <label asp-for="FssaiNo" class="control-label"></label>
+                                            <input asp-for="FssaiNo" class="form-control" placeholder="FSSAI License No" />
+                                            <span asp-validation-for="FssaiNo" class="field-validation-error"></span>
+                                            <div class="help-text">Enter FSSAI license number (optional)</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-3">
                                             <label asp-for="CurrencySymbol" class="control-label"></label>
                                             <div class="input-group">
                                                 <span class="input-group-text"><i class="fas fa-rupee-sign"></i></span>
