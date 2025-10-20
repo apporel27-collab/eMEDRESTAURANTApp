@@ -1,0 +1,33 @@
+:root{
+    --card-padding: .5rem .75rem;
+}
+
+.settings-card{border-radius:.4rem}
+.compact-card{border:1px solid #eef2f6}
+
+/* Reduce vertical spacing and unify fonts */
+.settings-container h1{font-size:1.05rem}
+.settings-container .card{border-radius:.45rem}
+
+.compact-card .card-body{padding:.5rem .75rem}
+
+.logo-container{min-height:120px;display:flex;align-items:center;justify-content:center}
+.logo-image{max-width:160px;max-height:110px;object-fit:contain}
+
+.small{font-size:.9rem}
+
+/* compact dl styling replacement */
+.compact-info dt{font-size:.875rem}
+.compact-info dd{font-size:.95rem}
+
+/* badges and monospace */
+.font-monospace{font-family:Menlo, Monaco, Consolas, "Courier New", monospace}
+
+/* tight rows */
+.row.g-2 > [class*="col-"]{padding-top:.3rem;padding-bottom:.3rem}
+
+/* responsive tweaks */
+@media (max-width:767px){
+    .logo-image{max-width:120px}
+    .settings-container{padding-left:.5rem;padding-right:.5rem}
+}
