@@ -138,12 +138,21 @@
                                     <i class="fas fa-receipt me-1"></i> Split Bill
                                 </a>
                                 
-                                <a asp-action="PrintBill" asp-route-orderId="@Model.OrderId" class="btn btn-outline-success btn-lg" target="_blank">
-                                    <i class="fas fa-print me-1"></i> Print Bill(A4)
-                                </a>
-                                <a asp-action="PrintPOS" asp-route-orderId="@Model.OrderId" class="btn btn-outline-dark btn-lg" target="_blank">
-                                    <i class="fas fa-print me-1"></i> POS Print Bill
-                                </a>
+                                @{
+                                    var billFormat = (ViewBag.BillFormat ?? "A4").ToString();
+                                }
+                                @if (!string.Equals(billFormat, "POS", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <a asp-action="PrintBill" asp-route-orderId="@Model.OrderId" class="btn btn-outline-success btn-lg" target="_blank">
+                                        <i class="fas fa-print me-1"></i> Print Bill(A4)
+                                    </a>
+                                }
+                                @if (string.Equals(billFormat, "POS", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <a asp-action="PrintPOS" asp-route-orderId="@Model.OrderId" class="btn btn-outline-dark btn-lg" target="_blank">
+                                        <i class="fas fa-print me-1"></i> POS Print Bill
+                                    </a>
+                                }
                                 
                                 @* Manual 'Mark as Completed' removed — orders will be auto-completed when there is no due. *@
                             </div>

@@ -65,6 +65,24 @@ namespace RestaurantManagementSystem.Controllers
             {
                 return NotFound();
             }
+
+            // Read BillFormat from RestaurantSettings to control which print buttons are shown
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    conn.Open();
+                    using (var cmd = new SqlCommand("SELECT TOP 1 BillFormat FROM dbo.RestaurantSettings", conn))
+                    {
+                        var val = cmd.ExecuteScalar();
+                        ViewBag.BillFormat = (val != null && val != DBNull.Value) ? val.ToString() : "A4";
+                    }
+                }
+            }
+            catch
+            {
+                ViewBag.BillFormat = "A4"; // default
+            }
             
 
             
