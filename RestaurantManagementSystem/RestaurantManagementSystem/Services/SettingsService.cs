@@ -209,6 +209,13 @@ namespace RestaurantManagementSystem.Services
                                 ord = reader.GetOrdinal("IsCardPaymentApprovalRequired");
                                 s.IsCardPaymentApprovalRequired = !reader.IsDBNull(ord) && reader.GetBoolean(ord);
 
+                                // New KOT print flag
+                                if (ColumnExists(reader, "IsKOTBillPrintRequired"))
+                                {
+                                    ord = reader.GetOrdinal("IsKOTBillPrintRequired");
+                                    s.IsKOTBillPrintRequired = !reader.IsDBNull(ord) && reader.GetBoolean(ord);
+                                }
+
                                 ord = reader.GetOrdinal("BillFormat");
                                 s.BillFormat = reader.IsDBNull(ord) ? "A4" : reader.GetString(ord);
 
@@ -363,6 +370,7 @@ INSERT INTO dbo.RestaurantSettings (
                     currentSettings.IsTakeawayIncludedGSTReq = settings.IsTakeawayIncludedGSTReq;
                     currentSettings.IsDiscountApprovalRequired = settings.IsDiscountApprovalRequired;
                     currentSettings.IsCardPaymentApprovalRequired = settings.IsCardPaymentApprovalRequired;
+                    currentSettings.IsKOTBillPrintRequired = settings.IsKOTBillPrintRequired;
                     currentSettings.BillFormat = settings.BillFormat;
                     currentSettings.FssaiNo = settings.FssaiNo;
                     currentSettings.UpdatedAt = DateTime.Now;
@@ -445,6 +453,7 @@ END";
                             cmd.Parameters.AddWithValue("@IsTakeawayIncludedGSTReq", settings.IsTakeawayIncludedGSTReq);
                             cmd.Parameters.AddWithValue("@IsDiscountApprovalRequired", settings.IsDiscountApprovalRequired);
                             cmd.Parameters.AddWithValue("@IsCardPaymentApprovalRequired", settings.IsCardPaymentApprovalRequired);
+                            cmd.Parameters.AddWithValue("@IsKOTBillPrintRequired", settings.IsKOTBillPrintRequired);
                             cmd.Parameters.AddWithValue("@BillFormat", (object)settings.BillFormat ?? "A4");
 
                             await cmd.ExecuteNonQueryAsync();
@@ -575,6 +584,21 @@ END";
                         ALTER TABLE [dbo].[RestaurantSettings]
                         ADD [FssaiNo] NVARCHAR(32) NULL", connection);
                     await addFssai.ExecuteNonQueryAsync();
+                }
+
+                // Ensure IsKOTBillPrintRequired column exists
+                var checkKOT = new SqlCommand(@"
+                    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'RestaurantSettings' 
+                    AND COLUMN_NAME = 'IsKOTBillPrintRequired'
+                    AND TABLE_SCHEMA = 'dbo'", connection);
+                var kotExists = (int)await checkKOT.ExecuteScalarAsync() > 0;
+                if (!kotExists)
+                {
+                    var addKOT = new SqlCommand(@"
+                        ALTER TABLE [dbo].[RestaurantSettings] 
+                        ADD [IsKOTBillPrintRequired] BIT NOT NULL DEFAULT 0", connection);
+                    await addKOT.ExecuteNonQueryAsync();
                 }
 
                 // Normalize existing rows: replace NULLs with sensible defaults to avoid EF materialization errors

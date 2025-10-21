@@ -98,6 +98,9 @@ namespace RestaurantManagementSystem.ViewModels
 
     [Display(Name = "Card Payment Approval Required")]
     public bool IsCardPaymentApprovalRequired { get; set; } = false;
+
+    [Display(Name = "KOT Bill Print Required")]
+    public bool IsKOTBillPrintRequired { get; set; } = false;
         
         [Required(ErrorMessage = "Bill Format is required")]
         [Display(Name = "Bill Format")]

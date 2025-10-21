@@ -137,6 +137,9 @@
 
                                     <div class="col-6 mb-1">Card Payment Approval</div>
                                     <div class="col-6 text-end"><span class="badge @(Model.IsCardPaymentApprovalRequired ? "bg-success" : "bg-danger")">@(Model.IsCardPaymentApprovalRequired ? "Yes" : "No")</span></div>
+
+                                    <div class="col-6 mb-1">KOT Bill Print Required</div>
+                                    <div class="col-6 text-end"><span class="badge @(Model.IsKOTBillPrintRequired ? "bg-success" : "bg-danger")">@(Model.IsKOTBillPrintRequired ? "Yes" : "No")</span></div>
                                 </div>
                             </div>
                         </div>
