@@ -53,8 +53,13 @@ namespace RestaurantManagementSystem.Controllers
                 // Delivered tickets (today only)
                 var deliveredAll = GetTicketsByStatus(connection, 3, stationId);
                 var today = DateTime.Today;
+                // Normalize CompletedAt to local date and also accept UTC-stored dates
                 viewModel.DeliveredTickets = deliveredAll
-                    .Where(t => t.CompletedAt.HasValue && t.CompletedAt.Value.Date == today)
+                    .Where(t => t.CompletedAt.HasValue && (
+                        t.CompletedAt.Value.Date == today ||
+                        t.CompletedAt.Value.ToLocalTime().Date == today ||
+                        t.CompletedAt.Value.ToUniversalTime().Date == today
+                    ))
                     .OrderByDescending(t => t.CompletedAt)
                     .ToList();
                 
