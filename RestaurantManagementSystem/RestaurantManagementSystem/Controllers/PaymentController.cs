@@ -1600,59 +1600,6 @@ END", connection))
                     }
                 }
 
-                // Get pending payments that need approval
-                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    SELECT 
-                        p.Id AS PaymentId,
-                        p.OrderId,
-                        o.OrderNumber,
-                        ISNULL(t.TableName, 'Takeout/Delivery') AS TableName,
-                        pm.Name AS PaymentMethodName,
-                        pm.DisplayName AS PaymentMethodDisplay,
-                        p.Amount,
-                        p.TipAmount,
-                        p.CreatedAt,
-                        p.ProcessedByName,
-                        p.ReferenceNumber,
-                        p.LastFourDigits,
-                        p.CardType,
-                        p.Notes,
-                        ISNULL(p.DiscAmount, 0) AS DiscountAmount,
-                        (p.Amount + ISNULL(p.DiscAmount, 0)) AS OriginalAmount
-                    FROM Payments p
-                    INNER JOIN Orders o ON p.OrderId = o.Id
-                    INNER JOIN PaymentMethods pm ON p.PaymentMethodId = pm.Id
-                    LEFT JOIN TableTurnovers tt ON o.TableTurnoverId = tt.Id
-                    LEFT JOIN Tables t ON tt.TableId = t.Id
-                    WHERE p.Status = 0 -- Pending approval
-                    ORDER BY p.CreatedAt ASC", connection))
-                {
-                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            model.PendingPayments.Add(new PendingPaymentItem
-                            {
-                                PaymentId = reader.GetInt32("PaymentId"),
-                                OrderId = reader.GetInt32("OrderId"),
-                                OrderNumber = reader.GetString("OrderNumber"),
-                                TableName = GetMergedTableDisplayName((int)reader["OrderId"], reader.GetString("TableName")),
-                                PaymentMethodName = reader.GetString("PaymentMethodName"),
-                                PaymentMethodDisplay = reader.GetString("PaymentMethodDisplay"),
-                                Amount = reader.GetDecimal("Amount"),
-                                TipAmount = reader.GetDecimal("TipAmount"),
-                                CreatedAt = reader.GetDateTime("CreatedAt"),
-                                ProcessedByName = reader.IsDBNull("ProcessedByName") ? "" : reader.GetString("ProcessedByName"),
-                                ReferenceNumber = reader.IsDBNull("ReferenceNumber") ? "" : reader.GetString("ReferenceNumber"),
-                                LastFourDigits = reader.IsDBNull("LastFourDigits") ? "" : reader.GetString("LastFourDigits"),
-                                CardType = reader.IsDBNull("CardType") ? "" : reader.GetString("CardType"),
-                                Notes = reader.IsDBNull("Notes") ? "" : reader.GetString("Notes"),
-                                DiscountAmount = reader.GetDecimal("DiscountAmount"),
-                                OriginalAmount = reader.GetDecimal("OriginalAmount")
-                            });
-                        }
-                    }
-                }
             }
 
             return View(model);
@@ -1948,6 +1895,115 @@ END", connection))
             }
             
             return model;
+        }
+
+        // Helper to get payment history between two dates
+        private List<PaymentHistoryItem> GetPaymentHistory(DateTime fromDate, DateTime toDate)
+        {
+            var list = new List<PaymentHistoryItem>();
+            using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+            {
+                connection.Open();
+
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"
+                    SELECT 
+                        o.Id AS OrderId,
+                        o.OrderNumber,
+                        ISNULL(tt.TableName, 'Takeout/Delivery') AS TableName,
+                        (SELECT ISNULL(SUM(p2.Amount), 0) FROM Payments p2 WHERE p2.OrderId = o.Id AND p2.Status = 1) AS TotalPayable,
+                        ISNULL(SUM(p.Amount), 0) AS TotalPaid,
+                        0 AS DueAmount,
+                        ISNULL(SUM(p.GSTAmount), 0) AS GSTAmount,
+                        MAX(p.CreatedAt) AS PaymentDate,
+                        o.Status AS OrderStatus,
+                        CASE o.Status 
+                            WHEN 0 THEN 'Open'
+                            WHEN 1 THEN 'In Progress'
+                            WHEN 2 THEN 'Ready'
+                            WHEN 3 THEN 'Completed'
+                            WHEN 4 THEN 'Cancelled'
+                            ELSE 'Unknown'
+                        END AS OrderStatusDisplay
+                    FROM Orders o
+                    LEFT JOIN TableTurnovers tto ON o.TableTurnoverId = tto.Id
+                    LEFT JOIN Tables tt ON tto.TableId = tt.Id
+                    INNER JOIN Payments p ON o.Id = p.OrderId AND p.Status = 1
+                    WHERE CAST(p.CreatedAt AS DATE) BETWEEN @FromDate AND @ToDate
+                    GROUP BY o.Id, o.OrderNumber, tt.TableName, o.Status
+                    ORDER BY MAX(p.CreatedAt) DESC", connection))
+                {
+                    command.Parameters.AddWithValue("@FromDate", fromDate.Date);
+                    command.Parameters.AddWithValue("@ToDate", toDate.Date);
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var item = new PaymentHistoryItem
+                            {
+                                OrderId = reader.GetInt32(reader.GetOrdinal("OrderId")),
+                                OrderNumber = reader.IsDBNull(reader.GetOrdinal("OrderNumber")) ? "" : reader.GetString(reader.GetOrdinal("OrderNumber")),
+                                TableName = reader.IsDBNull(reader.GetOrdinal("TableName")) ? "" : GetMergedTableDisplayName((int)reader["OrderId"], reader.GetString(reader.GetOrdinal("TableName"))),
+                                TotalPayable = reader.IsDBNull(reader.GetOrdinal("TotalPayable")) ? 0m : Convert.ToDecimal(reader["TotalPayable"]),
+                                TotalPaid = reader.IsDBNull(reader.GetOrdinal("TotalPaid")) ? 0m : Convert.ToDecimal(reader["TotalPaid"]),
+                                DueAmount = reader.IsDBNull(reader.GetOrdinal("DueAmount")) ? 0m : Convert.ToDecimal(reader["DueAmount"]),
+                                GSTAmount = reader.IsDBNull(reader.GetOrdinal("GSTAmount")) ? 0m : Convert.ToDecimal(reader["GSTAmount"]),
+                                PaymentDate = reader.IsDBNull(reader.GetOrdinal("PaymentDate")) ? DateTime.MinValue : reader.GetDateTime(reader.GetOrdinal("PaymentDate")),
+                                OrderStatus = reader.IsDBNull(reader.GetOrdinal("OrderStatus")) ? 0 : reader.GetInt32(reader.GetOrdinal("OrderStatus")),
+                                OrderStatusDisplay = reader.IsDBNull(reader.GetOrdinal("OrderStatusDisplay")) ? "" : reader.GetString(reader.GetOrdinal("OrderStatusDisplay"))
+                            };
+
+                            list.Add(item);
+                        }
+                    }
+                }
+            }
+
+            return list;
+        }
+
+        // GET: Payment/ExportCsv
+        public IActionResult ExportCsv(DateTime? fromDate, DateTime? toDate)
+        {
+            var from = fromDate ?? DateTime.Today;
+            var to = toDate ?? DateTime.Today;
+
+            try
+            {
+                var items = GetPaymentHistory(from, to);
+
+                var csv = "OrderId,OrderNumber,TableName,TotalPayable,GSTAmount,TotalPaid,DueAmount,OrderStatus,PaymentDate\n";
+                foreach (var p in items)
+                {
+                    var safeTable = (p.TableName ?? "").Replace("\"", "\"\"");
+                    var safeOrder = (p.OrderNumber ?? "").Replace("\"", "\"\"");
+                    csv += $"{p.OrderId},\"{safeOrder}\",\"{safeTable}\",{p.TotalPayable},{p.GSTAmount},{p.TotalPaid},{p.DueAmount},\"{p.OrderStatusDisplay}\",{p.PaymentDate:O}\n";
+                }
+
+                var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+                return File(bytes, "text/csv", "payment-history.csv");
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error exporting CSV: " + ex.Message;
+                return RedirectToAction("Dashboard");
+            }
+        }
+
+        // GET: Payment/Print
+        public IActionResult Print(DateTime? fromDate, DateTime? toDate)
+        {
+            var from = fromDate ?? DateTime.Today;
+            var to = toDate ?? DateTime.Today;
+
+            var model = new PaymentDashboardViewModel
+            {
+                FromDate = from,
+                ToDate = to,
+                PaymentHistory = GetPaymentHistory(from, to)
+            };
+
+            return View("Print", model);
         }
         
         private int GetCurrentUserId()

@@ -1,0 +1,44 @@
+@model PaymentDashboardViewModel
+@{
+    Layout = "~/Views/Shared/_PrintLayout.cshtml";
+    ViewData["Title"] = "Payment History Print";
+}
+
+<div class="print-container">
+    <h3 class="text-center mb-3">Payment History</h3>
+    <p class="text-center small">From: @Model.FromDate.ToString("yyyy-MM-dd") &nbsp; To: @Model.ToDate.ToString("yyyy-MM-dd")</p>
+
+    <table class="table table-sm table-bordered">
+        <thead>
+            <tr>
+                <th>Order No</th>
+                <th>Table</th>
+                <th class="text-end">Total Payable</th>
+                <th class="text-end">GST Amount</th>
+                <th class="text-end">Total Paid</th>
+                <th class="text-end">Due</th>
+                <th>Status</th>
+                <th>Payment Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in Model.PaymentHistory)
+            {
+                <tr>
+                    <td>@p.OrderNumber</td>
+                    <td>@p.TableName</td>
+                    <td class="text-end">₹@p.TotalPayable.ToString("N2")</td>
+                    <td class="text-end">₹@p.GSTAmount.ToString("N2")</td>
+                    <td class="text-end">₹@p.TotalPaid.ToString("N2")</td>
+                    <td class="text-end">₹@p.DueAmount.ToString("N2")</td>
+                    <td>@p.OrderStatusDisplay</td>
+                    <td>@(p.PaymentDate == DateTime.MinValue ? "" : p.PaymentDate.ToString("yyyy-MM-dd HH:mm"))</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="text-center mt-3">
+        <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-1"></i>Print</button>
+    </div>
+</div>
