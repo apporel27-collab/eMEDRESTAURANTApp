@@ -23,8 +23,10 @@ namespace RestaurantManagementSystem.Models
         [ForeignKey("CategoryId")]
         public virtual Category? Category { get; set; }
         
-        // Display Order for sorting
-        public int DisplayOrder { get; set; } = 0;
+    // Display Order for sorting
+    [Range(1, int.MaxValue, ErrorMessage = "Display Order must be greater than 0")]
+    [Required(ErrorMessage = "Display Order is required")]
+    public int DisplayOrder { get; set; } = 1;
         
         // Timestamps
         public DateTime CreatedAt { get; set; } = DateTime.Now;

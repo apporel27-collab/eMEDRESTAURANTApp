@@ -66,8 +66,8 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label asp-for="DisplayOrder" class="form-label">Display Order</label>
-                                    <input asp-for="DisplayOrder" class="form-control" type="number" min="1" placeholder="Enter display order" />
+                                    <label asp-for="DisplayOrder" class="form-label required">Display Order</label>
+                                    <input asp-for="DisplayOrder" class="form-control" type="number" min="1" value="1" required placeholder="Enter display order" />
                                     <div class="form-text">Lower numbers appear first in lists</div>
                                     <span asp-validation-for="DisplayOrder" class="text-danger"></span>
                                 </div>
@@ -198,7 +198,7 @@
             let isValid = true;
             
             // Check required fields
-            const requiredFields = ['Name', 'CategoryId'];
+            const requiredFields = ['Name', 'CategoryId', 'DisplayOrder'];
             requiredFields.forEach(function(fieldName) {
                 const field = $('#' + fieldName);
                 const value = field.val().trim();
@@ -214,6 +214,15 @@
             // Check for duplicate name
             if ($('#Name').hasClass('is-invalid')) {
                 isValid = false;
+            }
+
+            // Check DisplayOrder numeric and > 0
+            const displayOrderVal = parseInt($('#DisplayOrder').val(), 10);
+            if (isNaN(displayOrderVal) || displayOrderVal < 1) {
+                $('#DisplayOrder').addClass('is-invalid');
+                isValid = false;
+            } else {
+                $('#DisplayOrder').removeClass('is-invalid');
             }
 
             if (!isValid) {
