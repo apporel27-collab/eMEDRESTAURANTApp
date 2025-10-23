@@ -44,10 +44,10 @@ namespace RestaurantManagementSystem.ViewModels
         [Display(Name = "Available")]
         public bool IsAvailable { get; set; } = true;
 
-        [Required(ErrorMessage = "Preparation time is required")]
-        [Display(Name = "Preparation Time (minutes)")]
-        [Range(1, 300, ErrorMessage = "Preparation time must be between 1 and 300 minutes")]
-        public int PreparationTimeMinutes { get; set; }
+    [Required(ErrorMessage = "Preparation time is required")]
+    [Display(Name = "Preparation Time (minutes)")]
+    [Range(1, 300, ErrorMessage = "Preparation time must be between 1 and 300 minutes")]
+    public int PreparationTimeMinutes { get; set; } = 1;
 
         [Display(Name = "Calorie Count")]
         [Range(0, 10000, ErrorMessage = "Calorie count must be between 0 and 10000")]

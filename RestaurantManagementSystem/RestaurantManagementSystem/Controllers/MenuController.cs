@@ -254,7 +254,7 @@ namespace RestaurantManagementSystem.Controllers
             ViewBag.Modifiers = GetAllModifiers();
             ViewBag.KitchenStations = GetKitchenStationSelectList();
             
-            return View(new MenuItemViewModel());
+            return View(new MenuItemViewModel { PreparationTimeMinutes = 1 });
         }
 
         // POST: Menu/Create
@@ -353,7 +353,12 @@ namespace RestaurantManagementSystem.Controllers
                 }
             }
 
-            // If we got this far, something failed, redisplay form
+            // If we got this far, something failed, ensure sensible defaults and redisplay form
+            if (model != null && model.PreparationTimeMinutes == 0)
+            {
+                model.PreparationTimeMinutes = 1;
+            }
+
             ViewBag.Categories = GetCategorySelectList();
             ViewBag.SubCategories = GetSubCategorySelectList(model.CategoryId);
             ViewBag.Allergens = GetAllAllergens();

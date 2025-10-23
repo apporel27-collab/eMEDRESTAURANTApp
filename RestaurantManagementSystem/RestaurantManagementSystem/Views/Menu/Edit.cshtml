@@ -47,7 +47,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label asp-for="PLUCode" class="control-label"></label>
-                                            <input asp-for="PLUCode" class="form-control" />
+                                            <input asp-for="PLUCode" class="form-control" required />
                                             <span asp-validation-for="PLUCode" class="text-danger"></span>
                                         </div>
                                         
@@ -91,7 +91,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label asp-for="PreparationTimeMinutes" class="control-label"></label>
-                                            <input asp-for="PreparationTimeMinutes" class="form-control" type="number" />
+                                            <input asp-for="PreparationTimeMinutes" class="form-control" type="number" min="1" value="@(Model.PreparationTimeMinutes == 0 ? 1 : Model.PreparationTimeMinutes)" />
                                             <span asp-validation-for="PreparationTimeMinutes" class="text-danger"></span>
                                         </div>
                                         
