@@ -1,0 +1,49 @@
+@model IEnumerable<RestaurantManagementSystem.Models.MenuItem>
+@{
+    ViewData["Title"] = "Menu Items Print";
+    Layout = "~/Views/Shared/_PrintLayout.cshtml";
+}
+
+<div class="container-fluid py-3">
+    <h3>Menu Items</h3>
+    <table class="table table-sm table-bordered mt-3">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>PLU</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Sub Category</th>
+                <th class="text-end">Price</th>
+                <th class="text-center">Prep Time</th>
+                <th class="text-center">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null && Model.Any())
+            {
+                var idx = 1;
+                foreach (var i in Model)
+                {
+                    <tr>
+                        <td>@idx</td>
+                        <td>@i.PLUCode</td>
+                        <td>@i.Name</td>
+                        <td>@(i.Category?.Name ?? "")</td>
+                        <td>@(i.SubCategory?.Name ?? "")</td>
+                        <td class="text-end">@i.Price.ToString("N2")</td>
+                        <td class="text-center">@i.PreparationTimeMinutes min</td>
+                        <td class="text-center">@(i.IsAvailable ? "Available" : "Unavailable")</td>
+                    </tr>
+                    idx++;
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="8" class="text-center">No menu items found</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -159,6 +159,56 @@ namespace RestaurantManagementSystem.Controllers
             }
         }
 
+        // GET: SubCategory/ExportCsv
+        public IActionResult ExportCsv()
+        {
+            try
+            {
+                var subCategories = _db.SubCategories
+                    .Include(s => s.Category)
+                    .OrderBy(s => s.Category.Name)
+                    .ThenBy(s => s.DisplayOrder)
+                    .ThenBy(s => s.Name)
+                    .ToList();
+
+                var csv = "Id,Name,Category,Description,DisplayOrder,IsActive,CreatedAt\n";
+                foreach (var s in subCategories)
+                {
+                    var line = $"{s.Id},\"{s.Name.Replace("\"", "\"\"")}\",\"{(s.Category?.Name ?? "").Replace("\"", "\"\"")}\",\"{(s.Description ?? "").Replace("\"", "\"\"")}\",{s.DisplayOrder},{(s.IsActive?1:0)},\"{s.CreatedAt:O}\"\n";
+                    csv += line;
+                }
+
+                var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+                return File(bytes, "text/csv", "subcategories.csv");
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error exporting CSV: " + ex.Message;
+                return RedirectToAction("Index");
+            }
+        }
+
+        // GET: SubCategory/Print
+        public IActionResult Print()
+        {
+            try
+            {
+                var subCategories = _db.SubCategories
+                    .Include(s => s.Category)
+                    .OrderBy(s => s.Category.Name)
+                    .ThenBy(s => s.DisplayOrder)
+                    .ThenBy(s => s.Name)
+                    .ToList();
+
+                return View("Print", subCategories);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error preparing print view: " + ex.Message;
+                return RedirectToAction("Index");
+            }
+        }
+
         // GET: SubCategory/Create
         public IActionResult Create()
         {

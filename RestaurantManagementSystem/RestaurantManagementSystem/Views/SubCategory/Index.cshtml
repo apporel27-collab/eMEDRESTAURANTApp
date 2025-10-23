@@ -20,10 +20,16 @@
                         </ol>
                     </nav>
                 </div>
-                <div>
+                <div class="btn-group" role="group" aria-label="Actions">
                     <a asp-action="Create" class="btn btn-success">
                         <i class="fas fa-plus me-1"></i>
                         Add New Sub Category
+                    </a>
+                    <a asp-action="ExportCsv" class="btn btn-outline-secondary" title="Export CSV">
+                        <i class="fas fa-file-csv"></i>
+                    </a>
+                    <a asp-action="Print" target="_blank" class="btn btn-outline-secondary" title="Print / PDF">
+                        <i class="fas fa-print"></i>
                     </a>
                 </div>
             </div>

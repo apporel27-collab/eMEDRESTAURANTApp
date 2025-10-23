@@ -138,6 +138,45 @@ namespace RestaurantManagementSystem.Controllers
                 return View(new List<MenuItem>());
             }
         }
+
+        // GET: Menu/ExportCsv
+        public IActionResult ExportCsv()
+        {
+            try
+            {
+                var items = GetAllMenuItems();
+
+                var csv = "Id,PLU,Name,Category,SubCategory,Price,PrepTime,Available\n";
+                foreach (var i in items)
+                {
+                    var line = $"{i.Id},\"{(i.PLUCode ?? "")}\",\"{(i.Name ?? "").Replace("\"", "\"\"")}\",\"{(i.Category?.Name ?? "").Replace("\"", "\"\"")}\",\"{(i.SubCategory?.Name ?? "").Replace("\"", "\"\"")}\",{i.Price}, {i.PreparationTimeMinutes}, {(i.IsAvailable?1:0)}\n";
+                    csv += line;
+                }
+
+                var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+                return File(bytes, "text/csv", "menu-items.csv");
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error exporting CSV: " + ex.Message;
+                return RedirectToAction("Index");
+            }
+        }
+
+        // GET: Menu/Print
+        public IActionResult Print()
+        {
+            try
+            {
+                var items = GetAllMenuItems();
+                return View("Print", items);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error preparing print view: " + ex.Message;
+                return RedirectToAction("Index");
+            }
+        }
         
         // Diagnostic action to check database status
         [HttpGet]

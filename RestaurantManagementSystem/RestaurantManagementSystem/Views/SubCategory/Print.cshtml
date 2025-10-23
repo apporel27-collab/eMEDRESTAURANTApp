@@ -1,0 +1,47 @@
+@model IEnumerable<RestaurantManagementSystem.Models.SubCategory>
+@{
+    ViewData["Title"] = "Sub Categories Print";
+    Layout = "~/Views/Shared/_PrintLayout.cshtml"; // lightweight print layout; fallback to default if missing
+}
+
+<div class="container-fluid py-3">
+    <h3>Sub Categories</h3>
+    <table class="table table-sm table-bordered mt-3">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Sub Category</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th class="text-center">Display Order</th>
+                <th class="text-center">Status</th>
+                <th class="text-center">Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null && Model.Any())
+            {
+                var idx = 1;
+                foreach (var s in Model)
+                {
+                    <tr>
+                        <td>@idx</td>
+                        <td>@s.Name</td>
+                        <td>@(s.Category?.Name ?? "")</td>
+                        <td>@(string.IsNullOrEmpty(s.Description) ? "-" : s.Description)</td>
+                        <td class="text-center">@s.DisplayOrder</td>
+                        <td class="text-center">@(s.IsActive ? "Active" : "Inactive")</td>
+                        <td class="text-center">@s.CreatedAt.ToString("yyyy-MM-dd")</td>
+                    </tr>
+                    idx++;
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="7" class="text-center">No sub categories found</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
