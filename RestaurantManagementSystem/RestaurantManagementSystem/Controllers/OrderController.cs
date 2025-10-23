@@ -298,7 +298,7 @@ namespace RestaurantManagementSystem.Controllers
             using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
-                using (var command = new Microsoft.Data.SqlClient.SqlCommand("SELECT Id, Name, Description, Price FROM MenuItems WHERE IsAvailable = 1 ORDER BY Name", connection))
+                using (var command = new Microsoft.Data.SqlClient.SqlCommand("SELECT Id, PLUCode, Name, Description, Price FROM MenuItems WHERE IsAvailable = 1 ORDER BY Name", connection))
                 {
                     using (var reader = command.ExecuteReader())
                     {
@@ -307,9 +307,10 @@ namespace RestaurantManagementSystem.Controllers
                             model.AvailableMenuItems.Add(new MenuItem
                             {
                                 Id = reader.GetInt32(0),
-                                Name = reader.GetString(1),
-                                Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-                                Price = reader.GetDecimal(3)
+                                PLUCode = reader.IsDBNull(1) ? null : reader.GetString(1),
+                                Name = reader.GetString(2),
+                                Description = reader.IsDBNull(3) ? null : reader.GetString(3),
+                                Price = reader.GetDecimal(4)
                             });
                         }
                     }
@@ -330,7 +331,7 @@ namespace RestaurantManagementSystem.Controllers
                 using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
                     connection.Open();
-                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("SELECT TOP 1 Id FROM MenuItems WHERE Name = @Name", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand("SELECT TOP 1 Id FROM MenuItems WHERE Name = @Name OR PLUCode = @Name", connection))
                     {
                         command.Parameters.AddWithValue("@Name", menuItemNameOrId);
                         var result = command.ExecuteScalar();

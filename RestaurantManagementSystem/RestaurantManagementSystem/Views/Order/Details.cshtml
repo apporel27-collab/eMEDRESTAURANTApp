@@ -24,10 +24,10 @@
             <label for="menuItemInput" class="visually-hidden">Menu Item</label>
             <input list="menuItems" id="menuItemInput" class="form-control form-control-sm" placeholder="Search menu (name)..." required />
             <datalist id="menuItems">
-              @foreach (var mi in Model.AvailableMenuItems)
-              {
-                <option value="@mi.Name" data-id="@mi.Id" data-price="@mi.Price.ToString("F2")">@mi.Name (₹@mi.Price.ToString("F2"))</option>
-              }
+                @foreach (var mi in Model.AvailableMenuItems)
+                {
+                  <option value="@mi.Name" data-id="@mi.Id" data-price="@mi.Price.ToString("F2")" data-plu="@mi.PLUCode">@mi.PLUCode - @mi.Name (₹@mi.Price.ToString("F2"))</option>
+                }
             </datalist>
           </div>
           <div class="col">

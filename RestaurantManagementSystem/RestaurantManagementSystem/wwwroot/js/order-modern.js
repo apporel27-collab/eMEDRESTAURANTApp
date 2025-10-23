@@ -125,11 +125,15 @@
 
   function resolveMenuItemByName(name){
     const options = document.querySelectorAll('#menuItems option');
+    const target = name.trim().toLowerCase();
     for(const opt of options){
-      if(opt.value.trim().toLowerCase() === name.trim().toLowerCase()){
+      const optName = (opt.value||'').trim().toLowerCase();
+      const optPlu = (opt.getAttribute('data-plu')||'').trim().toLowerCase();
+      if(optName === target || optPlu === target){
         return {
           id: parseInt(opt.getAttribute('data-id'),10),
-          price: parseFloat(opt.getAttribute('data-price'))
+          price: parseFloat(opt.getAttribute('data-price')),
+          displayName: opt.getAttribute('data-plu') && optPlu === target ? opt.textContent.split(' - ').slice(1).join(' - ').trim() : opt.value
         };
       }
     }
@@ -150,7 +154,7 @@
     const subtotal = resolved.price * qty;
     tr.innerHTML = `
       <td class="text-center"><input type="checkbox" class="fire-select" disabled /></td>
-      <td><div class="fw-semibold">${name}</div><input type="text" class="form-control form-control-sm item-note mt-1" placeholder="Note" /></td>
+      <td><div class="fw-semibold">${resolved.displayName || name}</div><input type="text" class="form-control form-control-sm item-note mt-1" placeholder="Note" /></td>
       <td class="text-center"><input type="number" class="form-control form-control-sm item-qty" value="${qty}" min="1" /></td>
       <td class="text-end">${formatMoney(resolved.price)}</td>
       <td class="text-end subtotal-cell">${formatMoney(subtotal)}</td>
