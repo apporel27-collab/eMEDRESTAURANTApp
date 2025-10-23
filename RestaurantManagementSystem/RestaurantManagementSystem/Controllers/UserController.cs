@@ -247,20 +247,39 @@ END";
                         
                         int userId = model.Id;
                         string roleIds = selectedRoles != null && selectedRoles.Count > 0 ? string.Join(",", selectedRoles) : "";
-                        // Always supply Salt: generate if missing
-                        if (string.IsNullOrWhiteSpace(model.Salt))
+                        // Determine password and salt to use. If a plaintext password was provided, hash it with BCrypt and save its salt.
+                        string passwordToUse = null;
+                        string saltToUse = null;
+                        if (!string.IsNullOrWhiteSpace(model.Password))
                         {
-                            model.Salt = Guid.NewGuid().ToString("N");
+                            // If the provided value already looks like a BCrypt hash, use as-is and extract salt
+                            var p = model.Password.Trim();
+                            if (p.StartsWith("$2a$") || p.StartsWith("$2b$") || p.StartsWith("$2y$"))
+                            {
+                                passwordToUse = p;
+                                // bcrypt salt is the first 29 chars of the hash
+                                if (p.Length >= 29) saltToUse = p.Substring(0, 29);
+                            }
+                            else
+                            {
+                                saltToUse = BCrypt.Net.BCrypt.GenerateSalt(12);
+                                passwordToUse = BCrypt.Net.BCrypt.HashPassword(p, saltToUse);
+                            }
                         }
-                        // If editing and password is blank, fetch current hash from DB
-                        string passwordToUse = model.Password;
-                        if (model.Id > 0 && string.IsNullOrWhiteSpace(model.Password))
+                        else if (model.Id > 0)
                         {
-                            using (var pwdCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT PasswordHash FROM purojit2_idmcbp.Users WHERE Id = @Id", con))
+                            // No new password supplied for edit — preserve current stored hash and salt
+                            using (var pwdCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT PasswordHash, Salt FROM purojit2_idmcbp.Users WHERE Id = @Id", con))
                             {
                                 pwdCmd.Parameters.AddWithValue("@Id", model.Id);
-                                var dbPwd = pwdCmd.ExecuteScalar();
-                                passwordToUse = dbPwd?.ToString() ?? "";
+                                using (var rdr = pwdCmd.ExecuteReader())
+                                {
+                                    if (rdr.Read())
+                                    {
+                                        passwordToUse = rdr.IsDBNull(0) ? null : rdr.GetString(0);
+                                        saltToUse = rdr.FieldCount > 1 && !rdr.IsDBNull(1) ? rdr.GetString(1) : null;
+                                    }
+                                }
                             }
                         }
                         using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("purojit2_idmcbp.usp_CreateOrUpdateUserWithRoles", con))
@@ -268,8 +287,9 @@ END";
                             cmd.CommandType = System.Data.CommandType.StoredProcedure;
                             cmd.Parameters.AddWithValue("@Id", model.Id);
                             cmd.Parameters.AddWithValue("@Username", model.Username);
-                            cmd.Parameters.AddWithValue("@PasswordHash", passwordToUse);
-                            cmd.Parameters.AddWithValue("@Salt", model.Salt);
+                            cmd.Parameters.AddWithValue("@PasswordHash", (object)passwordToUse ?? (object)DBNull.Value);
+                            // Ensure we never pass NULL for Salt; use extracted/generated salt or empty string fallback
+                            cmd.Parameters.AddWithValue("@Salt", (object)(saltToUse ?? string.Empty));
                             cmd.Parameters.AddWithValue("@FirstName", model.FirstName);
                             cmd.Parameters.AddWithValue("@LastName", model.LastName ?? (object)DBNull.Value);
                             cmd.Parameters.AddWithValue("@Email", model.Email ?? (object)DBNull.Value);

@@ -151,8 +151,9 @@ namespace RestaurantManagementSystem.Services
                 {
                     await connection.OpenAsync();
                     
-                    // Generate salt and hash password
-                    var (salt, passwordHash) = PasswordHasher.HashPassword(user.Password);
+                    // Hash password using BCrypt to match authentication verification
+                    var salt = BCrypt.Net.BCrypt.GenerateSalt(12);
+                    var passwordHash = BCrypt.Net.BCrypt.HashPassword(user.Password, salt);
                     
                     using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_CreateUser", connection))
                     {
@@ -160,7 +161,7 @@ namespace RestaurantManagementSystem.Services
                         
                         command.Parameters.AddWithValue("@Username", user.Username);
                         command.Parameters.AddWithValue("@PasswordHash", passwordHash);
-                        command.Parameters.AddWithValue("@Salt", salt);
+                        command.Parameters.AddWithValue("@Salt", salt ?? (object)DBNull.Value);
                         command.Parameters.AddWithValue("@FirstName", user.FirstName);
                         command.Parameters.AddWithValue("@LastName", user.LastName ?? (object)DBNull.Value);
                         command.Parameters.AddWithValue("@Email", user.Email ?? (object)DBNull.Value);
@@ -202,6 +203,19 @@ namespace RestaurantManagementSystem.Services
                 {
                     await connection.OpenAsync();
                     
+                    // If no new password is provided, fetch existing Salt to avoid passing NULL (DB may disallow NULLs)
+                    string existingSalt = null;
+                    if (string.IsNullOrEmpty(user.Password))
+                    {
+                        using (var saltCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT Salt FROM Users WHERE Id = @UserId", connection))
+                        {
+                            saltCmd.Parameters.AddWithValue("@UserId", user.Id);
+                            var res = await saltCmd.ExecuteScalarAsync();
+                            if (res != null && res != DBNull.Value)
+                                existingSalt = res.ToString();
+                        }
+                    }
+
                     using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_UpdateUser", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
@@ -221,16 +235,17 @@ namespace RestaurantManagementSystem.Services
                         // If password is provided, update it
                         if (!string.IsNullOrEmpty(user.Password))
                         {
-                            var (salt, passwordHash) = PasswordHasher.HashPassword(user.Password);
-                            
+                            var salt = BCrypt.Net.BCrypt.GenerateSalt(12);
+                            var passwordHash = BCrypt.Net.BCrypt.HashPassword(user.Password, salt);
                             command.Parameters.AddWithValue("@PasswordHash", passwordHash);
                             command.Parameters.AddWithValue("@Salt", salt);
                             command.Parameters.AddWithValue("@UpdatePassword", true);
                         }
                         else
                         {
+                            // pass back existing salt (or empty string) to avoid NULL insertion
                             command.Parameters.AddWithValue("@PasswordHash", DBNull.Value);
-                            command.Parameters.AddWithValue("@Salt", DBNull.Value);
+                            command.Parameters.AddWithValue("@Salt", (object)existingSalt ?? string.Empty);
                             command.Parameters.AddWithValue("@UpdatePassword", false);
                         }
                         
@@ -287,7 +302,8 @@ namespace RestaurantManagementSystem.Services
                 {
                     await connection.OpenAsync();
                     
-                    var (salt, passwordHash) = PasswordHasher.HashPassword(newPassword);
+                    var salt = BCrypt.Net.BCrypt.GenerateSalt(12);
+                    var passwordHash = BCrypt.Net.BCrypt.HashPassword(newPassword, salt);
                     
                     using (var command = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_ResetUserPassword", connection))
                     {

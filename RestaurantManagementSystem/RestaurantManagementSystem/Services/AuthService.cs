@@ -494,49 +494,59 @@ namespace RestaurantManagementSystem.Services
                     await connection.OpenAsync();
                     _logger?.LogInformation("Database connection opened successfully");
                     
-                    using (var command = new SqlCommand("SELECT * FROM Users WHERE Username = @Username", connection))
+                    // Try known schemas: prefer the namespaced table used by the UI/stored procedures, then fall back to the default Users table
+                    var tableCandidates = new[] { "purojit2_idmcbp.Users", "Users" };
+                    foreach (var table in tableCandidates)
                     {
-                        command.Parameters.AddWithValue("@Username", username);
-                        _logger?.LogInformation("Executing query for username: {Username}", username);
-                        
-                        using (var reader = await command.ExecuteReaderAsync())
+                        try
                         {
-                            if (await reader.ReadAsync())
+                            using (var command = new SqlCommand($"SELECT * FROM {table} WHERE Username = @Username", connection))
                             {
-                                _logger?.LogInformation("User found in database");
-                                
-                                // Debug log all columns to help diagnose issues
-                                var columnNames = new List<string>();
-                                for (int i = 0; i < reader.FieldCount; i++)
+                                command.Parameters.AddWithValue("@Username", username);
+                                _logger?.LogInformation("Executing query against {Table} for username: {Username}", table, username);
+
+                                using (var reader = await command.ExecuteReaderAsync())
                                 {
-                                    columnNames.Add(reader.GetName(i));
+                                    if (await reader.ReadAsync())
+                                    {
+                                        _logger?.LogInformation("User found in database ({Table})", table);
+
+                                        // Debug log all columns to help diagnose issues
+                                        var columnNames = new List<string>();
+                                        for (int i = 0; i < reader.FieldCount; i++)
+                                        {
+                                            columnNames.Add(reader.GetName(i));
+                                        }
+                                        _logger?.LogInformation("Columns in {Table}: {Columns}", table, string.Join(", ", columnNames));
+
+                                        // Extract the password hash directly to check its format
+                                        string passwordHash = reader["PasswordHash"]?.ToString();
+                                        _logger?.LogInformation("Raw PasswordHash: {PasswordHash}", passwordHash ?? "NULL");
+
+                                        return new User
+                                        {
+                                            Id = Convert.ToInt32(reader["Id"]),
+                                            Username = reader["Username"].ToString(),
+                                            PasswordHash = passwordHash,
+                                            FirstName = reader["FirstName"]?.ToString(),
+                                            LastName = reader.IsDBNull(reader.GetOrdinal("LastName")) ? null : reader["LastName"].ToString(),
+                                            Email = reader.IsDBNull(reader.GetOrdinal("Email")) ? null : reader["Email"].ToString(),
+                                            IsActive = reader.IsDBNull(reader.GetOrdinal("IsActive")) ? true : Convert.ToBoolean(reader["IsActive"]),
+                                            IsLockedOut = reader.IsDBNull(reader.GetOrdinal("IsLockedOut")) ? false : Convert.ToBoolean(reader["IsLockedOut"]),
+                                            RequiresMFA = reader.IsDBNull(reader.GetOrdinal("RequiresMFA")) ? false : Convert.ToBoolean(reader["RequiresMFA"]),
+                                            CreatedAt = reader.IsDBNull(reader.GetOrdinal("CreatedDate")) ? DateTime.MinValue : Convert.ToDateTime(reader["CreatedDate"])
+                                        };
+                                    }
                                 }
-                                _logger?.LogInformation("Columns in Users table: {Columns}", string.Join(", ", columnNames));
-                                
-                                // Extract the password hash directly to check its format
-                                string passwordHash = reader["PasswordHash"]?.ToString();
-                                _logger?.LogInformation("Raw PasswordHash: {PasswordHash}", passwordHash ?? "NULL");
-                                
-                                return new User
-                                {
-                                    Id = Convert.ToInt32(reader["Id"]),
-                                    Username = reader["Username"].ToString(),
-                                    PasswordHash = passwordHash,
-                                    FirstName = reader["FirstName"].ToString(),
-                                    LastName = reader.IsDBNull(reader.GetOrdinal("LastName")) ? null : reader["LastName"].ToString(),
-                                    Email = reader.IsDBNull(reader.GetOrdinal("Email")) ? null : reader["Email"].ToString(),
-                                    IsActive = Convert.ToBoolean(reader["IsActive"]),
-                                    IsLockedOut = Convert.ToBoolean(reader["IsLockedOut"]),
-                                    RequiresMFA = reader.IsDBNull(reader.GetOrdinal("RequiresMFA")) ? false : Convert.ToBoolean(reader["RequiresMFA"]),
-                                    CreatedAt = Convert.ToDateTime(reader["CreatedDate"])
-                                };
-                            }
-                            else
-                            {
-                                _logger?.LogWarning("No user found with username: {Username}", username);
                             }
                         }
+                        catch (SqlException sqlEx)
+                        {
+                            // If table doesn't exist in this schema, try the next candidate
+                            _logger?.LogDebug(sqlEx, "Query against {Table} failed, trying next candidate", table);
+                        }
                     }
+                    _logger?.LogWarning("No user found with username: {Username} in any known Users table", username);
                 }
                 catch (Exception ex)
                 {
@@ -1039,24 +1049,47 @@ namespace RestaurantManagementSystem.Services
         {
             try
             {
-                _logger?.LogInformation("Verifying password with BCrypt. Hash length: {Length}", passwordHash?.Length ?? 0);
-                
-                // Check if hash is in BCrypt format
-                bool isBcryptFormat = passwordHash != null && (passwordHash.StartsWith("$2a$") || passwordHash.StartsWith("$2b$") || passwordHash.StartsWith("$2y$"));
-                _logger?.LogInformation("Hash is in BCrypt format: {IsBcryptFormat}", isBcryptFormat);
-                
-                if (!isBcryptFormat)
+                _logger?.LogInformation("Verifying password. Stored hash length: {Length}", passwordHash?.Length ?? 0);
+
+                if (string.IsNullOrEmpty(passwordHash))
                 {
-                    _logger?.LogWarning("Password hash is not in BCrypt format");
+                    _logger?.LogWarning("Empty password hash provided");
                     return false;
                 }
-                
-                return BCrypt.Net.BCrypt.Verify(password, passwordHash);
+
+                // BCrypt formats start with $2a$, $2b$, $2y$
+                if (passwordHash.StartsWith("$2a$") || passwordHash.StartsWith("$2b$") || passwordHash.StartsWith("$2y$"))
+                {
+                    var ok = BCrypt.Net.BCrypt.Verify(password, passwordHash);
+                    _logger?.LogInformation("BCrypt verification result: {Result}", ok);
+                    return ok;
+                }
+
+                // Legacy PBKDF2 format: iterations:salt:hash
+                if (passwordHash.Contains(":"))
+                {
+                    var ok = PasswordHasher.VerifyPassword(password, passwordHash);
+                    _logger?.LogInformation("PBKDF2 verification result: {Result}", ok);
+                    return ok;
+                }
+
+                // Unknown format - attempt BCrypt verify as a last resort
+                try
+                {
+                    var ok = BCrypt.Net.BCrypt.Verify(password, passwordHash);
+                    _logger?.LogInformation("Fallback BCrypt verification result: {Result}", ok);
+                    return ok;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Unknown password hash format and BCrypt fallback failed");
+                    return false;
+                }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error verifying password with BCrypt");
-                throw;
+                _logger?.LogError(ex, "Error verifying password");
+                return false;
             }
         }
         
