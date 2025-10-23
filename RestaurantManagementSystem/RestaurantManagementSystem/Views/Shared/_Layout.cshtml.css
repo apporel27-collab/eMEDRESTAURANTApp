@@ -40,8 +40,10 @@ button.accept-policy {
 }
 
 .footer {
-  position: absolute;
-  bottom: 0;
+  /* Avoid absolute positioning so the footer doesn't overlap page content.
+     The global `site.css` file already implements a sticky-footer layout
+     using flexbox; keep the footer flow-friendly here. */
+  position: relative;
   width: 100%;
   white-space: nowrap;
   line-height: 60px;
