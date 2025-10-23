@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Net;
 using RestaurantManagementSystem.Models;
 
 namespace RestaurantManagementSystem.Services
@@ -136,20 +137,351 @@ namespace RestaurantManagementSystem.Services
         
         public async Task SignInUserAsync(ClaimsPrincipal principal, bool rememberMe)
         {
-            // Sign in the user
-            await _httpContextAccessor.HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                principal,
-                new AuthenticationProperties
+            // Before signing in, create a session record in the database and add the session token as a claim
+            try
+            {
+                var httpContext = _httpContextAccessor.HttpContext;
+
+                // Extract user id from principal
+                int? userId = null;
+                var idClaim = principal?.FindFirst(ClaimTypes.NameIdentifier);
+                if (idClaim != null && int.TryParse(idClaim.Value, out int uid))
                 {
-                    IsPersistent = rememberMe,
-                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(12)
-                });
+                    userId = uid;
+                }
+
+                // Generate a session token
+                var sessionToken = Guid.NewGuid().ToString();
+
+                // Capture IP address using helper (prefers X-Forwarded-For, X-Real-IP, then RemoteIpAddress)
+                string ip = GetClientIp(httpContext);
+
+                // Capture user agent
+                string userAgent = httpContext?.Request?.Headers["User-Agent"].FirstOrDefault();
+
+                // Device id (optional header)
+                string deviceId = httpContext?.Request?.Headers["X-Device-Id"].FirstOrDefault();
+
+                // Call stored procedure to create/update session
+                Guid? sessionId = null;
+                try
+                {
+                    if (userId.HasValue)
+                    {
+                        using (var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+                        using (var command = new SqlCommand("sp_CreateOrUpdateSession", connection))
+                        {
+                            command.CommandType = CommandType.StoredProcedure;
+                            command.Parameters.AddWithValue("@UserId", userId.Value);
+                            command.Parameters.AddWithValue("@Token", sessionToken);
+                            command.Parameters.AddWithValue("@ExpiryMinutes", 60 * 12); // 12 hours
+                            command.Parameters.AddWithValue("@IpAddress", (object)ip ?? DBNull.Value);
+                            command.Parameters.AddWithValue("@DeviceId", (object)deviceId ?? DBNull.Value);
+                            command.Parameters.AddWithValue("@UserAgent", (object)userAgent ?? DBNull.Value);
+
+                            await connection.OpenAsync();
+                            using (var reader = await command.ExecuteReaderAsync())
+                            {
+                                if (await reader.ReadAsync())
+                                {
+                                    if (!reader.IsDBNull(reader.GetOrdinal("SessionId")))
+                                    {
+                                        sessionId = reader.GetGuid(reader.GetOrdinal("SessionId"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error creating user session for user {UserId}", userId);
+                }
+
+                // If we have a session token, add it as a claim so we can end the session on sign-out
+                if (!string.IsNullOrEmpty(sessionToken) && principal?.Identity is ClaimsIdentity identity)
+                {
+                    identity.AddClaim(new Claim("SessionToken", sessionToken));
+                    if (sessionId.HasValue)
+                    {
+                        identity.AddClaim(new Claim("SessionId", sessionId.Value.ToString()));
+                    }
+                }
+
+                // Sign in the user (cookie) with the augmented claims
+                await _httpContextAccessor.HttpContext.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    principal,
+                    new AuthenticationProperties
+                    {
+                        IsPersistent = rememberMe,
+                        ExpiresUtc = DateTimeOffset.UtcNow.AddHours(12)
+                    });
+
+                // Create an audit log entry for login
+                try
+                {
+                    if (userId.HasValue)
+                    {
+                        await CreateAuditLogAsync(userId.Value, "Login", null, ip, userAgent, "UserSessions", sessionId?.ToString());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error creating audit log for login for user {UserId}", userId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in SignInUserAsync session creation/logging");
+                // fallback to simple sign-in to avoid blocking login
+                await _httpContextAccessor.HttpContext.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    principal,
+                    new AuthenticationProperties { IsPersistent = rememberMe, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(12) });
+            }
         }
 
         public async Task SignOutUserAsync()
         {
-            await _httpContextAccessor.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            try
+            {
+                var httpContext = _httpContextAccessor.HttpContext;
+                var user = httpContext?.User;
+
+                // Capture session token claim if present
+                string sessionToken = user?.FindFirst("SessionToken")?.Value;
+
+                // Capture user id for audit
+                int? userId = null;
+                var idClaim = user?.FindFirst(ClaimTypes.NameIdentifier);
+                if (idClaim != null && int.TryParse(idClaim.Value, out int uid)) userId = uid;
+
+                // Capture IP and user agent
+                string ip = GetClientIp(httpContext);
+                string userAgent = httpContext?.Request?.Headers["User-Agent"].FirstOrDefault();
+
+                // Deactivate session record if token exists
+                if (!string.IsNullOrEmpty(sessionToken))
+                {
+                    try
+                    {
+                        using (var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+                        using (var command = new SqlCommand(@"UPDATE UserSessions SET IsActive = 0 WHERE Token = @Token", connection))
+                        {
+                            command.Parameters.AddWithValue("@Token", sessionToken);
+                            await connection.OpenAsync();
+                            await command.ExecuteNonQueryAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Error deactivating session token {Token}", sessionToken);
+                    }
+                }
+
+                // Create audit log for logout
+                try
+                {
+                    if (userId.HasValue)
+                    {
+                        await CreateAuditLogAsync(userId.Value, "Logout", null, ip, userAgent, "UserSessions", sessionToken);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error creating audit log for logout for user {UserId}", userId);
+                }
+
+                // Sign out the cookie
+                await _httpContextAccessor.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in SignOutUserAsync");
+                // Try a best-effort signout
+                await _httpContextAccessor.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        }
+
+        private async Task CreateAuditLogAsync(int userId, string action, string details, string ipAddress, string userAgent, string entityName = null, string entityId = null)
+        {
+            try
+            {
+                using (var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+                using (var command = new SqlCommand("sp_CreateAuditLog", connection))
+                {
+                    command.CommandType = CommandType.StoredProcedure;
+                    command.Parameters.AddWithValue("@UserId", userId);
+                    command.Parameters.AddWithValue("@Action", action);
+                    command.Parameters.AddWithValue("@Details", (object)details ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@IpAddress", (object)ipAddress ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@UserAgent", (object)userAgent ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@EntityName", (object)entityName ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@EntityId", (object)entityId ?? DBNull.Value);
+
+                    await connection.OpenAsync();
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error creating audit log entry for user {UserId}", userId);
+            }
+        }
+
+            /// <summary>
+            /// Update the IP address for an existing session token.
+            /// </summary>
+            public async Task<bool> UpdateSessionIpAsync(string token, string ipAddress)
+            {
+                if (string.IsNullOrEmpty(token)) return false;
+
+                try
+                {
+                    using (var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+                    using (var command = new SqlCommand(@"UPDATE UserSessions SET IpAddress = @IpAddress, LastActivityDate = GETDATE() WHERE Token = @Token", connection))
+                    {
+                        command.Parameters.AddWithValue("@IpAddress", (object)ipAddress ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@Token", token);
+                        await connection.OpenAsync();
+                        var rows = await command.ExecuteNonQueryAsync();
+                        return rows > 0;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error updating session IP for token {Token}", token);
+                    return false;
+                }
+            }
+
+        /// <summary>
+        /// Extract client IP address, preferring X-Forwarded-For, X-Real-IP or CF-Connecting-IP headers when present.
+        /// When a header contains multiple IPs, prefer the first public IP (skip private/local addresses).
+        /// Normalizes IPv6-loopback and IPv6-mapped IPv4 addresses to IPv4 where possible.
+        /// </summary>
+        private string GetClientIp(HttpContext httpContext)
+        {
+            try
+            {
+                if (httpContext == null) return null;
+
+                string ip = null;
+
+                if (httpContext.Request?.Headers != null)
+                {
+                    // Check common headers in order of trust
+                    if (httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var xff))
+                        ip = xff.FirstOrDefault();
+
+                    if (string.IsNullOrEmpty(ip) && httpContext.Request.Headers.TryGetValue("X-Real-IP", out var xrip))
+                        ip = xrip.FirstOrDefault();
+
+                    if (string.IsNullOrEmpty(ip) && httpContext.Request.Headers.TryGetValue("CF-Connecting-IP", out var cfip))
+                        ip = cfip.FirstOrDefault();
+
+                    if (string.IsNullOrEmpty(ip) && httpContext.Request.Headers.TryGetValue("Forwarded", out var forwarded))
+                    {
+                        // Forwarded: for=192.0.2.60;proto=http;by=203.0.113.43
+                        var f = forwarded.FirstOrDefault();
+                        if (!string.IsNullOrEmpty(f))
+                        {
+                            var forPart = f.Split(';').Select(p => p.Trim()).FirstOrDefault(p => p.StartsWith("for=", StringComparison.OrdinalIgnoreCase));
+                            if (!string.IsNullOrEmpty(forPart))
+                            {
+                                var raw = forPart.Substring(4).Trim();
+                                // strip quotes
+                                raw = raw.Trim('"');
+                                ip = raw;
+                            }
+                        }
+                    }
+                }
+
+                // If header contains multiple IPs, prefer the first public IP (skip private/local addresses)
+                if (!string.IsNullOrEmpty(ip) && ip.Contains(","))
+                {
+                    var candidates = ip.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                    var publicIp = candidates.FirstOrDefault(c => IsPublicIp(c));
+                    ip = publicIp ?? candidates.FirstOrDefault();
+                }
+
+                // Fallback to remote address
+                if (string.IsNullOrEmpty(ip))
+                {
+                    ip = httpContext.Connection?.RemoteIpAddress?.ToString();
+                }
+
+                if (string.IsNullOrEmpty(ip)) return null;
+
+                // Normalize IPv6 loopback to IPv4 loopback
+                if (ip == "::1" || ip == "0:0:0:0:0:0:0:1") ip = "127.0.0.1";
+
+                // Handle IPv6-mapped IPv4 addresses like ::ffff:127.0.0.1
+                if (IPAddress.TryParse(ip, out var addr))
+                {
+                    if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+                    {
+                        try
+                        {
+                            var mapped = addr.MapToIPv4();
+                            if (mapped != null)
+                            {
+                                ip = mapped.ToString();
+                            }
+                        }
+                        catch
+                        {
+                            // ignore mapping errors and keep original
+                        }
+                    }
+                }
+
+                return ip;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Failed to determine client IP");
+                return null;
+            }
+        }
+
+        private bool IsPublicIp(string ipString)
+        {
+            if (string.IsNullOrEmpty(ipString)) return false;
+            if (!IPAddress.TryParse(ipString, out var addr)) return false;
+
+            // IPv4 private ranges and loopback
+            if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                var bytes = addr.GetAddressBytes();
+                // 10.0.0.0/8
+                if (bytes[0] == 10) return false;
+                // 172.16.0.0/12
+                if (bytes[0] == 172 && (bytes[1] >= 16 && bytes[1] <= 31)) return false;
+                // 192.168.0.0/16
+                if (bytes[0] == 192 && bytes[1] == 168) return false;
+                // 127.0.0.0/8 loopback
+                if (bytes[0] == 127) return false;
+                // Link-local 169.254.0.0/16
+                if (bytes[0] == 169 && bytes[1] == 254) return false;
+                return true;
+            }
+
+            // For IPv6, consider global unicast as public
+            if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                // fc00::/7 are unique local addresses
+                var bytes = addr.GetAddressBytes();
+                if ((bytes[0] & 0xfe) == 0xfc) return false; // fc00::/7
+                if (addr.IsIPv6LinkLocal || addr.IsIPv6SiteLocal || addr.IsIPv6Multicast) return false;
+                // loopback
+                if (IPAddress.IsLoopback(addr)) return false;
+                return true;
+            }
+
+            return false;
         }
         
         private async Task<User> GetUserByUsernameAsync(string username)

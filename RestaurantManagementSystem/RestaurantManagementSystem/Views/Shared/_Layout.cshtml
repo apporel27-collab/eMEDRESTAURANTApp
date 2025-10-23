@@ -4,6 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - RestaurantManagementSystem</title>
+    @* Expose session token to client-side JS in a meta tag (only for authenticated users) *@
+    @if (User?.Identity?.IsAuthenticated == true)
+    {
+        var sessionToken = User.FindFirst("SessionToken")?.Value;
+        if (!string.IsNullOrEmpty(sessionToken))
+        {
+            <meta name="session-token" content="@sessionToken" />
+        }
+    }
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -742,6 +751,47 @@
                 }, 3000);
             }
         });
+    </script>
+    <script>
+        // If a session token meta is present, fetch public IP and POST to server to update session record
+        (function() {
+            try {
+                var meta = document.querySelector('meta[name="session-token"]');
+                if (!meta) return; // no session token available
+
+                var token = meta.getAttribute('content');
+                if (!token) return;
+
+                // Fetch public IP from ipify (simple, reliable)
+                fetch('https://api.ipify.org?format=json')
+                    .then(function(resp) { return resp.json(); })
+                    .then(function(data) {
+                        var ip = data && data.ip ? data.ip : null;
+                        if (!ip) return;
+
+                        // Post to server endpoint to update session ip
+                        var formData = new FormData();
+                        formData.append('token', token);
+                        formData.append('ip', ip);
+
+                        fetch('/Account/ReportClientIp', {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'same-origin'
+                        }).then(function(res) {
+                            // optional: log success/failure to console for debugging
+                            if (!res.ok) console.debug('Failed to report client IP', res.status);
+                        }).catch(function(err) {
+                            console.debug('Error reporting client IP', err);
+                        });
+                    })
+                    .catch(function(err) {
+                        console.debug('Error fetching public IP', err);
+                    });
+            } catch (e) {
+                console.debug('Exception in client IP reporter', e);
+            }
+        })();
     </script>
 </body>
 </html>

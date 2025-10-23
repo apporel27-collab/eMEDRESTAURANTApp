@@ -31,6 +31,24 @@ namespace RestaurantManagementSystem.Controllers
             _userRoleService = userRoleService;
             _logger = logger;
         }
+
+        [HttpPost]
+        public async Task<IActionResult> ReportClientIp([FromForm] string token, [FromForm] string ip)
+        {
+            if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(ip)) return BadRequest();
+
+            try
+            {
+                var updated = await (_authService as Services.AuthService)?.UpdateSessionIpAsync(token, ip);
+                if (updated == true) return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error updating client IP");
+            }
+
+            return StatusCode(500);
+        }
         
         [HttpGetAttribute]
         [AllowAnonymousAttribute]
