@@ -1,0 +1,45 @@
+@model RestaurantManagementSystem.ViewModels.KitchenTicketsViewModel
+@{
+    ViewData["Title"] = "Kitchen Tickets Print";
+    Layout = "~/Views/Shared/_PrintLayout.cshtml";
+}
+
+<div class="container-fluid py-3">
+    <h3>Kitchen Tickets</h3>
+    <table class="table table-sm table-bordered mt-3">
+        <thead>
+            <tr>
+                <th>Ticket #</th>
+                <th>Order #</th>
+                <th>Table</th>
+                <th>Station</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Wait Minutes</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model?.Tickets != null && Model.Tickets.Any())
+            {
+                foreach (var ticket in Model.Tickets)
+                {
+                    <tr>
+                        <td>@ticket.TicketNumber</td>
+                        <td>@ticket.OrderNumber</td>
+                        <td>@ticket.TableName</td>
+                        <td>@ticket.StationName</td>
+                        <td>@ticket.StatusDisplay</td>
+                        <td>@ticket.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-center">@ticket.MinutesSinceCreated</td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="7" class="text-center">No tickets found</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

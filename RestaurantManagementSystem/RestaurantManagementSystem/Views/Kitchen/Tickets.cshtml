@@ -113,8 +113,16 @@
     
     <!-- Tickets Table -->
     <div class="card">
-        <div class="card-header">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Ticket List</h5>
+            <div>
+                <a asp-action="ExportCsv" asp-controller="Kitchen" class="btn btn-outline-secondary btn-sm me-2" title="Export CSV">
+                    <i class="fas fa-file-csv"></i>
+                </a>
+                <a asp-action="Print" asp-controller="Kitchen" target="_blank" class="btn btn-outline-secondary btn-sm" title="Print / PDF">
+                    <i class="fas fa-print"></i>
+                </a>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">

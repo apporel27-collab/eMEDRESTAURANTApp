@@ -94,6 +94,58 @@ namespace RestaurantManagementSystem.Controllers
             
             return View(viewModel);
         }
+
+        // GET: Kitchen/ExportCsv
+        public IActionResult ExportCsv(KitchenStationFilterViewModel filter)
+        {
+            try
+            {
+                var tickets = new List<KitchenTicket>();
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    tickets = GetFilteredTickets(connection, filter);
+                }
+
+                var csv = "TicketNumber,OrderNumber,TableName,StationName,Status,CreatedAt,WaitMinutes\n";
+                foreach (var t in tickets)
+                {
+                    var line = $"{t.TicketNumber},\"{t.OrderNumber}\",\"{(t.TableName ?? "").Replace("\"", "\"\"")}\",\"{(t.StationName ?? "").Replace("\"", "\"\"")}\",\"{t.StatusDisplay}\",{t.CreatedAt:O},{t.MinutesSinceCreated}\n";
+                    csv += line;
+                }
+
+                var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+                return File(bytes, "text/csv", "kitchen-tickets.csv");
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error exporting CSV: " + ex.Message;
+                return RedirectToAction("Tickets");
+            }
+        }
+
+        // GET: Kitchen/Print
+        public IActionResult Print(KitchenStationFilterViewModel filter)
+        {
+            try
+            {
+                var viewModel = new KitchenTicketsViewModel { Filter = filter ?? new KitchenStationFilterViewModel() };
+                using (var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    viewModel.Filter.Stations = GetKitchenStations(connection);
+                    viewModel.Tickets = GetFilteredTickets(connection, filter);
+                    viewModel.Stats = GetKitchenStats(connection, filter?.StationId);
+                }
+
+                return View("Print", viewModel);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error preparing print view: " + ex.Message;
+                return RedirectToAction("Tickets");
+            }
+        }
         
         // GET: Kitchen/TicketDetails/{id}
         public IActionResult TicketDetails(int id)
