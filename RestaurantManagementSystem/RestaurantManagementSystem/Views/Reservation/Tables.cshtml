@@ -94,7 +94,7 @@
                                     }
                                 </td>
                                 <td>@table.MinPartySize</td>
-                                <td>@(table.LastOccupiedAt.HasValue ? table.LastOccupiedAt.Value.ToString("MMM dd, yyyy h:mm tt") : "-")</td>
+                                <td>@(table.LastOccupiedAt != null ? ((DateTime)table.LastOccupiedAt).ToString("MMM dd, yyyy h:mm tt") : "-")</td>
                                 <td>
                                     @if (table.IsActive)
                                     {

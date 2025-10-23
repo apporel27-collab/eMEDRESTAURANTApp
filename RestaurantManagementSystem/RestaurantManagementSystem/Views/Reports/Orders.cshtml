@@ -286,7 +286,7 @@
                                                 <div>@order.FormattedCreatedAt</div>
                                             </td>
                                             <td>
-                                                @if (order.PreparationTimeMinutes.HasValue)
+                                                @if (order.PreparationTimeMinutes != null)
                                                 {
                                                     <span class="badge bg-info">@order.FormattedPreparationTime</span>
                                                 }

@@ -102,11 +102,11 @@
                             </span>
                         </div>
                     </div>
-                    @if (Model.Ticket.CompletedAt.HasValue)
+                    @if (Model.Ticket.CompletedAt != null)
                     {
                         <div class="row mb-2">
                             <div class="col-sm-4 fw-bold">Completed:</div>
-                            <div class="col-sm-8">@Model.Ticket.CompletedAt.Value.ToString("MM/dd/yyyy HH:mm")</div>
+                            <div class="col-sm-8">@(((DateTime)Model.Ticket.CompletedAt).ToString("MM/dd/yyyy HH:mm"))</div>
                         </div>
                     }
                     @if (!string.IsNullOrEmpty(Model.OrderNotes))
@@ -176,13 +176,13 @@
                                             </span>
                                         </td>
                                         <td>
-                                            @if (item.StartTime.HasValue && !item.CompletionTime.HasValue)
+                                            @if (item.StartTime != null && item.CompletionTime == null)
                                             {
                                                 <span class="@(item.MinutesCooking > item.PrepTime ? "text-danger" : "")">
                                                     @item.MinutesCooking min
                                                 </span>
                                             }
-                                            else if (item.StartTime.HasValue && item.CompletionTime.HasValue)
+                                            else if (item.StartTime != null && item.CompletionTime != null)
                                             {
                                                 <span>Completed in @item.MinutesCooking min</span>
                                             }
