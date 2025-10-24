@@ -4,6 +4,14 @@
 }
 
 <div class="container-fluid p-2">
+    <style>
+        /* Ensure dropdown menus inside the responsive table are visible and above other elements */
+        .table-responsive { overflow: visible; }
+        .table-responsive .dropdown-menu { z-index: 2050; }
+        /* Slightly increase button hit area and make icons vertically centered */
+        .btn-xs { padding: .15rem .4rem; font-size: .8rem; }
+        .fw-medium { font-weight: 600; }
+    </style>
     <div class="d-flex justify-content-between align-items-center mb-2">
         <div>
             <h5 class="mb-0 fw-bold">Waitlist Management</h5>
@@ -81,7 +89,7 @@
                                         </td>
                                         <td class="px-2 py-1 text-center">
                                             <div class="dropdown">
-                                                <button class="btn btn-xs btn-outline-secondary dropdown-toggle px-1 py-0" type="button" data-bs-toggle="dropdown">
+                                                <button class="btn btn-xs btn-outline-secondary dropdown-toggle px-1 py-0" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport">
                                                     <i class="bi bi-three-dots"></i>
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end">
