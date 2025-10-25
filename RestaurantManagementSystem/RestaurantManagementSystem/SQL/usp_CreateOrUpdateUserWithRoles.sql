@@ -1,4 +1,4 @@
-CREATE PROCEDURE [purojit2_idmcbp].[usp_CreateOrUpdateUserWithRoles]
+CREATE PROCEDURE [dbo].[usp_CreateOrUpdateUserWithRoles]
     @Id INT = 0,
     @Username NVARCHAR(50),
     @PasswordHash NVARCHAR(255),
@@ -16,13 +16,13 @@ BEGIN
 
     IF @Id = 0
     BEGIN
-        INSERT INTO [purojit2_idmcbp].[Users] (Username, PasswordHash, Salt, FirstName, LastName, Email, Phone, IsActive)
+    INSERT INTO [dbo].[Users] (Username, PasswordHash, Salt, FirstName, LastName, Email, Phone, IsActive)
         VALUES (@Username, @PasswordHash, @Salt, @FirstName, @LastName, @Email, @Phone, @IsActive);
         SET @NewUserId = SCOPE_IDENTITY();
     END
     ELSE
     BEGIN
-        UPDATE [purojit2_idmcbp].[Users]
+    UPDATE [dbo].[Users]
         SET Username = @Username,
             PasswordHash = @PasswordHash,
             Salt = @Salt,
@@ -36,7 +36,7 @@ BEGIN
     END
 
     -- Remove existing role mappings
-    DELETE FROM [purojit2_idmcbp].[UserRoles] WHERE UserId = @NewUserId;
+    DELETE FROM [dbo].[UserRoles] WHERE UserId = @NewUserId;
 
     -- Add new role mappings
     IF @RoleIds IS NOT NULL AND LEN(@RoleIds) > 0
@@ -51,7 +51,7 @@ BEGIN
             INSERT INTO @RoleIdTable (RoleId) VALUES (CAST(@RoleId AS INT));
             SET @Pos = @NextPos;
         END
-        INSERT INTO [purojit2_idmcbp].[UserRoles] (UserId, RoleId)
+    INSERT INTO [dbo].[UserRoles] (UserId, RoleId)
         SELECT @NewUserId, RoleId FROM @RoleIdTable;
     END
 

@@ -34,7 +34,7 @@ namespace RestaurantManagementSystem.Services
                     // Use direct SQL query instead of stored procedure
                     string sql = @"SELECT Id, Name, Description, 
                                   CASE WHEN IsSystemRole IS NULL THEN 0 ELSE IsSystemRole END AS IsSystemRole 
-                                  FROM purojit2_idmcbp.Roles";
+                                  FROM dbo.Roles";
                                   
                     using (var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
                     {
@@ -301,8 +301,8 @@ namespace RestaurantManagementSystem.Services
                     // Use direct SQL query instead of stored procedure
                     string sql = @"
                         SELECT r.Id AS RoleId, r.Name AS RoleName, r.Description AS RoleDescription
-                        FROM purojit2_idmcbp.Roles r
-                        INNER JOIN purojit2_idmcbp.UserRoles ur ON r.Id = ur.RoleId
+                        FROM dbo.Roles r
+                        INNER JOIN dbo.UserRoles ur ON r.Id = ur.RoleId
                         WHERE ur.UserId = @UserId";
                         
                     using (var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
@@ -345,7 +345,7 @@ namespace RestaurantManagementSystem.Services
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"INSERT INTO purojit2_idmcbp.UserRoles (UserId, RoleId) VALUES (@UserId, @RoleId); SELECT 'Role assigned' AS Message;", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"INSERT INTO dbo.UserRoles (UserId, RoleId) VALUES (@UserId, @RoleId); SELECT 'Role assigned' AS Message;", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         
@@ -389,7 +389,7 @@ namespace RestaurantManagementSystem.Services
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"DELETE FROM purojit2_idmcbp.UserRoles WHERE UserId = @UserId AND RoleId = @RoleId; SELECT 'Role removed' AS Message;", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"DELETE FROM dbo.UserRoles WHERE UserId = @UserId AND RoleId = @RoleId; SELECT 'Role removed' AS Message;", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
                         
@@ -443,7 +443,7 @@ namespace RestaurantManagementSystem.Services
                 {
                     await connection.OpenAsync();
                     
-                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"DELETE FROM purojit2_idmcbp.UserRoles WHERE UserId = @UserId", connection))
+                    using (var command = new Microsoft.Data.SqlClient.SqlCommand(@"DELETE FROM dbo.UserRoles WHERE UserId = @UserId", connection))
                     {
                         command.Parameters.AddWithValue("@UserId", userId);
                         await command.ExecuteNonQueryAsync();

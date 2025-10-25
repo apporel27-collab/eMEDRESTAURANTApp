@@ -495,7 +495,7 @@ namespace RestaurantManagementSystem.Services
                     _logger?.LogInformation("Database connection opened successfully");
                     
                     // Try known schemas: prefer the namespaced table used by the UI/stored procedures, then fall back to the default Users table
-                    var tableCandidates = new[] { "purojit2_idmcbp.Users", "Users" };
+                    var tableCandidates = new[] { "dbo.Users", "Users" };
                     foreach (var table in tableCandidates)
                     {
                         try

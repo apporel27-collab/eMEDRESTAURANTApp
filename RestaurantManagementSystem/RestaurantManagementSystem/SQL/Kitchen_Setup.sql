@@ -281,6 +281,19 @@ BEGIN
         Tables t ON tt.TableId = t.Id
     WHERE 
         o.Id = @OrderId;
+
+    -- Ensure we have a non-null OrderNumber. If the Orders row has NULL (migrated DB differences),
+    -- try a direct SELECT with NOLOCK and finally fall back to a generated value based on OrderId.
+    IF @OrderNumber IS NULL OR LTRIM(RTRIM(@OrderNumber)) = ''
+    BEGIN
+        SELECT @OrderNumber = OrderNumber FROM Orders WITH (NOLOCK) WHERE Id = @OrderId;
+    END
+
+    IF @OrderNumber IS NULL OR LTRIM(RTRIM(@OrderNumber)) = ''
+    BEGIN
+        -- Fallback: generate an order number from the OrderId to avoid NULL inserts into KitchenTickets
+        SET @OrderNumber = 'ORD-' + RIGHT('00000' + CAST(@OrderId AS VARCHAR(10)), 5);
+    END
     
     -- Process items by kitchen station
     DECLARE @StationId INT;

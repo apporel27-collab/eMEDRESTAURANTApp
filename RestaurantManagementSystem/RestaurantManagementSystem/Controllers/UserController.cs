@@ -48,11 +48,11 @@ namespace RestaurantManagementSystem.Controllers
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('purojit2_idmcbp.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
+    DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('dbo.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
     
     DECLARE @sql nvarchar(max) = N'SELECT Id, Username, FirstName, LastName, Email, IsActive, ' +
         CASE WHEN @hasPhone=1 THEN N'Phone' ELSE N'CAST(NULL AS NVARCHAR(20)) AS Phone' END +
-        N' FROM purojit2_idmcbp.Users';
+    N' FROM dbo.Users';
     EXEC sp_executesql @sql;
 END";
                     using (var createCmd = new Microsoft.Data.SqlClient.SqlCommand(createSp, con))
@@ -128,11 +128,11 @@ END";
                         AS
                         BEGIN
                             SET NOCOUNT ON;
-                            DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('purojit2_idmcbp.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
+                            DECLARE @hasPhone bit = CASE WHEN COL_LENGTH('dbo.Users','Phone') IS NOT NULL THEN 1 ELSE 0 END;
                             
                             DECLARE @sql nvarchar(max) = N'SELECT Id, Username, FirstName, LastName, Email, IsActive, ' +
                                 CASE WHEN @hasPhone=1 THEN N'Phone' ELSE N'CAST(NULL AS NVARCHAR(20)) AS Phone' END +
-                                N' FROM purojit2_idmcbp.Users WHERE Id = @Id';
+                                N' FROM dbo.Users WHERE Id = @Id';
                             EXEC sp_executesql @sql, N'@Id int', @Id=@Id;
                         END";
                         using (var createCmd = new Microsoft.Data.SqlClient.SqlCommand(createSp, con))
@@ -269,7 +269,7 @@ END";
                         else if (model.Id > 0)
                         {
                             // No new password supplied for edit — preserve current stored hash and salt
-                            using (var pwdCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT PasswordHash, Salt FROM purojit2_idmcbp.Users WHERE Id = @Id", con))
+                            using (var pwdCmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT PasswordHash, Salt FROM dbo.Users WHERE Id = @Id", con))
                             {
                                 pwdCmd.Parameters.AddWithValue("@Id", model.Id);
                                 using (var rdr = pwdCmd.ExecuteReader())
@@ -282,7 +282,7 @@ END";
                                 }
                             }
                         }
-                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("purojit2_idmcbp.usp_CreateOrUpdateUserWithRoles", con))
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("dbo.usp_CreateOrUpdateUserWithRoles", con))
                         {
                             cmd.CommandType = System.Data.CommandType.StoredProcedure;
                             cmd.Parameters.AddWithValue("@Id", model.Id);

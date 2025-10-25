@@ -24,7 +24,7 @@ BEGIN
     LEFT JOIN dbo.MenuItems i ON oi.MenuItemId = i.Id
     LEFT JOIN [dbo].[KitchenStations] s ON i.KitchenStationId = s.Id
     LEFT JOIN Tables t ON o.TableTurnoverId = t.Id
-    Left Join [purojit2_idmcbp].[KitchenTicketItems] kti on kti.OrderItemId=oi.id
+    Left Join [dbo].[KitchenTicketItems] kti on kti.OrderItemId=oi.id
     WHERE kti.StartTime >= @Start AND kti.CompletionTime < @End
     AND (@Station IS NULL OR @Station = '' OR s.Name = @Station)
     ORDER BY kti.StartTime DESC;
