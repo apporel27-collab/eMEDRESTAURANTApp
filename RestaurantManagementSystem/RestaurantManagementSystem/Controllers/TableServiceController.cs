@@ -396,136 +396,180 @@ namespace RestaurantManagementSystem.Controllers
         private List<SelectListItem> GetAvailableTables()
         {
             var tables = new List<SelectListItem>();
-            
-            using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
+            string diagnostics = null;
+
+            try
             {
-                connection.Open();
-                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(@"
-                    SELECT t.Id, t.TableName, t.Capacity, t.Status
-                    FROM Tables t
-                    LEFT JOIN OrderTables ot ON t.Id = ot.TableId
-                    LEFT JOIN Orders o ON ot.OrderId = o.Id AND o.Status IN (0, 1, 2)
-                    WHERE t.Status = 0 AND ot.TableId IS NULL -- Available and not assigned to active order
-                    ORDER BY t.TableName", connection))
+                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
                 {
-                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
+                    connection.Open();
+
+                    // Return currently available tables OR today's reserved tables (Pending/Confirmed)
+                    string sql = @"
+                        SELECT DISTINCT t.Id, t.TableName, t.Capacity, t.Status
+                        FROM Tables t
+                        LEFT JOIN OrderTables ot ON t.Id = ot.TableId
+                        LEFT JOIN Orders o ON ot.OrderId = o.Id AND o.Status IN (0, 1, 2)
+                        WHERE t.Status = 0 AND ot.TableId IS NULL -- Available and not assigned to active order
+
+                        UNION
+
+                        SELECT DISTINCT t2.Id, t2.TableName, t2.Capacity, t2.Status
+                        FROM Tables t2
+                        INNER JOIN Reservations r ON r.TableId = t2.Id
+                        WHERE CAST(r.ReservationTime AS DATE) = CAST(GETDATE() AS DATE)
+                          AND r.Status IN (0, 1) -- Pending or Confirmed
+                          AND t2.IsActive = 1
+
+                        ORDER BY 2";
+
+                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
                     {
-                        while (reader.Read())
+                        using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
                         {
-                            tables.Add(new SelectListItem
+                            int count = 0;
+                            while (reader.Read())
                             {
-                                Value = reader.GetInt32(0).ToString(),
-                                Text = $"{reader.GetString(1)} (Seats {reader.GetInt32(2)})"
-                            });
+                                tables.Add(new SelectListItem
+                                {
+                                    Value = reader.GetInt32(0).ToString(),
+                                    Text = $"{reader.GetString(1)} (Seats {reader.GetInt32(2)})"
+                                });
+                                count++;
+                            }
+                            diagnostics = $"GetAvailableTables returned {count} rows";
                         }
                     }
                 }
             }
-            
+            catch (Exception ex)
+            {
+                diagnostics = (diagnostics == null ? "" : diagnostics + ";") + "Error: " + ex.Message;
+            }
+
+            if (!tables.Any())
+            {
+                tables.Add(new SelectListItem { Value = "", Text = "-- No tables available --" });
+            }
+
+            if (!string.IsNullOrEmpty(diagnostics))
+            {
+                try { TempData["TableLoadDiagnostics"] = diagnostics; } catch { }
+            }
+
             return tables;
         }
         
     private List<SelectListItem> GetAvailableServers()
     {
         var servers = new List<SelectListItem>();
+        string diagnostics = null;
+
         try
         {
             using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
             {
                 connection.Open();
 
-                // Determine role filter based on available schema
                 int serverRoleId = ResolveServerRoleId(connection);
-
                 string selectName = "COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName,'')))), ''), u.Username, u.Email, 'User ' + CAST(u.Id AS NVARCHAR(10))) AS FullName";
 
-                string sql = null;
-                bool hasRole = false, hasRoleId = false, hasUserRoles = false, hasRoles = false;
-                try { hasRole = ColumnExists(connection, "Users", "Role"); } catch { hasRole = false; }
-                try { hasRoleId = ColumnExists(connection, "Users", "RoleId"); } catch { hasRoleId = false; }
-                try { hasUserRoles = TableExists(connection, "UserRoles"); } catch { hasUserRoles = false; }
-                try { hasRoles = TableExists(connection, "Roles"); } catch { hasRoles = false; }
-
-                if (hasRole)
+                // 1) Try Users.Role
+                try
                 {
-                    sql = $@"SELECT u.Id, {selectName}
-                             FROM Users u
-                             WHERE u.IsActive = 1 AND u.Role = @ServerRoleId
-                             ORDER BY 2";
-                }
-                else if (hasRoleId)
-                {
-                    sql = $@"SELECT u.Id, {selectName}
-                             FROM Users u
-                             WHERE u.IsActive = 1 AND u.RoleId = @ServerRoleId
-                             ORDER BY 2";
-                }
-                else if (hasUserRoles && hasRoles)
-                {
-                    sql = $@"SELECT u.Id, {selectName}
-                             FROM Users u
-                             INNER JOIN UserRoles ur ON u.Id = ur.UserId
-                             INNER JOIN Roles r ON ur.RoleId = r.RoleId
-                             WHERE u.IsActive = 1 AND r.RoleId = @ServerRoleId
-                             ORDER BY 2";
-                }
-                else
-                {
-                    // Fallback: no role info available — list all active users
-                    sql = $@"SELECT u.Id, {selectName}
-                             FROM Users u
-                             WHERE u.IsActive = 1
-                             ORDER BY 2";
-                }
-
-                using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
-                {
-                    if (sql.Contains("@ServerRoleId"))
+                    if (ColumnExists(connection, "Users", "Role"))
                     {
-                        command.Parameters.AddWithValue("@ServerRoleId", serverRoleId);
-                    }
-
-                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
+                        string q = $@"SELECT Id, {selectName} FROM Users WHERE IsActive = 1 AND Role = @r ORDER BY 2";
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(q, connection))
                         {
-                            servers.Add(new SelectListItem
+                            cmd.Parameters.AddWithValue("@r", serverRoleId);
+                            using (var rdr = cmd.ExecuteReader())
                             {
-                                Value = reader.GetInt32(0).ToString(),
-                                Text = reader.GetString(1)
-                            });
+                                while (rdr.Read()) servers.Add(new SelectListItem { Value = rdr.GetInt32(0).ToString(), Text = rdr.GetString(1) });
+                            }
+                        }
+                        if (servers.Any()) diagnostics = "Used Users.Role";
+                    }
+                }
+                catch (Exception e1) { diagnostics = (diagnostics ?? "") + ";Users.Role failed: " + e1.Message; }
+
+                // 2) Try Users.RoleId
+                if (!servers.Any())
+                {
+                    try
+                    {
+                        if (ColumnExists(connection, "Users", "RoleId"))
+                        {
+                            string q = $@"SELECT Id, {selectName} FROM Users WHERE IsActive = 1 AND RoleId = @r ORDER BY 2";
+                            using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(q, connection))
+                            {
+                                cmd.Parameters.AddWithValue("@r", serverRoleId);
+                                using (var rdr = cmd.ExecuteReader())
+                                {
+                                    while (rdr.Read()) servers.Add(new SelectListItem { Value = rdr.GetInt32(0).ToString(), Text = rdr.GetString(1) });
+                                }
+                            }
+                            if (servers.Any()) diagnostics = (diagnostics ?? "") + ";Used Users.RoleId";
                         }
                     }
+                    catch (Exception e2) { diagnostics = (diagnostics ?? "") + ";Users.RoleId failed: " + e2.Message; }
+                }
+
+                // 3) Try UserRoles + Roles (detect Roles id column)
+                if (!servers.Any())
+                {
+                    try
+                    {
+                        if (TableExists(connection, "UserRoles") && TableExists(connection, "Roles"))
+                        {
+                            string rolesIdCol = ColumnExists(connection, "Roles", "RoleId") ? "RoleId" : "Id";
+                            string q = $@"SELECT DISTINCT u.Id, {selectName} FROM Users u INNER JOIN UserRoles ur ON u.Id = ur.UserId INNER JOIN Roles r ON ur.RoleId = r.{rolesIdCol} WHERE u.IsActive = 1 AND r.{rolesIdCol} = @r ORDER BY 2";
+                            using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(q, connection))
+                            {
+                                cmd.Parameters.AddWithValue("@r", serverRoleId);
+                                using (var rdr = cmd.ExecuteReader())
+                                {
+                                    while (rdr.Read()) servers.Add(new SelectListItem { Value = rdr.GetInt32(0).ToString(), Text = rdr.GetString(1) });
+                                }
+                            }
+                            if (servers.Any()) diagnostics = (diagnostics ?? "") + ";Used UserRoles+Roles";
+                        }
+                    }
+                    catch (Exception e3) { diagnostics = (diagnostics ?? "") + ";UserRoles+Roles failed: " + e3.Message; }
+                }
+
+                // 4) Simple users list fallback
+                if (!servers.Any())
+                {
+                    try
+                    {
+                        string q = $@"SELECT Id, {selectName} FROM Users WHERE IsActive = 1 ORDER BY 2";
+                        using (var cmd = new Microsoft.Data.SqlClient.SqlCommand(q, connection))
+                        using (var rdr = cmd.ExecuteReader())
+                        {
+                            while (rdr.Read()) servers.Add(new SelectListItem { Value = rdr.GetInt32(0).ToString(), Text = rdr.GetString(1) });
+                        }
+                        if (servers.Any()) diagnostics = (diagnostics ?? "") + ";Used simple Users list";
+                    }
+                    catch (Exception e4) { diagnostics = (diagnostics ?? "") + ";Simple users query failed: " + e4.Message; }
                 }
             }
         }
         catch (Exception ex)
         {
-            // If any error occurs (e.g., invalid column), fallback to all active users
-            servers.Clear();
-            try
-            {
-                using (Microsoft.Data.SqlClient.SqlConnection connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString))
-                {
-                    connection.Open();
-                    string selectName = "COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName,'')))), ''), u.Username, u.Email, 'User ' + CAST(u.Id AS NVARCHAR(10))) AS FullName";
-                    string sql = $@"SELECT u.Id, {selectName} FROM Users u WHERE u.IsActive = 1 ORDER BY 2";
-                    using (Microsoft.Data.SqlClient.SqlCommand command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection))
-                    using (Microsoft.Data.SqlClient.SqlDataReader reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            servers.Add(new SelectListItem
-                            {
-                                Value = reader.GetInt32(0).ToString(),
-                                Text = reader.GetString(1)
-                            });
-                        }
-                    }
-                }
-            }
-            catch { /* swallow all errors, return empty list if all else fails */ }
+            diagnostics = (diagnostics ?? "") + ";Outer exception: " + ex.Message;
         }
+
+        if (!servers.Any())
+        {
+            servers.Add(new SelectListItem { Value = "", Text = "-- No servers available --" });
+        }
+
+        if (!string.IsNullOrEmpty(diagnostics))
+        {
+            try { TempData["ServerLoadDiagnostics"] = diagnostics; } catch { }
+        }
+
         return servers;
     }
 
